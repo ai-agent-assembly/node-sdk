@@ -3,7 +3,11 @@
 // convention (consistent with the existing `sendEvent(handle, eventJSON)`
 // path used by `native/aa-ffi-node`) — see AAASM-1450 for context.
 
-import type { CallStackNode, CallStackNodeKind } from "../types/audit.js";
+import type {
+  AuditEvent,
+  CallStackNode,
+  CallStackNodeKind,
+} from "../types/audit.js";
 
 /**
  * Wire-form shape of a {@link CallStackNode}. Keys are snake_case to
@@ -20,6 +24,24 @@ export interface WireCallStackNode {
   label: string;
   latency_ms?: number;
   children?: WireCallStackNode[];
+}
+
+/**
+ * Wire-form shape of an {@link AuditEvent}. Keys are snake_case to
+ * match the gateway's JSON convention; optional fields are omitted
+ * when undefined (rather than emitted as `null` or empty string), so a
+ * decoded round-trip yields the original `undefined`.
+ */
+export interface WireAuditEvent {
+  event_id: string;
+  agent_id: string;
+  action_type: string;
+  decision: string;
+  trace_id?: string;
+  span_id?: string;
+  parent_span_id?: string;
+  labels?: Record<string, string>;
+  call_stack?: WireCallStackNode[];
 }
 
 /**
@@ -42,4 +64,40 @@ export function encodeCallStackNode(node: CallStackNode): WireCallStackNode {
     wire.children = node.children.map(encodeCallStackNode);
   }
   return wire;
+}
+
+/**
+ * Serialize an {@link AuditEvent} to its JSON wire string.
+ *
+ * Translates the camelCase interface field names into the gateway's
+ * snake_case keys (`eventId` → `event_id`, `callStack` → `call_stack`,
+ * etc.), recursively encoding the call-stack tree via
+ * {@link encodeCallStackNode}. Optional fields whose value is
+ * `undefined`, an empty string, or an empty array are omitted so a
+ * legacy decoder that has never seen those fields reads the payload
+ * unchanged.
+ */
+export function encodeAuditEvent(event: AuditEvent): string {
+  const wire: WireAuditEvent = {
+    event_id: event.eventId,
+    agent_id: event.agentId,
+    action_type: event.actionType,
+    decision: event.decision,
+  };
+  if (event.traceId !== undefined && event.traceId !== "") {
+    wire.trace_id = event.traceId;
+  }
+  if (event.spanId !== undefined && event.spanId !== "") {
+    wire.span_id = event.spanId;
+  }
+  if (event.parentSpanId !== undefined && event.parentSpanId !== "") {
+    wire.parent_span_id = event.parentSpanId;
+  }
+  if (event.labels !== undefined && Object.keys(event.labels).length > 0) {
+    wire.labels = event.labels;
+  }
+  if (event.callStack !== undefined && event.callStack.length > 0) {
+    wire.call_stack = event.callStack.map(encodeCallStackNode);
+  }
+  return JSON.stringify(wire);
 }
