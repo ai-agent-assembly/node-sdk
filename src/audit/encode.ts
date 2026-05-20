@@ -101,3 +101,46 @@ export function encodeAuditEvent(event: AuditEvent): string {
   }
   return JSON.stringify(wire);
 }
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError("expected JSON object on the wire");
+  }
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Translate a wire JSON object back into a {@link CallStackNode}.
+ *
+ * Symmetric inverse of {@link encodeCallStackNode}: walks `children`
+ * recursively, restores `latencyMs` from `latency_ms`, and treats a
+ * missing or empty `children` field as `undefined` on the interface
+ * side (matches AAASM-1436's default).
+ */
+export function decodeCallStackNode(payload: unknown): CallStackNode {
+  const wire = asRecord(payload);
+  const id = wire.id;
+  const kindRaw = wire.kind;
+  const label = wire.label;
+  if (typeof id !== "string") {
+    throw new TypeError("CallStackNode.id missing or not a string");
+  }
+  if (typeof kindRaw !== "string") {
+    throw new TypeError("CallStackNode.kind missing or not a string");
+  }
+  if (typeof label !== "string") {
+    throw new TypeError("CallStackNode.label missing or not a string");
+  }
+  const node: CallStackNode = {
+    id,
+    kind: kindRaw as CallStackNodeKind,
+    label,
+  };
+  if (typeof wire.latency_ms === "number") {
+    node.latencyMs = wire.latency_ms;
+  }
+  if (Array.isArray(wire.children) && wire.children.length > 0) {
+    node.children = wire.children.map(decodeCallStackNode);
+  }
+  return node;
+}
