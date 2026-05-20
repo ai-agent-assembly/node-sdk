@@ -38,4 +38,23 @@ describe("AuditEvent wire round-trip", () => {
 
     expect(decoded).toEqual(original);
   });
+
+  it("decodes a legacy payload that has no call_stack into callStack === undefined", () => {
+    const legacy = JSON.stringify({
+      event_id: "evt-legacy",
+      agent_id: "old-agent",
+      action_type: "llm_call",
+      decision: "allow",
+    });
+
+    const decoded = decodeAuditEvent(legacy);
+
+    expect(decoded.callStack).toBeUndefined();
+    expect(decoded).toEqual({
+      eventId: "evt-legacy",
+      agentId: "old-agent",
+      actionType: "llm_call",
+      decision: "allow",
+    });
+  });
 });
