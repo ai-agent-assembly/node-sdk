@@ -144,3 +144,82 @@ export function decodeCallStackNode(payload: unknown): CallStackNode {
   }
   return node;
 }
+
+function asNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asStringMap(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const entries = Object.entries(value).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string"
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+/**
+ * Deserialize a JSON wire payload into a typed {@link AuditEvent}.
+ *
+ * Accepts either the raw JSON string (the gateway's standard
+ * transport) or an already-parsed object (handy for tests and for
+ * callers that received a JSON object via another path). Symmetric
+ * inverse of {@link encodeAuditEvent}: snake_case keys map back to
+ * camelCase fields, and missing / empty optionals decode to
+ * `undefined` so an `AuditEvent` produced from a legacy payload (no
+ * `call_stack`, empty `trace_id`, …) matches what AAASM-1436's
+ * existing consumer-side tests expect.
+ */
+export function decodeAuditEvent(
+  payload: string | Record<string, unknown>
+): AuditEvent {
+  const wire =
+    typeof payload === "string"
+      ? asRecord(JSON.parse(payload))
+      : asRecord(payload);
+
+  const eventId = wire.event_id;
+  const agentId = wire.agent_id;
+  const actionType = wire.action_type;
+  const decision = wire.decision;
+  if (typeof eventId !== "string") {
+    throw new TypeError("AuditEvent.event_id missing or not a string");
+  }
+  if (typeof agentId !== "string") {
+    throw new TypeError("AuditEvent.agent_id missing or not a string");
+  }
+  if (typeof actionType !== "string") {
+    throw new TypeError("AuditEvent.action_type missing or not a string");
+  }
+  if (typeof decision !== "string") {
+    throw new TypeError("AuditEvent.decision missing or not a string");
+  }
+
+  const event: AuditEvent = {
+    eventId,
+    agentId,
+    actionType,
+    decision,
+  };
+  const traceId = asNonEmptyString(wire.trace_id);
+  if (traceId !== undefined) {
+    event.traceId = traceId;
+  }
+  const spanId = asNonEmptyString(wire.span_id);
+  if (spanId !== undefined) {
+    event.spanId = spanId;
+  }
+  const parentSpanId = asNonEmptyString(wire.parent_span_id);
+  if (parentSpanId !== undefined) {
+    event.parentSpanId = parentSpanId;
+  }
+  const labels = asStringMap(wire.labels);
+  if (labels !== undefined) {
+    event.labels = labels;
+  }
+  if (Array.isArray(wire.call_stack) && wire.call_stack.length > 0) {
+    event.callStack = wire.call_stack.map(decodeCallStackNode);
+  }
+  return event;
+}
