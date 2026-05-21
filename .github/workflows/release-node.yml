@@ -1,0 +1,167 @@
+name: release-node
+
+# Triggered on every `v*.*.*` tag pushed to this repo. Stages the
+# per-platform `aasm` binaries from agent-assembly's matching GitHub
+# Release, bumps the version across the 5 packages in this workspace
+# (1 SDK + 4 runtime sub-packages), then publishes them to npm in the
+# correct order so the main `@agent-assembly/sdk`'s optionalDependencies
+# resolve to existing npm versions.
+#
+# `workflow_dispatch` lets an operator re-run the publish for an
+# already-pushed tag (e.g. after fixing a partial-publish failure)
+# without having to re-cut the tag.
+#
+# Issue: AAASM-1222 (sub-task of AAASM-1203 / F113)
+# Companion: AAASM-1200 (the agent-assembly release workflow that
+#            produces the aasm-{rust-target}.tar.gz assets consumed here)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "agent-assembly release tag to consume (e.g. v0.0.1). Required for manual dispatch."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write  # npm OIDC Trusted Publishing + SLSA provenance
+
+jobs:
+  publish:
+    name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4.2.2
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda  # v4.1.0
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a  # v4.2.0
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Resolve release tag
+        id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ inputs.release_tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="$DISPATCH_TAG"
+          else
+            tag="$REF_NAME"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::tag '$tag' does not match v*.*.* (semver) pattern"
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=${tag} version=${tag#v}"
+
+      - name: Download aasm binaries from agent-assembly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p bin-staging
+          gh release download "$RELEASE_TAG" \
+            --repo AI-agent-assembly/agent-assembly \
+            --pattern "aasm-*.tar.gz" \
+            --dir bin-staging
+          ls -la bin-staging/
+
+      - name: Stage runtime binaries into runtime-* sub-packages
+        run: |
+          set -euo pipefail
+          # Map Rust target triples to the matching node-sdk runtime
+          # sub-package (per AAASM-1220's package layout).
+          declare -A MAP=(
+            ["x86_64-unknown-linux-gnu"]="runtime-linux-x64"
+            ["aarch64-unknown-linux-gnu"]="runtime-linux-arm64"
+            ["x86_64-apple-darwin"]="runtime-darwin-x64"
+            ["aarch64-apple-darwin"]="runtime-darwin-arm64"
+          )
+          for target in "${!MAP[@]}"; do
+            pkg="${MAP[$target]}"
+            archive="bin-staging/aasm-${target}.tar.gz"
+            if [[ ! -f "$archive" ]]; then
+              echo "::error::missing release asset $archive"
+              exit 1
+            fi
+            tar -xzf "$archive" -C "packages/${pkg}/bin/"
+            chmod +x "packages/${pkg}/bin/aasm"
+            echo "staged ${pkg}/bin/aasm <- ${target}"
+          done
+          # Strip the AAASM-1220 .gitkeep placeholders so they don't end
+          # up in the published tarball alongside the real binary.
+          rm -f packages/*/bin/.gitkeep
+
+      - name: Bump versions across the 5 packages
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.VERSION;
+          const files = [
+            "package.json",
+            "packages/runtime-linux-x64/package.json",
+            "packages/runtime-linux-arm64/package.json",
+            "packages/runtime-darwin-x64/package.json",
+            "packages/runtime-darwin-arm64/package.json",
+          ];
+          for (const file of files) {
+            const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+            pkg.version = version;
+            if (pkg.optionalDependencies) {
+              for (const dep of Object.keys(pkg.optionalDependencies)) {
+                if (dep.startsWith("@agent-assembly/runtime-")) {
+                  pkg.optionalDependencies[dep] = version;
+                }
+              }
+            }
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+            console.log(`bumped ${file} -> ${version}`);
+          }
+          NODE
+
+      - name: Build main SDK (ESM + CJS)
+        run: pnpm build
+
+      # Publish the 4 runtime sub-packages first. The main SDK's
+      # optionalDependencies (declared under AAASM-1221) point at the
+      # `@agent-assembly/runtime-*` versions we're publishing here;
+      # publishing them out of order would mean the main SDK install
+      # phase produces "no matching version" warnings during the brief
+      # window before all sub-packages land on the registry.
+      - name: Publish 4 runtime sub-packages
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          for pkg in runtime-linux-x64 runtime-linux-arm64 runtime-darwin-x64 runtime-darwin-arm64; do
+            echo "::group::publish @agent-assembly/${pkg}"
+            pnpm publish --access public --no-git-checks "packages/${pkg}"
+            echo "::endgroup::"
+          done
+
+      - name: Publish main @agent-assembly/sdk
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish --access public --no-git-checks
