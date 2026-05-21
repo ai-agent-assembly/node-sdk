@@ -10,11 +10,11 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, openSync } from "node:fs";
+import { createRequire } from "node:module";
 import { createConnection } from "node:net";
 import { arch, homedir, platform } from "node:os";
-import { delimiter as PATH_DELIM, dirname, join, resolve } from "node:path";
+import { delimiter as PATH_DELIM, dirname, join } from "node:path";
 import { cwd, env } from "node:process";
-import { fileURLToPath } from "node:url";
 
 export const BINARY_NAME = "aasm";
 export const DEFAULT_PORT = 7878;
@@ -36,21 +36,22 @@ export const INSTALL_HINT: string = [
 
 /**
  * Path to the platform-specific `aasm` binary bundled as an optional npm
- * dependency. Resolved relative to this module so it works both in `src/`
- * (during tests) and `dist/esm/` (after build).
+ * dependency, or `null` when the consumer hasn't installed that platform's
+ * `@agent-assembly/runtime-{platform}-{arch}` sub-package.
+ *
+ * Uses `createRequire(<cwd>/package.json)` — the same pattern used by
+ * `src/native/client.ts` and the framework-detection modules — so this
+ * module compiles cleanly under both the ESM and CJS build targets
+ * (`import.meta.url` is ESM-only and breaks `tsconfig.cjs.json`).
  */
-function bundledRuntimeBinaryPath(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  // src/runtime.ts → ../node_modules/...
-  // dist/esm/runtime.js → ../../node_modules/...
-  const candidates = [
-    resolve(here, "..", "node_modules", "@agent-assembly", RUNTIME_SUBPACKAGE, "bin", BINARY_NAME),
-    resolve(here, "..", "..", "node_modules", "@agent-assembly", RUNTIME_SUBPACKAGE, "bin", BINARY_NAME),
-  ];
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+function bundledRuntimeBinaryPath(): string | null {
+  try {
+    const requireFromCwd = createRequire(`${cwd()}/package.json`);
+    const pkgJson = requireFromCwd.resolve(`@agent-assembly/${RUNTIME_SUBPACKAGE}/package.json`);
+    return join(dirname(pkgJson), "bin", BINARY_NAME);
+  } catch {
+    return null;
   }
-  return candidates[0]!;
 }
 
 /**
@@ -70,7 +71,7 @@ export function findAasmBinary(): string | null {
   const userLocal = join(USER_LOCAL_BIN, BINARY_NAME);
   if (existsSync(userLocal)) return userLocal;
   const bundled = bundledRuntimeBinaryPath();
-  if (existsSync(bundled)) return bundled;
+  if (bundled !== null && existsSync(bundled)) return bundled;
   const docker = join(DOCKER_BASE_BIN, BINARY_NAME);
   if (existsSync(docker)) return docker;
   return null;
