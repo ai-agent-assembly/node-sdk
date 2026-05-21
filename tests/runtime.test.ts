@@ -28,3 +28,22 @@ function makeBundledRuntimePackage(root: string): string {
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "test-bundled-runtime" }));
   return makeFakeAasm(join(pkgDir, "bin"));
 }
+
+describe("runtime — F115 lifecycle", () => {
+  it("findAasmBinary returns the resolved path when binary is on $PATH", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "aasm-path-"));
+    const originalPath = process.env.PATH;
+    const originalHome = process.env.HOME;
+    try {
+      const fake = makeFakeAasm(tmp);
+      process.env.PATH = tmp;
+      process.env.HOME = "/var/empty-aasm-no-home";
+
+      expect(findAasmBinary()).toBe(fake);
+    } finally {
+      process.env.PATH = originalPath;
+      process.env.HOME = originalHome;
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
