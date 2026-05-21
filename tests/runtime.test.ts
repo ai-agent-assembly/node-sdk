@@ -46,4 +46,24 @@ describe("runtime — F115 lifecycle", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  it("findAasmBinary returns the bundled-runtime path when the npm optional sub-package is installed", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "aasm-bundled-"));
+    const originalCwd = process.cwd();
+    const originalPath = process.env.PATH;
+    const originalHome = process.env.HOME;
+    try {
+      const fake = makeBundledRuntimePackage(tmp);
+      process.chdir(tmp);
+      process.env.PATH = join(tmp, "no-such-path");
+      process.env.HOME = join(tmp, "no-such-home");
+
+      expect(findAasmBinary()).toBe(fake);
+    } finally {
+      process.chdir(originalCwd);
+      process.env.PATH = originalPath;
+      process.env.HOME = originalHome;
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
