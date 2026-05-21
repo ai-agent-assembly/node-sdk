@@ -73,7 +73,11 @@
     "@agent-assembly/linux-x64-gnu": "0.0.0",
     "@agent-assembly/darwin-x64": "0.0.0",
     "@agent-assembly/darwin-arm64": "0.0.0",
-    "@agent-assembly/win32-x64-msvc": "0.0.0"
+    "@agent-assembly/win32-x64-msvc": "0.0.0",
+    "@agent-assembly/runtime-linux-x64": "0.0.0",
+    "@agent-assembly/runtime-linux-arm64": "0.0.0",
+    "@agent-assembly/runtime-darwin-x64": "0.0.0",
+    "@agent-assembly/runtime-darwin-arm64": "0.0.0"
   },
   "files": [
     "dist/",

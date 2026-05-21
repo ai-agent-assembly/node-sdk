@@ -37,7 +37,14 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Install website dependencies
-        run: pnpm install --no-frozen-lockfile
+        # `--ignore-workspace` tells pnpm to skip the parent
+        # `pnpm-workspace.yaml` (added under AAASM-1220) when installing
+        # in `website/`. Without this flag, pnpm 10 inherits the parent
+        # workspace context, sees website/ isn't a listed workspace
+        # member, and produces no website/node_modules — so the
+        # follow-up `pnpm build` then fails with `docusaurus: not found`.
+        # See AAASM-1221 / PR #43 CI diagnosis.
+        run: pnpm install --no-frozen-lockfile --ignore-workspace
         working-directory: website
 
       - name: Build Docusaurus site
