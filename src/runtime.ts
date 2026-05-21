@@ -8,8 +8,11 @@
  * flow with `import { initAssembly } from "@agent-assembly/sdk/runtime"`.
  */
 
+import { existsSync } from "node:fs";
 import { arch, homedir, platform } from "node:os";
-import { join } from "node:path";
+import { delimiter as PATH_DELIM, dirname, join, resolve } from "node:path";
+import { env } from "node:process";
+import { fileURLToPath } from "node:url";
 
 export const BINARY_NAME = "aasm";
 export const DEFAULT_PORT = 7878;
@@ -28,3 +31,45 @@ export const INSTALL_HINT: string = [
   "  Or manually:  brew install agent-assembly/tap/aasm",
   "               curl -fsSL https://get.agent-assembly.io | sh",
 ].join("\n");
+
+/**
+ * Path to the platform-specific `aasm` binary bundled as an optional npm
+ * dependency. Resolved relative to this module so it works both in `src/`
+ * (during tests) and `dist/esm/` (after build).
+ */
+function bundledRuntimeBinaryPath(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  // src/runtime.ts → ../node_modules/...
+  // dist/esm/runtime.js → ../../node_modules/...
+  const candidates = [
+    resolve(here, "..", "node_modules", "@agent-assembly", RUNTIME_SUBPACKAGE, "bin", BINARY_NAME),
+    resolve(here, "..", "..", "node_modules", "@agent-assembly", RUNTIME_SUBPACKAGE, "bin", BINARY_NAME),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return candidates[0]!;
+}
+
+/**
+ * Locate the `aasm` binary across the 4 supported install paths.
+ *
+ * Search order: `$PATH` (Homebrew, cargo install) → `~/.local/bin/aasm`
+ * (curl installer) → `node_modules/@agent-assembly/runtime-{platform}-{arch}/bin/aasm`
+ * (npm optionalDependency) → `/usr/local/bin/aasm` (Docker base image).
+ * Returns the first existing match, or `null` when none exist.
+ */
+export function findAasmBinary(): string | null {
+  for (const dir of (env.PATH ?? "").split(PATH_DELIM)) {
+    if (!dir) continue;
+    const candidate = join(dir, BINARY_NAME);
+    if (existsSync(candidate)) return candidate;
+  }
+  const userLocal = join(USER_LOCAL_BIN, BINARY_NAME);
+  if (existsSync(userLocal)) return userLocal;
+  const bundled = bundledRuntimeBinaryPath();
+  if (existsSync(bundled)) return bundled;
+  const docker = join(DOCKER_BASE_BIN, BINARY_NAME);
+  if (existsSync(docker)) return docker;
+  return null;
+}
