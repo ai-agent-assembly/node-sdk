@@ -120,3 +120,30 @@ export function startRuntime(
   child.unref();
   return child;
 }
+
+/**
+ * Ensure the local `aasm` sidecar is running, starting it if necessary.
+ *
+ * Lifecycle per F115 / AAASM-1205:
+ *  1. Probe `host:port` via {@link isRunning}; return early if already up.
+ *  2. Resolve the binary via {@link findAasmBinary}.
+ *  3. Spawn the sidecar via {@link startRuntime}.
+ *
+ * `agentId` is accepted to keep the ticket-specified signature stable;
+ * actual register-and-connect is performed by the existing gateway-aware
+ * `@agent-assembly/sdk` `initAssembly` once the sidecar is reachable.
+ *
+ * Throws `Error` with {@link INSTALL_HINT} when no binary is found.
+ */
+export async function initAssembly(
+  agentId?: string,
+  port: number = DEFAULT_PORT,
+): Promise<void> {
+  void agentId; // not consumed at the lifecycle layer; see jsdoc
+  if (await isRunning(port)) return;
+  const binary = findAasmBinary();
+  if (binary === null) {
+    throw new Error(INSTALL_HINT);
+  }
+  startRuntime(binary, port);
+}
