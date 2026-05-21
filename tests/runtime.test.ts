@@ -68,4 +68,26 @@ describe("runtime — F115 lifecycle", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  it("initAssembly throws Error with INSTALL_HINT when binary not found", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "aasm-missing-"));
+    const originalCwd = process.cwd();
+    const originalPath = process.env.PATH;
+    const originalHome = process.env.HOME;
+    try {
+      // Empty cwd (no node_modules), empty PATH/HOME → every search path misses.
+      writeFileSync(join(tmp, "package.json"), JSON.stringify({ name: "test-missing" }));
+      process.chdir(tmp);
+      process.env.PATH = join(tmp, "no-such-path");
+      process.env.HOME = join(tmp, "no-such-home");
+
+      await expect(initAssembly()).rejects.toThrowError(INSTALL_HINT);
+      await expect(initAssembly()).rejects.toThrowError(/agent-assembly runtime not found/);
+    } finally {
+      process.chdir(originalCwd);
+      process.env.PATH = originalPath;
+      process.env.HOME = originalHome;
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
