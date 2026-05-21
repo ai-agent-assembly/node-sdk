@@ -1,0 +1,9 @@
+# pnpm workspace — declares the root @agent-assembly/sdk package plus the
+# per-platform @agent-assembly/runtime-* runtime binary sub-packages added
+# under AAASM-1203 / AAASM-1220. The runtime sub-packages each ship a single
+# `aasm` binary built for a specific (os, cpu) pair; pnpm/npm install only
+# the sub-package matching the host platform via os/cpu constraints in their
+# individual package.json files.
+packages:
+  - "."
+  - "packages/*"

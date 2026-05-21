@@ -1,0 +1,19 @@
+{
+  "name": "@agent-assembly/runtime-linux-arm64",
+  "version": "0.0.0",
+  "description": "AAASM aasm runtime binary for Linux ARM64",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AI-agent-assembly/node-sdk.git",
+    "directory": "packages/runtime-linux-arm64"
+  },
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "bin": {
+    "aasm": "./bin/aasm"
+  },
+  "files": [
+    "bin/"
+  ]
+}
