@@ -9,6 +9,7 @@
  */
 
 import { existsSync } from "node:fs";
+import { createConnection } from "node:net";
 import { arch, homedir, platform } from "node:os";
 import { delimiter as PATH_DELIM, dirname, join, resolve } from "node:path";
 import { env } from "node:process";
@@ -72,4 +73,26 @@ export function findAasmBinary(): string | null {
   const docker = join(DOCKER_BASE_BIN, BINARY_NAME);
   if (existsSync(docker)) return docker;
   return null;
+}
+
+/**
+ * Resolve to `true` iff a local TCP listener accepts a connect on
+ * `host:port` within 100 ms. Any socket error (refused, timeout,
+ * unreachable) resolves to `false` and is treated as no sidecar.
+ */
+export function isRunning(
+  port: number = DEFAULT_PORT,
+  host: string = DEFAULT_RUNTIME_HOST,
+): Promise<boolean> {
+  return new Promise((resolveResult) => {
+    const socket = createConnection({ port, host, timeout: 100 });
+    const settle = (value: boolean): void => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolveResult(value);
+    };
+    socket.once("connect", () => settle(true));
+    socket.once("timeout", () => settle(false));
+    socket.once("error", () => settle(false));
+  });
 }
