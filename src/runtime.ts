@@ -8,11 +8,12 @@
  * flow with `import { initAssembly } from "@agent-assembly/sdk/runtime"`.
  */
 
-import { existsSync } from "node:fs";
+import { type ChildProcess, spawn } from "node:child_process";
+import { existsSync, openSync } from "node:fs";
 import { createConnection } from "node:net";
 import { arch, homedir, platform } from "node:os";
 import { delimiter as PATH_DELIM, dirname, join, resolve } from "node:path";
-import { env } from "node:process";
+import { cwd, env } from "node:process";
 import { fileURLToPath } from "node:url";
 
 export const BINARY_NAME = "aasm";
@@ -95,4 +96,27 @@ export function isRunning(
     socket.once("timeout", () => settle(false));
     socket.once("error", () => settle(false));
   });
+}
+
+/**
+ * Spawn `aasm serve --port <port>` as a detached background subprocess.
+ *
+ * Stdout/stderr are appended to `<logDir>/.aasm-runtime.log` (default
+ * `process.cwd()`) so the sidecar outlives the parent. `detached: true`
+ * + `child.unref()` releases the event loop so the Node process can
+ * exit independently of the sidecar.
+ */
+export function startRuntime(
+  binaryPath: string,
+  port: number = DEFAULT_PORT,
+  logDir: string = cwd(),
+): ChildProcess {
+  const logPath = join(logDir, RUNTIME_LOG_FILENAME);
+  const fd = openSync(logPath, "a");
+  const child = spawn(binaryPath, ["serve", "--port", String(port)], {
+    detached: true,
+    stdio: ["ignore", fd, fd],
+  });
+  child.unref();
+  return child;
 }
