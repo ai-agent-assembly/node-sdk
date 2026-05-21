@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# Placeholder shipped under AAASM-1220 — replaced at publish time by
+# the platform-specific `aasm` binary built by the AAASM-1222 release
+# workflow. Reaching this script in production means the publish step
+# was skipped or the wrong sub-package was unpacked; either way the
+# install needs re-running with `npm install -g @agent-assembly/sdk`.
+echo "@agent-assembly/runtime-darwin-arm64: aasm binary placeholder — see AAASM-1222" >&2
+exit 1
