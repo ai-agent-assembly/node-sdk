@@ -21,3 +21,9 @@ export type {
   WireCallStackNode,
 } from "./audit/index.js";
 export { currentAgentId, runWithAgentId } from "./lineage/index.js";
+// Runtime binary resolution helpers (F113 / AAASM-1221). Re-export the
+// discovery + error-message surfaces from src/runtime.ts; the lifecycle
+// `initAssembly` from runtime.ts intentionally stays scoped to the
+// `@agent-assembly/sdk/runtime` subpath export to avoid colliding with
+// the gateway-based `initAssembly` re-exported above.
+export { INSTALL_HINT, findAasmBinary } from "./runtime.js";
