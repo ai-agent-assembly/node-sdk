@@ -90,4 +90,34 @@ describe("runtime — F115 lifecycle", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  it("initAssembly is idempotent when a sidecar is already running on the target port", async () => {
+    // Bind an ephemeral port and pass it explicitly; this avoids a fixed-port
+    // collision with whatever might be on 7878 on the host machine.
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "string" || address === null) {
+      throw new Error("expected AddressInfo from createServer().address()");
+    }
+    const port = address.port;
+
+    const originalPath = process.env.PATH;
+    const originalHome = process.env.HOME;
+    try {
+      // Pre-load every search path with a guaranteed miss; the orchestrator
+      // should still succeed because is_running short-circuits ahead of
+      // findAasmBinary.
+      process.env.PATH = "/var/empty-aasm-no-path";
+      process.env.HOME = "/var/empty-aasm-no-home";
+
+      await expect(initAssembly(undefined, port)).resolves.toBeUndefined();
+    } finally {
+      process.env.PATH = originalPath;
+      process.env.HOME = originalHome;
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve()))
+      );
+    }
+  });
 });
