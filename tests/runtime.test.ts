@@ -6,7 +6,7 @@
 //   - binary-not-found
 //   - already-running (initAssembly skips spawn when sidecar reachable)
 
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { arch, platform, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,7 +58,9 @@ describe("runtime — F115 lifecycle", () => {
       process.env.PATH = join(tmp, "no-such-path");
       process.env.HOME = join(tmp, "no-such-home");
 
-      expect(findAasmBinary()).toBe(fake);
+      // createRequire.resolve canonicalises symlinks (on macOS, /var/folders
+      // → /private/var/folders); compare against the realpath form.
+      expect(findAasmBinary()).toBe(realpathSync(fake));
     } finally {
       process.chdir(originalCwd);
       process.env.PATH = originalPath;
