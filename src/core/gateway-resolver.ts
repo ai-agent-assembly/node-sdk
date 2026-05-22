@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 
+import { ConfigurationError, GatewayError } from "../errors/index.js";
+
 /**
  * Resolve the gateway URL and API key for ``initAssembly``.
  *
@@ -151,4 +153,37 @@ const _seams = {
 };
 
 export const __testing = { _seams };
+
+/**
+ * Spawn ``aasm start --mode local --foreground`` and wait until ``/healthz``
+ * responds.
+ *
+ * Throws ``ConfigurationError`` when the ``aasm`` binary is missing from
+ * PATH — the SDK cannot meaningfully auto-start without it. Throws
+ * ``GatewayError`` when the spawned gateway does not become ready within
+ * ``timeoutMs``. The subprocess is launched detached + stdio:"ignore" so
+ * it survives the parent Node process — the docker-style daemon hand-off
+ * described in Epic 17 S-G.
+ */
+export async function autoStartGateway(
+  baseUrl: string = DEFAULT_GATEWAY_URL,
+  timeoutMs: number = DEFAULT_AUTO_START_TIMEOUT_MS
+): Promise<void> {
+  const aasmPath = _seams.findAasmOnPath();
+  if (aasmPath === null) {
+    throw new ConfigurationError(
+      `No gateway found at ${baseUrl} and 'aasm' is not on PATH. ` +
+        "Install it with: npm install -g @agent-assembly/cli (or pnpm add -g)"
+    );
+  }
+
+  _seams.spawnAasm(aasmPath);
+
+  if (!(await waitForHealthz(baseUrl, timeoutMs))) {
+    throw new GatewayError(
+      `Auto-started gateway at ${baseUrl} did not become ready ` +
+        `within ${(timeoutMs / 1000).toFixed(0)} seconds`
+    );
+  }
+}
 
