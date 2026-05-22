@@ -150,6 +150,9 @@ function defaultSpawnAasm(aasmPath: string): void {
 const _seams = {
   findAasmOnPath: defaultFindAasmOnPath,
   spawnAasm: defaultSpawnAasm,
+  probeHealthz: probeHealthz,
+  loadConfigFile: loadConfigFile,
+  autoStartGateway: autoStartGateway,
 };
 
 export const __testing = { _seams };
@@ -185,5 +188,34 @@ export async function autoStartGateway(
         `within ${(timeoutMs / 1000).toFixed(0)} seconds`
     );
   }
+}
+
+/**
+ * Resolve the gateway URL using the 4-step precedence chain.
+ *
+ * Returns the resolved URL. May spawn a local ``aasm`` subprocess
+ * (step 4 only). Propagates ``ConfigurationError`` / ``GatewayError``
+ * from ``autoStartGateway`` when the local default is needed but
+ * cannot be brought up.
+ */
+export async function resolveGatewayUrl(explicit?: string): Promise<string> {
+  if (explicit) return explicit;
+
+  const fromEnv = process.env[ENV_GATEWAY_URL];
+  if (fromEnv) return fromEnv;
+
+  const config = await _seams.loadConfigFile();
+  const agent = config["agent"];
+  if (agent !== null && typeof agent === "object") {
+    const url = (agent as Record<string, unknown>)["gateway_url"];
+    if (typeof url === "string" && url.length > 0) return url;
+  }
+
+  if (await _seams.probeHealthz(DEFAULT_GATEWAY_URL)) {
+    return DEFAULT_GATEWAY_URL;
+  }
+
+  await _seams.autoStartGateway(DEFAULT_GATEWAY_URL);
+  return DEFAULT_GATEWAY_URL;
 }
 
