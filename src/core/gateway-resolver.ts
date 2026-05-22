@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve as resolvePath } from "node:path";
+
 /**
  * Resolve the gateway URL and API key for ``initAssembly``.
  *
@@ -71,5 +75,45 @@ export async function waitForHealthz(
     await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
   }
   return probeHealthz(baseUrl);
+}
+
+function expandHome(p: string): string {
+  return p.startsWith("~") ? resolvePath(homedir(), p.slice(p.startsWith("~/") ? 2 : 1)) : p;
+}
+
+/**
+ * Load ``~/.aasm/config.yaml`` if present.
+ *
+ * Returns an empty record when the file is missing, when ``js-yaml`` is
+ * not installed (it is a soft dependency for SDK consumers), or when
+ * the file's contents are not an object. This keeps the resolver chain
+ * purely advisory at step 3 — never throws.
+ */
+export async function loadConfigFile(
+  configPath: string = DEFAULT_CONFIG_FILE_PATH
+): Promise<Record<string, unknown>> {
+  // Indirect specifier defeats static module resolution so missing js-yaml
+  // surfaces at runtime (caught below) rather than as a TS compile error.
+  const yamlSpec = "js-yaml";
+  let yamlMod: { load: (input: string) => unknown };
+  try {
+    yamlMod = (await import(yamlSpec)) as { load: (input: string) => unknown };
+  } catch {
+    return {};
+  }
+
+  const expanded = expandHome(configPath);
+  if (!existsSync(expanded)) {
+    return {};
+  }
+
+  try {
+    const parsed = yamlMod.load(readFileSync(expanded, "utf8"));
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
