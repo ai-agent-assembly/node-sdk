@@ -8,9 +8,11 @@ import {
   __testing,
   autoStartGateway,
   DEFAULT_GATEWAY_URL,
+  ENV_API_KEY,
   ENV_GATEWAY_URL,
   loadConfigFile,
   probeHealthz,
+  resolveApiKey,
   resolveGatewayUrl,
   waitForHealthz,
 } from "../src/core/gateway-resolver.js";
@@ -223,5 +225,44 @@ describe("resolveGatewayUrl", () => {
 
     await expect(resolveGatewayUrl()).resolves.toBe(DEFAULT_GATEWAY_URL);
     expect(autoStartSpy).toHaveBeenCalledWith(DEFAULT_GATEWAY_URL);
+  });
+});
+
+describe("resolveApiKey", () => {
+  const originalSeams = { ...__testing._seams };
+  const originalEnv = process.env[ENV_API_KEY];
+
+  afterEach(() => {
+    Object.assign(__testing._seams, originalSeams);
+    if (originalEnv === undefined) delete process.env[ENV_API_KEY];
+    else process.env[ENV_API_KEY] = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it("short-circuits on the explicit argument", async () => {
+    process.env[ENV_API_KEY] = "k-env";
+    await expect(resolveApiKey("k-explicit")).resolves.toBe("k-explicit");
+  });
+
+  it("uses AAASM_API_KEY over config-file value", async () => {
+    process.env[ENV_API_KEY] = "k-env";
+    __testing._seams.loadConfigFile = async () => ({
+      agent: { api_key: "k-config" }
+    });
+    await expect(resolveApiKey()).resolves.toBe("k-env");
+  });
+
+  it("falls back to config file when env is unset", async () => {
+    delete process.env[ENV_API_KEY];
+    __testing._seams.loadConfigFile = async () => ({
+      agent: { api_key: "k-config" }
+    });
+    await expect(resolveApiKey()).resolves.toBe("k-config");
+  });
+
+  it("returns empty string as the documented local-mode default", async () => {
+    delete process.env[ENV_API_KEY];
+    __testing._seams.loadConfigFile = async () => ({});
+    await expect(resolveApiKey()).resolves.toBe("");
   });
 });
