@@ -1,6 +1,7 @@
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve as resolvePath } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 
 /**
  * Resolve the gateway URL and API key for ``initAssembly``.
@@ -116,4 +117,38 @@ export async function loadConfigFile(
     return {};
   }
 }
+
+function defaultFindAasmOnPath(): string | null {
+  const PATH = process.env.PATH ?? "";
+  const sep = process.platform === "win32" ? ";" : ":";
+  const exts = process.platform === "win32" ? [".exe", ".cmd", ""] : [""];
+  for (const dir of PATH.split(sep)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      const candidate = join(dir, `aasm${ext}`);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+function defaultSpawnAasm(aasmPath: string): void {
+  const child = spawn(aasmPath, [...AASM_AUTO_START_ARGV], {
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+}
+
+/**
+ * Mutable seams used by ``autoStartGateway`` — exposed via ``__testing``
+ * so tests can stub the PATH lookup and subprocess spawn without using
+ * ESM module mocking. Production callers should treat this as private.
+ */
+const _seams = {
+  findAasmOnPath: defaultFindAasmOnPath,
+  spawnAasm: defaultSpawnAasm,
+};
+
+export const __testing = { _seams };
 
