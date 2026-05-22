@@ -219,3 +219,26 @@ export async function resolveGatewayUrl(explicit?: string): Promise<string> {
   return DEFAULT_GATEWAY_URL;
 }
 
+/**
+ * Resolve the API key using the same 4-step precedence as the URL.
+ *
+ * Returns the resolved key (possibly empty for local mode, which
+ * accepts unauthenticated agents). Never rejects — an empty API key
+ * is the documented "local dev" default per Epic 17.
+ */
+export async function resolveApiKey(explicit?: string): Promise<string> {
+  if (explicit) return explicit;
+
+  const fromEnv = process.env[ENV_API_KEY];
+  if (fromEnv) return fromEnv;
+
+  const config = await _seams.loadConfigFile();
+  const agent = config["agent"];
+  if (agent !== null && typeof agent === "object") {
+    const apiKey = (agent as Record<string, unknown>)["api_key"];
+    if (typeof apiKey === "string" && apiKey.length > 0) return apiKey;
+  }
+
+  return "";
+}
+
