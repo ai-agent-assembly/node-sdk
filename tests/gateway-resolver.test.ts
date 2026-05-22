@@ -5,11 +5,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  __testing,
+  autoStartGateway,
   DEFAULT_GATEWAY_URL,
   loadConfigFile,
   probeHealthz,
   waitForHealthz,
 } from "../src/core/gateway-resolver.js";
+import { ConfigurationError, GatewayError } from "../src/errors/index.js";
 
 describe("probeHealthz", () => {
   let originalFetch: typeof globalThis.fetch;
@@ -119,5 +122,49 @@ describe("loadConfigFile", () => {
     const cfg = join(tmp, "config.yaml");
     writeFileSync(cfg, ":\n  not: valid: yaml: at all\n", "utf8");
     await expect(loadConfigFile(cfg)).resolves.toEqual({});
+  });
+});
+
+describe("autoStartGateway", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let originalFind: (typeof __testing._seams)["findAasmOnPath"];
+  let originalSpawn: (typeof __testing._seams)["spawnAasm"];
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    originalFind = __testing._seams.findAasmOnPath;
+    originalSpawn = __testing._seams.spawnAasm;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    __testing._seams.findAasmOnPath = originalFind;
+    __testing._seams.spawnAasm = originalSpawn;
+    vi.restoreAllMocks();
+  });
+
+  it("throws ConfigurationError when aasm is not on PATH", async () => {
+    __testing._seams.findAasmOnPath = () => null;
+    await expect(autoStartGateway()).rejects.toBeInstanceOf(ConfigurationError);
+    await expect(autoStartGateway()).rejects.toThrow(/'aasm' is not on PATH/);
+  });
+
+  it("spawns aasm and resolves when healthz becomes ready", async () => {
+    const spawnSpy = vi.fn();
+    __testing._seams.findAasmOnPath = () => "/usr/local/bin/aasm";
+    __testing._seams.spawnAasm = spawnSpy;
+    globalThis.fetch = vi.fn().mockResolvedValue({ status: 200 } as Response) as unknown as typeof fetch;
+
+    await expect(autoStartGateway()).resolves.toBeUndefined();
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(spawnSpy).toHaveBeenCalledWith("/usr/local/bin/aasm");
+  });
+
+  it("throws GatewayError when the spawned gateway never becomes ready", async () => {
+    __testing._seams.findAasmOnPath = () => "/usr/local/bin/aasm";
+    __testing._seams.spawnAasm = vi.fn();
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("refused")) as unknown as typeof fetch;
+
+    await expect(autoStartGateway(DEFAULT_GATEWAY_URL, 30)).rejects.toBeInstanceOf(GatewayError);
   });
 });
