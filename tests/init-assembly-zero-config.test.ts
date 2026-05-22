@@ -51,4 +51,26 @@ describe("initAssembly zero-config", () => {
       await ctx.shutdown();
     }
   });
+
+  it("explicit gatewayUrl + apiKey bypass the resolver entirely", async () => {
+    const probeSpy = vi.fn().mockImplementation(() => {
+      throw new Error("resolver should not probe when explicit args provided");
+    });
+    const autoStartSpy = vi.fn().mockImplementation(() => {
+      throw new Error("resolver should not auto-start when explicit args provided");
+    });
+    __testing._seams.probeHealthz = probeSpy;
+    __testing._seams.autoStartGateway = autoStartSpy;
+
+    const ctx = await initAssembly({
+      gatewayUrl: "http://explicit.gw:9999",
+      apiKey: "explicit-key"
+    });
+    try {
+      expect(probeSpy).not.toHaveBeenCalled();
+      expect(autoStartSpy).not.toHaveBeenCalled();
+    } finally {
+      await ctx.shutdown();
+    }
+  });
 });
