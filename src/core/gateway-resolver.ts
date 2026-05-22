@@ -50,3 +50,26 @@ export async function probeHealthz(
   }
 }
 
+/**
+ * Poll the gateway healthz endpoint until success or timeout.
+ *
+ * Resolves ``true`` as soon as ``probeHealthz`` succeeds, ``false`` if
+ * the gateway has not become ready within ``timeoutMs``. The poll
+ * interval is short (default 100ms) so the auto-start path feels
+ * instant when the local CP comes up quickly.
+ */
+export async function waitForHealthz(
+  baseUrl: string,
+  timeoutMs: number = DEFAULT_AUTO_START_TIMEOUT_MS,
+  pollIntervalMs: number = 100
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await probeHealthz(baseUrl)) {
+      return true;
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  return probeHealthz(baseUrl);
+}
+
