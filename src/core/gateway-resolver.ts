@@ -24,3 +24,29 @@ export const ENV_GATEWAY_URL = "AAASM_GATEWAY_URL";
 export const ENV_API_KEY = "AAASM_API_KEY";
 
 export const AASM_AUTO_START_ARGV = ["start", "--mode", "local", "--foreground"] as const;
+
+/**
+ * Return true if a gateway responds with a 2xx status at ``{baseUrl}/healthz``.
+ *
+ * Uses the global ``fetch`` (Node 18+) with an AbortController-driven
+ * timeout. Any network / timeout / parse error is swallowed and reported
+ * as ``false`` — the resolver treats unreachable as "absent" rather than
+ * fatal.
+ */
+export async function probeHealthz(
+  baseUrl: string,
+  timeoutMs: number = DEFAULT_PROBE_TIMEOUT_MS
+): Promise<boolean> {
+  const url = baseUrl.replace(/\/+$/, "") + DEFAULT_HEALTHZ_PATH;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return response.status >= 200 && response.status < 300;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
