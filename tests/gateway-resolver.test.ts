@@ -8,8 +8,10 @@ import {
   __testing,
   autoStartGateway,
   DEFAULT_GATEWAY_URL,
+  ENV_GATEWAY_URL,
   loadConfigFile,
   probeHealthz,
+  resolveGatewayUrl,
   waitForHealthz,
 } from "../src/core/gateway-resolver.js";
 import { ConfigurationError, GatewayError } from "../src/errors/index.js";
@@ -166,5 +168,60 @@ describe("autoStartGateway", () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error("refused")) as unknown as typeof fetch;
 
     await expect(autoStartGateway(DEFAULT_GATEWAY_URL, 30)).rejects.toBeInstanceOf(GatewayError);
+  });
+});
+
+describe("resolveGatewayUrl", () => {
+  const originalSeams = { ...__testing._seams };
+  const originalEnv = process.env[ENV_GATEWAY_URL];
+
+  afterEach(() => {
+    Object.assign(__testing._seams, originalSeams);
+    if (originalEnv === undefined) delete process.env[ENV_GATEWAY_URL];
+    else process.env[ENV_GATEWAY_URL] = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it("short-circuits on the explicit argument", async () => {
+    process.env[ENV_GATEWAY_URL] = "http://from-env:7391";
+    await expect(resolveGatewayUrl("http://explicit:7391")).resolves.toBe("http://explicit:7391");
+  });
+
+  it("uses AAASM_GATEWAY_URL over config + default", async () => {
+    process.env[ENV_GATEWAY_URL] = "http://from-env:7391";
+    __testing._seams.loadConfigFile = async () => ({
+      agent: { gateway_url: "http://from-config:7391" }
+    });
+    await expect(resolveGatewayUrl()).resolves.toBe("http://from-env:7391");
+  });
+
+  it("falls back to config file when env is unset", async () => {
+    delete process.env[ENV_GATEWAY_URL];
+    __testing._seams.loadConfigFile = async () => ({
+      agent: { gateway_url: "http://from-config:7391" }
+    });
+    await expect(resolveGatewayUrl()).resolves.toBe("http://from-config:7391");
+  });
+
+  it("returns the local default when probe succeeds (no auto-start)", async () => {
+    delete process.env[ENV_GATEWAY_URL];
+    __testing._seams.loadConfigFile = async () => ({});
+    __testing._seams.probeHealthz = async () => true;
+    const autoStartSpy = vi.fn();
+    __testing._seams.autoStartGateway = autoStartSpy;
+
+    await expect(resolveGatewayUrl()).resolves.toBe(DEFAULT_GATEWAY_URL);
+    expect(autoStartSpy).not.toHaveBeenCalled();
+  });
+
+  it("invokes autoStartGateway when probe fails", async () => {
+    delete process.env[ENV_GATEWAY_URL];
+    __testing._seams.loadConfigFile = async () => ({});
+    __testing._seams.probeHealthz = async () => false;
+    const autoStartSpy = vi.fn().mockResolvedValue(undefined);
+    __testing._seams.autoStartGateway = autoStartSpy;
+
+    await expect(resolveGatewayUrl()).resolves.toBe(DEFAULT_GATEWAY_URL);
+    expect(autoStartSpy).toHaveBeenCalledWith(DEFAULT_GATEWAY_URL);
   });
 });
