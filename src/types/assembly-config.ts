@@ -1,6 +1,7 @@
 import type { GatewayClient } from "../gateway/client.js";
 import type { LangChainAdapterConfig } from "./langchain-adapter.js";
 import type { AssemblyMode } from "./assembly-mode.js";
+import type { EnforcementMode } from "./enforcement-mode.js";
 
 export interface AssemblyConfig {
   /**
@@ -31,4 +32,16 @@ export interface AssemblyConfig {
   delegationReason?: string;
   /** Name of the tool that spawned this agent, if applicable. */
   spawnedByTool?: string;
+  /**
+   * Per-agent governance posture override sent to the gateway at registration.
+   *
+   * When omitted, the field is left off the registration body and the gateway
+   * applies its server-side default (live `"enforce"`) — the pre-feature wire
+   * shape is preserved. Pass `"observe"` to register this agent in dry-run /
+   * sandbox mode (every action proceeds; the gateway records would-be
+   * violations as shadow audit events surfaced by `aa audit list --dry-run-only`).
+   *
+   * Unknown string values are rejected at runtime with a `RangeError`.
+   */
+  enforcementMode?: EnforcementMode;
 }

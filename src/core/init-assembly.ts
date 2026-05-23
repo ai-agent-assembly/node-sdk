@@ -9,6 +9,7 @@ import { createNoopGatewayClient, type GatewayClient } from "../gateway/client.j
 import { createNativeClient, type NativeClient } from "../native/client.js";
 import type { AssemblyConfig } from "../types/assembly-config.js";
 import type { AssemblyContext } from "../types/assembly-context.js";
+import { ENFORCEMENT_MODES } from "../types/enforcement-mode.js";
 import type {
   LangChainCallbackHandlerLike,
   LangChainToolLike
@@ -32,6 +33,11 @@ function buildRegistrationEvent(config: AssemblyConfig): Record<string, string> 
   if (config.teamId !== undefined) event.team_id = config.teamId;
   if (config.delegationReason !== undefined) event.delegation_reason = config.delegationReason;
   if (config.spawnedByTool !== undefined) event.spawned_by_tool = config.spawnedByTool;
+  // AAASM-1561: per-agent enforcement_mode override. Sent only when the
+  // caller set it explicitly so a pre-feature SDK call produces a pre-feature
+  // wire shape. The gateway's REST → gRPC bridge maps the snake_case token
+  // onto RegisterRequest.enforcement_mode (proto enum) per AAASM-1555.
+  if (config.enforcementMode !== undefined) event.enforcement_mode = config.enforcementMode;
   return event;
 }
 
@@ -205,6 +211,14 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
   if (config.delegationReason !== undefined && config.delegationReason.length > 256) {
     throw new RangeError("delegationReason must be <= 256 characters");
   }
+  // AAASM-1561: catch invalid enforcementMode strings from non-TS callers
+  // (plain JS, JSON config, dynamic input) so the agent doesn't silently
+  // register under live enforcement when the operator meant observe.
+  if (config.enforcementMode !== undefined && !ENFORCEMENT_MODES.includes(config.enforcementMode)) {
+    throw new RangeError(
+      `enforcementMode must be one of: ${ENFORCEMENT_MODES.join(", ")} (got: ${String(config.enforcementMode)})`
+    );
+  }
   // Auto-populate parentAgentId from the async context store when not explicitly provided.
   // This allows child agents spawned inside framework hooks to inherit lineage automatically.
   const resolvedParentAgentId = config.parentAgentId ?? currentAgentId();
@@ -258,6 +272,7 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     ...(resolvedConfig.teamId !== undefined && { teamId: resolvedConfig.teamId }),
     ...(resolvedConfig.delegationReason !== undefined && { delegationReason: resolvedConfig.delegationReason }),
     ...(resolvedConfig.spawnedByTool !== undefined && { spawnedByTool: resolvedConfig.spawnedByTool }),
+    ...(resolvedConfig.enforcementMode !== undefined && { enforcementMode: resolvedConfig.enforcementMode }),
     shutdown: async () => {
       for (const adapter of adapters) {
         await adapter.shutdown?.();
