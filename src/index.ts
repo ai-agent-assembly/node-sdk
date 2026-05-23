@@ -8,18 +8,17 @@ export type {
   AuditEvent,
   CallStackNode,
   CallStackNodeKind,
-  ToolMap,
+  EnforcementMode,
+  ToolMap
 } from "./types/index.js";
+export { ENFORCEMENT_MODES } from "./types/index.js";
 export {
   decodeAuditEvent,
   decodeCallStackNode,
   encodeAuditEvent,
-  encodeCallStackNode,
+  encodeCallStackNode
 } from "./audit/index.js";
-export type {
-  WireAuditEvent,
-  WireCallStackNode,
-} from "./audit/index.js";
+export type { WireAuditEvent, WireCallStackNode } from "./audit/index.js";
 export { currentAgentId, runWithAgentId } from "./lineage/index.js";
 // Runtime binary resolution helpers (F113 / AAASM-1221). Re-export the
 // discovery + error-message surfaces from src/runtime.ts; the lifecycle
