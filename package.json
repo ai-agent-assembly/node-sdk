@@ -54,11 +54,13 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@napi-rs/cli": "3.6.2",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.8.0",
     "@vitest/coverage-v8": "^2.1.8",
     "blocked-at": "^1.2.0",
     "eslint": "^10.4.0",
     "grpc-tools": "^1.13.1",
+    "js-yaml": "^4.1.1",
     "langchain": "^1.4.0",
     "prettier": "^3.5.3",
     "ts-proto": "^2.11.8",
@@ -74,11 +76,11 @@
   ],
   "optionalDependencies": {
     "@agent-assembly/darwin-arm64": "0.0.0",
-    "@agent-assembly/win32-x64-msvc": "0.0.0",
-    "@agent-assembly/runtime-linux-x64": "0.0.0",
-    "@agent-assembly/runtime-linux-arm64": "0.0.0",
+    "@agent-assembly/runtime-darwin-arm64": "0.0.0",
     "@agent-assembly/runtime-darwin-x64": "0.0.0",
-    "@agent-assembly/runtime-darwin-arm64": "0.0.0"
+    "@agent-assembly/runtime-linux-arm64": "0.0.0",
+    "@agent-assembly/runtime-linux-x64": "0.0.0",
+    "@agent-assembly/win32-x64-msvc": "0.0.0"
   },
   "files": [
     "dist/",

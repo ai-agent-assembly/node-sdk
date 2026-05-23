@@ -22,6 +22,7 @@ import { patchMastra } from "../hooks/mastra.js";
 import { hasOpenAIAgentsSDK } from "../hooks/openai-agents-detection.js";
 import { patchOpenAIAgents } from "../hooks/openai-agents.js";
 import { currentAgentId } from "../lineage/index.js";
+import { resolveApiKey, resolveGatewayUrl } from "./gateway-resolver.js";
 
 const requireFromCwd = createRequire(`${process.cwd()}/`);
 
@@ -200,16 +201,21 @@ async function patchDetectedOpenAIAgents(
   return patchOpenAIAgents({ gatewayClient: client });
 }
 
-export async function initAssembly(config: AssemblyConfig): Promise<AssemblyContext> {
+export async function initAssembly(config: AssemblyConfig = {}): Promise<AssemblyContext> {
   if (config.delegationReason !== undefined && config.delegationReason.length > 256) {
     throw new RangeError("delegationReason must be <= 256 characters");
   }
   // Auto-populate parentAgentId from the async context store when not explicitly provided.
   // This allows child agents spawned inside framework hooks to inherit lineage automatically.
   const resolvedParentAgentId = config.parentAgentId ?? currentAgentId();
-  const resolvedConfig: AssemblyConfig = resolvedParentAgentId
-    ? { ...config, parentAgentId: resolvedParentAgentId }
-    : config;
+  const resolvedGatewayUrl = await resolveGatewayUrl(config.gatewayUrl);
+  const resolvedApiKey = await resolveApiKey(config.apiKey);
+  const resolvedConfig: AssemblyConfig = {
+    ...config,
+    gatewayUrl: resolvedGatewayUrl,
+    apiKey: resolvedApiKey,
+    ...(resolvedParentAgentId ? { parentAgentId: resolvedParentAgentId } : {})
+  };
 
   const client = createClient(resolvedConfig);
   const frameworks = detectFrameworks();
@@ -222,8 +228,8 @@ export async function initAssembly(config: AssemblyConfig): Promise<AssemblyCont
   let nativeClient: NativeClient | undefined;
   if (resolvedConfig.mode !== "sdk-only") {
     nativeClient = createNativeClient({
-      gateway: resolvedConfig.gatewayUrl,
-      apiKey: resolvedConfig.apiKey,
+      gateway: resolvedGatewayUrl,
+      apiKey: resolvedApiKey,
       mode: resolvedConfig.mode === "napi-inprocess" ? "napi-inprocess" : "grpc-sidecar",
     });
     nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
