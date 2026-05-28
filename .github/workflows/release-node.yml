@@ -154,9 +154,17 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            DIST_TAG="--tag alpha"
+          else
+            DIST_TAG=""
+          fi
+          echo "Publishing runtime sub-packages at version=$VERSION dist-tag arg='$DIST_TAG'"
           for pkg in runtime-linux-x64 runtime-linux-arm64 runtime-darwin-x64 runtime-darwin-arm64; do
             echo "::group::publish @agent-assembly/${pkg}"
-            pnpm publish --access public --no-git-checks "packages/${pkg}"
+            # shellcheck disable=SC2086
+            pnpm publish --access public --no-git-checks $DIST_TAG "packages/${pkg}"
             echo "::endgroup::"
           done
 
@@ -164,4 +172,13 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: "true"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm publish --access public --no-git-checks
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            DIST_TAG="--tag alpha"
+          else
+            DIST_TAG=""
+          fi
+          echo "Publishing main SDK at version=$VERSION dist-tag arg='$DIST_TAG'"
+          # shellcheck disable=SC2086
+          pnpm publish --access public --no-git-checks $DIST_TAG

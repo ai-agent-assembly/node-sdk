@@ -35,6 +35,15 @@ jobs:
         run: pnpm build
 
       - name: Publish package
-        run: pnpm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            DIST_TAG="--tag alpha"
+          else
+            DIST_TAG=""
+          fi
+          echo "Publishing version=$VERSION with dist-tag arg='$DIST_TAG'"
+          # shellcheck disable=SC2086
+          pnpm publish --no-git-checks $DIST_TAG
