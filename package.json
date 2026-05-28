@@ -75,12 +75,10 @@
     "nodejs"
   ],
   "optionalDependencies": {
-    "@agent-assembly/darwin-arm64": "0.0.0",
-    "@agent-assembly/runtime-darwin-arm64": "0.0.1-alpha.1",
-    "@agent-assembly/runtime-darwin-x64": "0.0.1-alpha.1",
-    "@agent-assembly/runtime-linux-arm64": "0.0.1-alpha.1",
-    "@agent-assembly/runtime-linux-x64": "0.0.1-alpha.1",
-    "@agent-assembly/win32-x64-msvc": "0.0.0"
+    "@agent-assembly/runtime-darwin-arm64": "workspace:*",
+    "@agent-assembly/runtime-darwin-x64": "workspace:*",
+    "@agent-assembly/runtime-linux-arm64": "workspace:*",
+    "@agent-assembly/runtime-linux-x64": "workspace:*"
   },
   "files": [
     "dist/",

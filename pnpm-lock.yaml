@@ -66,6 +66,19 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.1)
+    optionalDependencies:
+      '@agent-assembly/runtime-darwin-arm64':
+        specifier: workspace:*
+        version: link:packages/runtime-darwin-arm64
+      '@agent-assembly/runtime-darwin-x64':
+        specifier: workspace:*
+        version: link:packages/runtime-darwin-x64
+      '@agent-assembly/runtime-linux-arm64':
+        specifier: workspace:*
+        version: link:packages/runtime-linux-arm64
+      '@agent-assembly/runtime-linux-x64':
+        specifier: workspace:*
+        version: link:packages/runtime-linux-x64
 
   packages/runtime-darwin-arm64: {}
 
