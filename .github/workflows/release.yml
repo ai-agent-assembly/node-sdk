@@ -39,8 +39,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          if [[ "$VERSION" == *-* ]]; then
-            DIST_TAG="--tag alpha"
+          # Derive the npm dist-tag from the SemVer pre-release identifier.
+          # 0.0.1-alpha.1 → --tag alpha, 0.0.1-rc.1 → --tag rc, 0.0.1 → (empty, defaults to @latest)
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([a-zA-Z]+) ]]; then
+            DIST_TAG="--tag ${BASH_REMATCH[1]}"
           else
             DIST_TAG=""
           fi
