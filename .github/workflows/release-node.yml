@@ -154,9 +154,19 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          # Derive the npm dist-tag from the SemVer pre-release identifier.
+          # 0.0.1-alpha.1 → --tag alpha, 0.0.1-rc.1 → --tag rc, 0.0.1 → (empty, defaults to @latest)
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([a-zA-Z]+) ]]; then
+            DIST_TAG="--tag ${BASH_REMATCH[1]}"
+          else
+            DIST_TAG=""
+          fi
+          echo "Publishing runtime sub-packages at version=$VERSION dist-tag arg='$DIST_TAG'"
           for pkg in runtime-linux-x64 runtime-linux-arm64 runtime-darwin-x64 runtime-darwin-arm64; do
             echo "::group::publish @agent-assembly/${pkg}"
-            pnpm publish --access public --no-git-checks "packages/${pkg}"
+            # shellcheck disable=SC2086
+            pnpm publish --access public --no-git-checks $DIST_TAG "packages/${pkg}"
             echo "::endgroup::"
           done
 
@@ -164,4 +174,15 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: "true"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm publish --access public --no-git-checks
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          # Derive the npm dist-tag from the SemVer pre-release identifier.
+          # 0.0.1-alpha.1 → --tag alpha, 0.0.1-rc.1 → --tag rc, 0.0.1 → (empty, defaults to @latest)
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([a-zA-Z]+) ]]; then
+            DIST_TAG="--tag ${BASH_REMATCH[1]}"
+          else
+            DIST_TAG=""
+          fi
+          echo "Publishing main SDK at version=$VERSION dist-tag arg='$DIST_TAG'"
+          # shellcheck disable=SC2086
+          pnpm publish --access public --no-git-checks $DIST_TAG
