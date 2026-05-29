@@ -48,4 +48,4 @@ jobs:
           fi
           echo "Publishing version=$VERSION with dist-tag arg='$DIST_TAG'"
           # shellcheck disable=SC2086
-          pnpm publish --no-git-checks $DIST_TAG
+          pnpm publish --access public --no-git-checks $DIST_TAG
