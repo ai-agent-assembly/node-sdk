@@ -82,6 +82,7 @@
   },
   "files": [
     "dist/",
+    "scripts/postinstall.mjs",
     "native/aa-ffi-node/*.node",
     "native/aa-ffi-node/index.cjs",
     "native/aa-ffi-node/index.d.ts",
