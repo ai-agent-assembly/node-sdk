@@ -77,10 +77,32 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p bin-staging
-          gh release download "$RELEASE_TAG" \
-            --repo AI-agent-assembly/agent-assembly \
-            --pattern "aasm-*.tar.gz" \
-            --dir bin-staging
+          # Cross-repo race: release-node fires on the same tag-push event as
+          # agent-assembly's Release workflow, in parallel. agent-assembly takes
+          # ~10 min to build + publish the binaries we depend on. Retry up to
+          # 20 times × 60s = 20 min ceiling waiting for the Release object.
+          # AAASM-2328.
+          MAX_ATTEMPTS=20
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            if gh release download "$RELEASE_TAG" \
+                 --repo AI-agent-assembly/agent-assembly \
+                 --pattern "aasm-*.tar.gz" \
+                 --dir bin-staging 2>&1 | tee /tmp/gh-rd.log; then
+              echo "✓ Downloaded on attempt ${attempt}/${MAX_ATTEMPTS}"
+              break
+            fi
+            # Distinguish 'release not found' (race — retry) from other errors (fail-fast)
+            if ! grep -q 'release not found' /tmp/gh-rd.log; then
+              echo "::error::gh release download failed with non-race error — aborting retry"
+              exit 1
+            fi
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "::error::Release v${RELEASE_TAG} never appeared after $((MAX_ATTEMPTS * 60))s — agent-assembly Release pipeline likely failed"
+              exit 1
+            fi
+            echo "Attempt ${attempt}/${MAX_ATTEMPTS}: release not yet published, sleeping 60s..."
+            sleep 60
+          done
           ls -la bin-staging/
 
       - name: Stage runtime binaries into runtime-* sub-packages
