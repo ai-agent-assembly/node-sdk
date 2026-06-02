@@ -16,9 +16,13 @@ name: release-node
 #            produces the aasm-{rust-target}.tar.gz assets consumed here)
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  # Listen for agent-assembly's release.yml `notify-downstream` job firing a
+  # repository_dispatch after the Release object is published. This replaces
+  # the prior `push: tags` trigger which raced agent-assembly's release
+  # pipeline and required the AAASM-2328 retry workaround.
+  # AAASM-2336.
+  repository_dispatch:
+    types: [agent-assembly-release-published]
   workflow_dispatch:
     inputs:
       release_tag:
@@ -54,13 +58,16 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_TAG: ${{ inputs.release_tag }}
-          REF_NAME: ${{ github.ref_name }}
+          DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             tag="$DISPATCH_TAG"
+          elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
+            tag="$DISPATCH_PAYLOAD_TAG"
           else
-            tag="$REF_NAME"
+            echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
+            exit 1
           fi
           if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
             echo "::error::tag '$tag' does not match v*.*.* (semver) pattern"
@@ -77,32 +84,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p bin-staging
-          # Cross-repo race: release-node fires on the same tag-push event as
-          # agent-assembly's Release workflow, in parallel. agent-assembly takes
-          # ~10 min to build + publish the binaries we depend on. Retry up to
-          # 20 times × 60s = 20 min ceiling waiting for the Release object.
-          # AAASM-2328.
-          MAX_ATTEMPTS=20
-          for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            if gh release download "$RELEASE_TAG" \
-                 --repo AI-agent-assembly/agent-assembly \
-                 --pattern "aasm-*.tar.gz" \
-                 --dir bin-staging 2>&1 | tee /tmp/gh-rd.log; then
-              echo "✓ Downloaded on attempt ${attempt}/${MAX_ATTEMPTS}"
-              break
-            fi
-            # Distinguish 'release not found' (race — retry) from other errors (fail-fast)
-            if ! grep -q 'release not found' /tmp/gh-rd.log; then
-              echo "::error::gh release download failed with non-race error — aborting retry"
-              exit 1
-            fi
-            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "::error::Release v${RELEASE_TAG} never appeared after $((MAX_ATTEMPTS * 60))s — agent-assembly Release pipeline likely failed"
-              exit 1
-            fi
-            echo "Attempt ${attempt}/${MAX_ATTEMPTS}: release not yet published, sleeping 60s..."
-            sleep 60
-          done
+          # AAASM-2336: this workflow fires on repository_dispatch from
+          # agent-assembly's `notify-downstream` job AFTER its Release object
+          # is published. So `gh release download` is guaranteed to find the
+          # assets on the first try — no retry needed.
+          gh release download "$RELEASE_TAG" \
+            --repo AI-agent-assembly/agent-assembly \
+            --pattern "aasm-*.tar.gz" \
+            --dir bin-staging
           ls -la bin-staging/
 
       - name: Stage runtime binaries into runtime-* sub-packages
