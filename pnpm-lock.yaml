@@ -47,7 +47,7 @@ importers:
         version: 1.13.1
       js-yaml:
         specifier: ^4.1.1
-        version: 4.1.1
+        version: 4.2.0
       langchain:
         specifier: ^1.4.0
         version: 1.4.0(@langchain/core@1.1.45(openai@6.35.0(ws@8.20.0)(zod@4.4.3))(ws@8.20.0))(openai@6.35.0(ws@8.20.0)(zod@4.4.3))(ws@8.20.0)(zod-to-json-schema@3.25.2(zod@4.4.3))
@@ -1841,8 +1841,8 @@ packages:
   js-tiktoken@1.0.21:
     resolution: {integrity: sha512-biOj/6M5qdgx5TKjDnFT1ymSpM5tbd3ylwDtrQvFQSu0Z7bBYko2dF+W/aUkXUPuk6IVpRxk/3Q2sHOzGlS36g==}
 
-  js-yaml@4.1.1:
-    resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
+  js-yaml@4.2.0:
+    resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
     hasBin: true
 
   json-buffer@3.0.1:
@@ -2915,7 +2915,7 @@ snapshots:
       colorette: 2.0.20
       emnapi: 1.10.0
       es-toolkit: 1.47.0
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
       obug: 2.1.1
       semver: 7.8.1
       typanion: 3.14.0
@@ -4154,7 +4154,7 @@ snapshots:
     dependencies:
       base64-js: 1.5.1
 
-  js-yaml@4.1.1:
+  js-yaml@4.2.0:
     dependencies:
       argparse: 2.0.1
 
