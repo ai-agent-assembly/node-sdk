@@ -75,12 +75,14 @@ export async function patchMastra(options: PatchMastraOptions): Promise<boolean>
   module.Agent.prototype.generate = function patchedGenerate(
     ...args: unknown[]
   ): Promise<unknown> {
+    let result: Promise<unknown>;
     try {
-      return runWithAgentId(agentId, () => originalGenerate.apply(this, args));
+      result = runWithAgentId(agentId, () => originalGenerate.apply(this, args));
     } catch (e) {
       console.warn("[assembly] Mastra lineage patch error on generate; falling back:", e);
       return originalGenerate.apply(this, args);
     }
+    return result;
   };
 
   // Wrap Workflow.prototype.execute if present
@@ -92,12 +94,14 @@ export async function patchMastra(options: PatchMastraOptions): Promise<boolean>
     module.Workflow.prototype.execute = function patchedExecute(
       ...args: unknown[]
     ): Promise<unknown> {
+      let result: Promise<unknown>;
       try {
-        return runWithAgentId(agentId, () => originalExecute.apply(this, args));
+        result = runWithAgentId(agentId, () => originalExecute.apply(this, args));
       } catch (e) {
         console.warn("[assembly] Mastra lineage patch error on execute; falling back:", e);
         return originalExecute.apply(this, args);
       }
+      return result;
     };
   }
 

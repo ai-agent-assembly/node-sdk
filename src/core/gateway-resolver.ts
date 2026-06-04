@@ -44,7 +44,11 @@ export async function probeHealthz(
   baseUrl: string,
   timeoutMs: number = DEFAULT_PROBE_TIMEOUT_MS
 ): Promise<boolean> {
-  const url = baseUrl.replace(/\/+$/, "") + DEFAULT_HEALTHZ_PATH;
+  let trimmedBase = baseUrl;
+  while (trimmedBase.endsWith("/")) {
+    trimmedBase = trimmedBase.slice(0, -1);
+  }
+  const url = trimmedBase + DEFAULT_HEALTHZ_PATH;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
