@@ -2,18 +2,24 @@
 name = "aa-ffi-node"
 version = "0.0.0"
 edition = "2021"
-description = "napi-rs binding layer for Agent Assembly Node SDK"
+description = "Thin napi-rs shim over aa-sdk-client for the Agent Assembly Node SDK"
 license = "Apache-2.0"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
+# Shared, FFI-agnostic SDK runtime-client: UDS transport, IPC wire codec,
+# AssemblyClient lifecycle, and advisory (non-authoritative) preflight. Pinned
+# by git SHA, mirroring the python-sdk precedent (which pins aa-core/aa-proto by
+# `rev`); advisory preflight arrives transitively via its default `preflight`
+# feature. AAASM-2559 will formalize a published/pinned distribution + a
+# standalone-build CI smoke check on the agent-assembly side.
+aa-sdk-client = { git = "https://github.com/AI-agent-assembly/agent-assembly.git", rev = "9cf8a033d39c870ba46a0929b62261d125a00a09", package = "aa-sdk-client" }
 napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "3"
-serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+tokio = { version = "1", features = ["rt"] }
 
 [build-dependencies]
 napi-build = "2"
