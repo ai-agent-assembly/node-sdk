@@ -31,6 +31,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup protoc
+        # The Node binding now depends (transitively, via aa-sdk-client) on
+        # aa-proto, whose build script compiles .proto sources with protoc.
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v6.0.8
         with:
