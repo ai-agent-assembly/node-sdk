@@ -1,176 +1,105 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+//! Thin napi-rs shim over the shared [`aa_sdk_client`] runtime client.
+//!
+//! All transport, IPC wire codec, [`AssemblyClient`] lifecycle, and advisory
+//! credential preflight live in `aa-sdk-client`; this crate only translates
+//! between the Node/napi world and that shared client so the runtime-client
+//! logic cannot drift between the language SDKs.
+//!
+//! The SDK is **not** a security boundary. The mandatory runtime chokepoint
+//! (`aa-runtime`, AAASM-2568) re-scans, re-redacts, and normalizes every event
+//! authoritatively, so this shim holds **no** authoritative scanning, redaction,
+//! or policy-decision logic — it captures events and ships them.
+
 use std::sync::Arc;
 
-use napi::bindgen_prelude::{Error, Function, Result};
-use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
+use aa_sdk_client::ipc::spawn_ipc_thread;
+use aa_sdk_client::{AssemblyClient, AssemblyConfig};
+use napi::bindgen_prelude::{Error, Result};
 use napi_derive::napi;
 use serde_json::Value;
-use tokio::sync::mpsc;
 
 const ERR_CONNECT: &str = "AA_ERR_CONNECT";
 const ERR_SEND_EVENT: &str = "AA_ERR_SEND_EVENT";
-const ERR_QUERY_POLICY: &str = "AA_ERR_QUERY_POLICY";
 const ERR_DISCONNECT: &str = "AA_ERR_DISCONNECT";
-const ERR_SET_EVENT_LISTENER: &str = "AA_ERR_SET_EVENT_LISTENER";
 
-type EventSink = ThreadsafeFunction<String, (), String, napi::Status, false, false, 0>;
-
-struct ClientState {
-  socket_path: String,
-  closed: AtomicBool,
-  event_tx: std::sync::Mutex<Option<mpsc::UnboundedSender<Value>>>,
-  event_loop: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
-  event_sink: std::sync::Mutex<Option<EventSink>>,
-}
-
+/// Handle to an active Agent Assembly session, wrapping the shared
+/// [`AssemblyClient`]. The inner `Arc` keeps napi calls cheap and lets the
+/// async `disconnect` move a clone onto a blocking task.
 #[napi]
 pub struct ClientHandle {
-  inner: Arc<ClientState>,
+  inner: Arc<AssemblyClient>,
 }
 
-#[napi(object)]
-pub struct PolicyResult {
-  pub denied: Option<bool>,
-  pub pending: Option<bool>,
-  pub reason: Option<String>,
-}
-
+/// Connect to the `aa-runtime` Unix-domain socket and open a session.
+///
+/// Socket resolution, the background IPC thread, and the wire codec are all
+/// delegated to `aa-sdk-client`; this shim only validates the argument and
+/// wraps the resulting client.
 #[napi]
 pub async fn connect(socket_path: String) -> Result<ClientHandle> {
   if socket_path.trim().is_empty() {
     return Err(typed_error(ERR_CONNECT, "socketPath cannot be empty"));
   }
 
-  let (event_tx, mut event_rx) = mpsc::unbounded_channel::<Value>();
+  let config = AssemblyConfig {
+    agent_id: String::new(),
+    socket_path: Some(socket_path),
+  };
+  let resolved = config.resolve_socket_path();
 
-  let state = Arc::new(ClientState {
-    socket_path,
-    closed: AtomicBool::new(false),
-    event_tx: std::sync::Mutex::new(Some(event_tx)),
-    event_loop: std::sync::Mutex::new(None),
-    event_sink: std::sync::Mutex::new(None),
-  });
+  let ipc =
+    spawn_ipc_thread(resolved).map_err(|err| typed_error(ERR_CONNECT, &err.to_string()))?;
+  let client = AssemblyClient::new(ipc, Vec::new());
 
-  let state_for_loop = Arc::clone(&state);
-
-  // Simulate an always-on IPC pump. The task yields each iteration so JS stays non-blocking.
-  let loop_handle = tokio::spawn(async move {
-    while let Some(event) = event_rx.recv().await {
-      if let Ok(payload) = serde_json::to_string(&event) {
-        if let Ok(guard) = state_for_loop.event_sink.lock() {
-          if let Some(sink) = guard.as_ref() {
-            let _ = sink.call(payload, ThreadsafeFunctionCallMode::NonBlocking);
-          }
-        }
-      }
-      tokio::task::yield_now().await;
-    }
-  });
-
-  if let Ok(mut guard) = state.event_loop.lock() {
-    *guard = Some(loop_handle);
-  }
-
-  Ok(ClientHandle { inner: state })
-}
-
-#[napi]
-pub fn send_event(handle: &ClientHandle, event: Value) -> Result<()> {
-  if handle.inner.closed.load(Ordering::Relaxed) {
-    return Err(typed_error(
-      ERR_SEND_EVENT,
-      "client is disconnected; sendEvent is unavailable",
-    ));
-  }
-
-  let send_result = handle
-    .inner
-    .event_tx
-    .lock()
-    .map_err(|_| typed_error(ERR_SEND_EVENT, "event queue lock poisoned"))?
-    .as_ref()
-    .ok_or_else(|| typed_error(ERR_SEND_EVENT, "event queue has been closed"))?
-    .send(event);
-
-  send_result.map_err(|_| typed_error(ERR_SEND_EVENT, "failed to enqueue event"))
-}
-
-#[napi]
-pub async fn query_policy(handle: &ClientHandle, action: Value) -> Result<PolicyResult> {
-  if handle.inner.closed.load(Ordering::Relaxed) {
-    return Err(typed_error(
-      ERR_QUERY_POLICY,
-      "client is disconnected; queryPolicy is unavailable",
-    ));
-  }
-
-  let denied = action
-    .get("denied")
-    .and_then(Value::as_bool)
-    .or_else(|| action.get("deny").and_then(Value::as_bool));
-
-  let pending = action.get("pending").and_then(Value::as_bool);
-  let reason = action
-    .get("reason")
-    .and_then(Value::as_str)
-    .map(ToOwned::to_owned);
-
-  Ok(PolicyResult {
-    denied: Some(denied.unwrap_or(false)),
-    pending: Some(pending.unwrap_or(false)),
-    reason,
+  Ok(ClientHandle {
+    inner: Arc::new(client),
   })
 }
 
+/// Ship a captured event to the runtime.
+///
+/// The JS event object is translated to the shared client's
+/// `(event_type, details)` shape and forwarded via
+/// [`AssemblyClient::report_event`]. Advisory preflight (inside the shared
+/// client) may redact locally; the runtime re-scans the event authoritatively
+/// regardless.
 #[napi]
-pub async fn disconnect(handle: &ClientHandle) -> Result<()> {
-  if handle.inner.closed.swap(true, Ordering::Relaxed) {
-    return Ok(());
-  }
-
+pub fn send_event(handle: &ClientHandle, event: Value) -> Result<()> {
+  let (event_type, details) = translate_event(event);
   handle
     .inner
-    .event_tx
-    .lock()
-    .map_err(|_| typed_error(ERR_DISCONNECT, "event queue lock poisoned"))?
-    .take();
-
-  let event_loop = handle
-    .inner
-    .event_loop
-    .lock()
-    .map_err(|_| typed_error(ERR_DISCONNECT, "event loop lock poisoned"))?
-    .take();
-
-  if let Some(event_loop) = event_loop {
-    event_loop
-      .await
-      .map_err(|err| typed_error(ERR_DISCONNECT, &format!("event loop join error: {err}")))?;
-  }
-
-  Ok(())
+    .report_event(event_type, details)
+    .map_err(|err| typed_error(ERR_SEND_EVENT, &err.to_string()))
 }
 
+/// Shut down the session and join the background IPC thread.
+///
+/// Idempotent — delegates to [`AssemblyClient::shutdown`], which blocks on the
+/// background-thread join, so it runs on a blocking task to keep the napi async
+/// runtime free.
 #[napi]
-pub fn set_event_listener(handle: &ClientHandle, callback: Function<'_, String, ()>) -> Result<()> {
-  let sink = callback
-    .build_threadsafe_function::<String>()
-    .build()
-    .map_err(|err| typed_error(ERR_SET_EVENT_LISTENER, &err.to_string()))?;
-
-  let mut guard = handle
-    .inner
-    .event_sink
-    .lock()
-    .map_err(|_| typed_error(ERR_SET_EVENT_LISTENER, "event sink lock poisoned"))?;
-  *guard = Some(sink);
-
-  Ok(())
+pub async fn disconnect(handle: &ClientHandle) -> Result<()> {
+  let client = Arc::clone(&handle.inner);
+  tokio::task::spawn_blocking(move || client.shutdown())
+    .await
+    .map_err(|err| typed_error(ERR_DISCONNECT, &err.to_string()))?
+    .map_err(|err| typed_error(ERR_DISCONNECT, &err.to_string()))
 }
 
-#[napi]
-pub fn socket_path(handle: &ClientHandle) -> Result<String> {
-  Ok(handle.inner.socket_path.clone())
+/// Translate a JS event object into the shared client's `(event_type, details)`
+/// pair.
+///
+/// `event_type` is read from the object's `event_type` field (falling back to
+/// `"event"`); the whole object is serialized as `details` so no captured data
+/// is dropped before the runtime re-scans it.
+fn translate_event(event: Value) -> (String, String) {
+  let event_type = event
+    .get("event_type")
+    .and_then(Value::as_str)
+    .unwrap_or("event")
+    .to_string();
+  let details = serde_json::to_string(&event).unwrap_or_default();
+  (event_type, details)
 }
 
 fn typed_error(code: &str, message: &str) -> Error {
