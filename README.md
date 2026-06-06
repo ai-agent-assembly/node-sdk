@@ -38,7 +38,7 @@ during `postinstall`. No additional build step is required for typical consumers
 import { initAssembly, withAssembly } from "@agent-assembly/sdk";
 import { ChatOpenAI } from "@langchain/openai";
 
-const ctx = await initAssembly({ gatewayUrl: "http://localhost:8080", agentId: "demo" });
+const ctx = await initAssembly({ gatewayUrl: "http://localhost:7391", agentId: "demo" });
 const governedTools = withAssembly(myTools, { context: ctx });
 const model = new ChatOpenAI({ model: "gpt-4o-mini" }).bindTools(governedTools);
 ```
@@ -49,7 +49,7 @@ const model = new ChatOpenAI({ model: "gpt-4o-mini" }).bindTools(governedTools);
 const { initAssembly, withAssembly } = require("@agent-assembly/sdk");
 const { ChatOpenAI } = require("@langchain/openai");
 
-const ctx = await initAssembly({ gatewayUrl: "http://localhost:8080", agentId: "demo" });
+const ctx = await initAssembly({ gatewayUrl: "http://localhost:7391", agentId: "demo" });
 const governedTools = withAssembly(myTools, { context: ctx });
 const model = new ChatOpenAI({ model: "gpt-4o-mini" }).bindTools(governedTools);
 ```
