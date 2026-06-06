@@ -11,7 +11,6 @@ export interface PolicyResult {
 interface NativeBinding {
   connect: (socketPath: string) => Promise<object>;
   sendEvent: (handle: object, event: unknown) => void;
-  queryPolicy: (handle: object, action: unknown) => Promise<PolicyResult>;
   disconnect: (handle: object) => Promise<void>;
 }
 
@@ -187,17 +186,19 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
           pendingSendError = mapNativeError(error);
         });
     },
-    queryPolicy: async (action: unknown) => {
+    queryPolicy: async () => {
       if (pendingSendError) {
         const error = pendingSendError;
         pendingSendError = undefined;
         throw error;
       }
 
-      const handle = await getHandle();
-      return binding.queryPolicy(handle, action).catch((error: unknown) => {
-        throw mapNativeError(error);
-      });
+      // The SDK is not a policy authority. Ensure the session is connected
+      // (surfacing any connect error), then defer: authoritative policy and
+      // approval are enforced server-side (gateway / runtime). The native shim
+      // no longer synthesizes a decision, so this always resolves neutral.
+      await getHandle();
+      return { denied: false, pending: false };
     }
   };
 }

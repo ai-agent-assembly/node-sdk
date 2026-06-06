@@ -102,7 +102,7 @@ describe("createNativeClient", () => {
     await expect(client.close()).resolves.toBeUndefined();
   });
 
-  it("loads binding and forwards queryPolicy/close in napi-inprocess mode", async () => {
+  it("loads binding and connects in napi-inprocess mode; queryPolicy defers neutrally", async () => {
     const binding = {
       connect: vi.fn(async () => ({ id: "handle-1" })),
       sendEvent: vi.fn(() => undefined),
@@ -118,10 +118,13 @@ describe("createNativeClient", () => {
       mode: "napi-inprocess"
     });
 
+    // The SDK is not a policy authority: queryPolicy resolves neutral and never
+    // consults the native binding, even when the binding would report a denial.
     await expect(client.queryPolicy({ action: "check" })).resolves.toEqual({
-      denied: true,
-      reason: "blocked"
+      denied: false,
+      pending: false
     });
+    expect(binding.queryPolicy).not.toHaveBeenCalled();
 
     expect(binding.connect).toHaveBeenCalledWith("/tmp/aa.sock");
     await expect(client.close()).resolves.toBeUndefined();
@@ -246,13 +249,11 @@ describe("createNativeClient", () => {
     );
   });
 
-  it("maps queryPolicy and disconnect failures to typed native errors", async () => {
+  it("maps disconnect failures to a typed native error", async () => {
     const binding = {
       connect: vi.fn(async () => ({ id: "handle-4" })),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => {
-        throw new Error("AA_ERR_QUERY_POLICY:query failed");
-      }),
+      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
       disconnect: vi.fn(async () => {
         throw new Error("AA_ERR_DISCONNECT:disconnect failed");
       })
@@ -265,9 +266,9 @@ describe("createNativeClient", () => {
       mode: "napi-inprocess"
     });
 
-    await expect(client.queryPolicy({ action: "check" })).rejects.toBeInstanceOf(
-      mod.NativeQueryPolicyError
-    );
+    // queryPolicy ensures the session is connected; a failing disconnect then
+    // surfaces as a typed NativeDisconnectError on close.
+    await client.queryPolicy({ action: "check" });
     await expect(client.close()).rejects.toBeInstanceOf(mod.NativeDisconnectError);
   });
 
