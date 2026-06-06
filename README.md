@@ -190,8 +190,10 @@ Native integration acceptance test:
 
 - `AA_NATIVE_TEST=1 pnpm vitest run tests/native-napi-integration.test.ts`
 
-The `build-addon` GitHub workflow produces prebuilt `index.node` artifacts
-for Node 18/20/22 on Linux/macOS/Windows.
+The `build-addon` GitHub workflow compiles the native addon (Node 20 and 22): an
+ubuntu-only debug build on pull requests, and ubuntu + macOS builds on `master` and release
+tags. The addon embeds a Unix-domain-socket transport and **does not build on Windows**;
+Windows consumers use `grpc-sidecar` mode.
 
 ## Packaging Layout (AAASM-61)
 
@@ -201,8 +203,11 @@ The package now publishes dual module outputs with explicit conditional exports:
 - CJS entry: `./dist/cjs/index.js`
 - Type declarations: `./dist/types/index.d.ts`
 
-Platform-native binaries are declared via `optionalDependencies` and selected
-during `postinstall` based on `process.platform` and `process.arch`.
+The four `@agent-assembly/runtime-*` packages (`runtime-linux-x64`, `runtime-linux-arm64`,
+`runtime-darwin-x64`, `runtime-darwin-arm64`) are declared as `optionalDependencies`,
+`os`/`cpu`-constrained so only the matching platform installs. They carry the `aasm`
+runtime binary; there is no Windows runtime package. The napi-rs `.node` addon is loaded at
+runtime by `native/aa-ffi-node/index.cjs`.
 
 Package verification checks include:
 
