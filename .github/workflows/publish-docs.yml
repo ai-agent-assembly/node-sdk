@@ -5,7 +5,6 @@ on:
     paths:
       - "docs/**"
       - "website/**"
-      - "src/**"
       - ".github/workflows/publish-docs.yml"
   push:
     branches:
