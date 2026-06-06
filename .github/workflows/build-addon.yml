@@ -29,7 +29,10 @@ jobs:
         # is Unix-domain sockets (tokio UnixStream/UnixListener, cfg(unix)). It
         # does not build on Windows, and the SDK ships no Windows native runtime
         # (see optionalDependencies); Windows consumers use grpc-sidecar mode.
-        os: [ubuntu-latest, macos-latest]
+        # Per-PR builds are ubuntu-only (fast public-minute feedback);
+        # macOS is added on push:master and tags, where the prebuilt
+        # release artifacts are actually consumed (AAASM-2664).
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest","macos-latest"]') }}
         node-version: [20, 22]
 
     steps:
