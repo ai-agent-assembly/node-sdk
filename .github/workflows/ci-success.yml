@@ -1,0 +1,45 @@
+name: CI Success
+
+# Single aggregate gate for branch protection. Instead of requiring ~20
+# individual matrix-leg check names (which change whenever the matrix
+# changes), branch protection can require just this one "CI Success" check.
+#
+# It runs after the key PR workflows complete (via workflow_run) and fails
+# if any of them concluded as failure / cancelled / timed_out. A skipped
+# workflow (e.g. paths-filtered out) is treated as success so that docs-only
+# or unrelated PRs are not blocked. AAASM-2664.
+
+on:
+  workflow_run:
+    workflows:
+      - test-matrix
+      - build-addon
+      - module-system-smoke
+      - pre-commit-checks
+      - quality-report
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  ci-success:
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Verify upstream workflow conclusion
+        env:
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: |
+          echo "Upstream workflow '${WORKFLOW}' concluded: ${CONCLUSION}"
+          case "${CONCLUSION}" in
+            success|skipped|neutral)
+              echo "::notice::'${WORKFLOW}' passed the CI Success gate (${CONCLUSION})."
+              ;;
+            *)
+              echo "::error::'${WORKFLOW}' did not pass: conclusion=${CONCLUSION}"
+              exit 1
+              ;;
+          esac
