@@ -63,7 +63,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build napi addon
+      # On PRs, a fast debug build is enough to prove the addon compiles
+      # and the napi bindings load. Release builds (optimised, --platform
+      # suffixed prebuilds) run only on push:master / tags (AAASM-2664).
+      - name: Build napi addon (debug, PR)
+        if: github.event_name == 'pull_request'
+        run: pnpm native:build
+
+      - name: Build napi addon (release, push/tag)
+        if: github.event_name != 'pull_request'
         run: pnpm native:build:release
 
       - name: Run native integration acceptance
