@@ -194,3 +194,18 @@ Full guides, architecture deep-dives, and the complete API reference are publish
 
 The site is built from the `docs/` (content) and `website/` (Docusaurus app) directories
 and is re-published on every push to `master` via the `publish-docs.yml` workflow.
+
+## Related projects
+
+`@agent-assembly/sdk` is one client of the Agent Assembly platform. The governance
+decisions it enforces are made by the core Rust runtime; the protocol it speaks is shared
+across all SDKs.
+
+| Project | What it is |
+| ------- | ---------- |
+| [agent-assembly](https://github.com/AI-agent-assembly/agent-assembly) | Core Rust runtime — gateway, policy engine, proxy, eBPF, CLI (`aasm`). The protocol specification lives here. |
+| [Documentation site](https://ai-agent-assembly.github.io/agent-assembly-docs/) | Canonical, cross-repo documentation for the whole platform. |
+| [python-sdk](https://github.com/AI-agent-assembly/python-sdk) | Sibling SDK for Python. |
+| [go-sdk](https://github.com/AI-agent-assembly/go-sdk) | Sibling SDK for Go. |
+| [Release notes](https://github.com/AI-agent-assembly/node-sdk/releases) | Per-version changelog for this package. |
+| [Organization profile](https://github.com/AI-agent-assembly) | Index of every Agent Assembly repository and its status. |
