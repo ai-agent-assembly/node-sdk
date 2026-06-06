@@ -51,12 +51,12 @@ flowchart TD
 Both `gatewayUrl` and `apiKey` are resolved with the same four-step precedence
 (highest first). The first source that yields a value wins:
 
-| Priority | Source | URL key | API-key key |
-| -------- | ------ | ------- | ----------- |
-| 1 | Explicit field on `config` | `gatewayUrl` | `apiKey` |
-| 2 | Environment variable | `AAASM_GATEWAY_URL` | `AAASM_API_KEY` |
-| 3 | Config file `~/.aasm/config.yaml` | `agent.gateway_url` | `agent.api_key` |
-| 4 | Local default | `http://localhost:7391` (probed; auto-started if absent) | `""` (local mode accepts unauthenticated agents) |
+| Priority | Source                            | URL key                                                  | API-key key                                      |
+| -------- | --------------------------------- | -------------------------------------------------------- | ------------------------------------------------ |
+| 1        | Explicit field on `config`        | `gatewayUrl`                                             | `apiKey`                                         |
+| 2        | Environment variable              | `AAASM_GATEWAY_URL`                                      | `AAASM_API_KEY`                                  |
+| 3        | Config file `~/.aasm/config.yaml` | `agent.gateway_url`                                      | `agent.api_key`                                  |
+| 4        | Local default                     | `http://localhost:7391` (probed; auto-started if absent) | `""` (local mode accepts unauthenticated agents) |
 
 The config file is optional and parsed only when the `js-yaml` soft dependency is
 present; a missing file, missing `js-yaml`, or malformed contents are treated as
@@ -78,30 +78,30 @@ time. See [Troubleshooting](./troubleshooting.md) for the recovery paths.
 
 ## `AssemblyConfig` fields
 
-| Field | Type | Default | Purpose |
-| ----- | ---- | ------- | ------- |
-| `gatewayUrl` | `string` | resolved (see above) | Base URL of the Agent Assembly gateway. |
-| `apiKey` | `string` | resolved (see above) | Credential for the gateway; empty in local mode. |
-| `agentId` | `string` | _none_ | Stable identifier for this agent. |
-| `mode` | `AssemblyMode` | `"auto"` | Transport selection (see below). |
-| `enforcementMode` | `EnforcementMode` | gateway default (`"enforce"`) | Per-agent governance posture sent at registration (see below). |
-| `parentAgentId` | `string` | async-lineage value | Parent agent that delegated to this one. |
-| `teamId` | `string` | _none_ | Team for budget and policy scoping. |
-| `delegationReason` | `string` | _none_ | Why this agent was delegated to; **must be ≤ 256 chars** or `initAssembly` throws `RangeError`. |
-| `spawnedByTool` | `string` | _none_ | Name of the tool that spawned this agent. |
-| `langchain` | `LangChainAdapterConfig` | _none_ | LangChain callbacks/tools/approval timeout. |
-| `gatewayClient` | `GatewayClient` | created internally | Inject a pre-built client (mainly for tests). |
+| Field              | Type                     | Default                       | Purpose                                                                                         |
+| ------------------ | ------------------------ | ----------------------------- | ----------------------------------------------------------------------------------------------- |
+| `gatewayUrl`       | `string`                 | resolved (see above)          | Base URL of the Agent Assembly gateway.                                                         |
+| `apiKey`           | `string`                 | resolved (see above)          | Credential for the gateway; empty in local mode.                                                |
+| `agentId`          | `string`                 | _none_                        | Stable identifier for this agent.                                                               |
+| `mode`             | `AssemblyMode`           | `"auto"`                      | Transport selection (see below).                                                                |
+| `enforcementMode`  | `EnforcementMode`        | gateway default (`"enforce"`) | Per-agent governance posture sent at registration (see below).                                  |
+| `parentAgentId`    | `string`                 | async-lineage value           | Parent agent that delegated to this one.                                                        |
+| `teamId`           | `string`                 | _none_                        | Team for budget and policy scoping.                                                             |
+| `delegationReason` | `string`                 | _none_                        | Why this agent was delegated to; **must be ≤ 256 chars** or `initAssembly` throws `RangeError`. |
+| `spawnedByTool`    | `string`                 | _none_                        | Name of the tool that spawned this agent.                                                       |
+| `langchain`        | `LangChainAdapterConfig` | _none_                        | LangChain callbacks/tools/approval timeout.                                                     |
+| `gatewayClient`    | `GatewayClient`          | created internally            | Inject a pre-built client (mainly for tests).                                                   |
 
 ### `mode`
 
 `AssemblyMode` selects how the SDK reaches the runtime:
 
-| Value | Behavior |
-| ----- | -------- |
-| `"auto"` | Default. Pick the transport automatically. |
-| `"sdk-only"` | No network layer and no registration event — in-process bookkeeping only. |
-| `"grpc-sidecar"` | Talk to a separate gateway process over gRPC. |
-| `"napi-inprocess"` | Use the in-process napi-rs binding. |
+| Value              | Behavior                                                                  |
+| ------------------ | ------------------------------------------------------------------------- |
+| `"auto"`           | Default. Pick the transport automatically.                                |
+| `"sdk-only"`       | No network layer and no registration event — in-process bookkeeping only. |
+| `"grpc-sidecar"`   | Talk to a separate gateway process over gRPC.                             |
+| `"napi-inprocess"` | Use the in-process napi-rs binding.                                       |
 
 ### `enforcementMode`
 
@@ -109,11 +109,11 @@ time. See [Troubleshooting](./troubleshooting.md) for the recovery paths.
 the registration payload and the gateway applies its server-side default (`"enforce"`),
 preserving the pre-feature wire shape.
 
-| Value | Behavior |
-| ----- | -------- |
-| `"enforce"` | Default. Deny blocks the action; redact strips secrets. |
-| `"observe"` | Dry-run. Every action proceeds; would-be violations are recorded as shadow audit events (`aa audit list --dry-run-only`). |
-| `"disabled"` | Policy evaluation skipped entirely. Hermetic tests only. |
+| Value        | Behavior                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `"enforce"`  | Default. Deny blocks the action; redact strips secrets.                                                                   |
+| `"observe"`  | Dry-run. Every action proceeds; would-be violations are recorded as shadow audit events (`aa audit list --dry-run-only`). |
+| `"disabled"` | Policy evaluation skipped entirely. Hermetic tests only.                                                                  |
 
 Unknown values throw a `RangeError` so a typo can never silently downgrade an agent into
 live enforcement when the operator meant `observe`.
@@ -139,7 +139,7 @@ const ctx = await initAssembly({
   agentId: "research-agent",
   teamId: "growth",
   enforcementMode: "observe",
-  delegationReason: "summarize quarterly metrics",
+  delegationReason: "summarize quarterly metrics"
 });
 ```
 

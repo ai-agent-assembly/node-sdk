@@ -35,7 +35,7 @@ Both paths resolve a `v*.*.*` tag and reject anything that is not SemVer.
    `AI-agent-assembly/agent-assembly` GitHub Release.
 2. Stage each binary into the corresponding `packages/runtime-*/bin/aasm` by Rust target:
    `x86_64-unknown-linux-gnu → runtime-linux-x64`, `aarch64-unknown-linux-gnu →
-   runtime-linux-arm64`, `x86_64-apple-darwin → runtime-darwin-x64`,
+runtime-linux-arm64`, `x86_64-apple-darwin → runtime-darwin-x64`,
    `aarch64-apple-darwin → runtime-darwin-arm64`.
 3. Bump all five `package.json` files (and the `@agent-assembly/runtime-*`
    `optionalDependencies` ranges) to the tag's version.

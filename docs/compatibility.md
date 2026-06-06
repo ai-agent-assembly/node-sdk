@@ -11,10 +11,10 @@ requires **Node.js ≥ 18.18.0**; older lines (≤ 16) are unsupported.
 
 | Node.js | Linux | macOS | Windows |
 | ------- | ----- | ----- | ------- |
-| 18 | ✅ | ✅ | ✅ |
-| 20 | ✅ | ✅ | ✅ |
-| 22 | ✅ | ✅ | ✅ |
-| 24 | ✅ | ✅ | ✅ |
+| 18      | ✅    | ✅    | ✅      |
+| 20      | ✅    | ✅    | ✅      |
+| 22      | ✅    | ✅    | ✅      |
+| 24      | ✅    | ✅    | ✅      |
 
 This matrix is enforced by `.github/workflows/test-matrix.yml`, which runs the full grid on
 pushes to `master` and on release tags, and an ubuntu-only subset on pull requests for fast

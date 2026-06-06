@@ -27,15 +27,15 @@ const searchWeb = {
   name: "search_web",
   invoke: async (input: { q: string }) => {
     return `results for ${input.q}`;
-  },
+  }
 };
 
 const ctx = await initAssembly({
   agentId: "demo",
   langchain: {
     tools: { searchWeb },
-    approvalTimeoutMs: 30_000, // optional; how long to wait on a "pending" decision
-  },
+    approvalTimeoutMs: 30_000 // optional; how long to wait on a "pending" decision
+  }
 });
 
 // Governed: if policy denies the call, invoke() rejects with a PolicyViolationError.
@@ -60,8 +60,8 @@ import { withAssembly } from "@agent-assembly/sdk";
 const tools = {
   search: {
     description: "Search the web",
-    execute: async (args: { query: string }) => `result:${args.query}`,
-  },
+    execute: async (args: { query: string }) => `result:${args.query}`
+  }
 };
 
 // `gatewayClient` is required; inject the client you constructed (e.g. the same one you
@@ -87,13 +87,13 @@ console.log(ctx.activeAdapters);
 // e.g. ["vercel-ai-sdk"] or ["openai-agents"] or ["langgraph-js"] or ["mastra"]
 ```
 
-| Framework | Detected package | Status |
-| --------- | ---------------- | ------ |
-| LangChain | `@langchain/core` | Validated (test suite) |
-| OpenAI Agents | `@openai/agents` | Experimental (auto-detect patch) |
-| Vercel AI SDK | `ai` | Experimental (auto-detect patch) |
-| LangGraph | `@langchain/langgraph` | Experimental (auto-detect patch) |
-| Mastra | `@mastra/core` | Experimental (auto-detect patch) |
+| Framework     | Detected package       | Status                           |
+| ------------- | ---------------------- | -------------------------------- |
+| LangChain     | `@langchain/core`      | Validated (test suite)           |
+| OpenAI Agents | `@openai/agents`       | Experimental (auto-detect patch) |
+| Vercel AI SDK | `ai`                   | Experimental (auto-detect patch) |
+| LangGraph     | `@langchain/langgraph` | Experimental (auto-detect patch) |
+| Mastra        | `@mastra/core`         | Experimental (auto-detect patch) |
 
 > **Tool naming caveat (Vercel AI SDK).** Vercel AI SDK tools do not expose a `.name`
 > field, so governance policies must match by tool description content (or the tool-map
