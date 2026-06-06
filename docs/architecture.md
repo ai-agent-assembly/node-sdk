@@ -25,11 +25,16 @@ flowchart LR
     F -->|gRPC / in-process| G["Agent Assembly gateway"]
 ```
 
-The per-platform binary is shipped as an `optionalDependencies` entry
-(`@agent-assembly/linux-x64-gnu`, `darwin-x64`, `darwin-arm64`, `win32-x64-msvc`) and
-selected at install time by `scripts/postinstall.mjs` based on `process.platform` and
-`process.arch`. Consumers who can't use a prebuilt binary may rebuild via
-`pnpm native:build:release` against a local Rust toolchain.
+Four `@agent-assembly/runtime-*` packages — `runtime-linux-x64`, `runtime-linux-arm64`,
+`runtime-darwin-x64`, and `runtime-darwin-arm64` — are declared as `optionalDependencies`.
+Each is constrained by `os`/`cpu` so npm installs only the one matching the host, and each
+carries the platform `aasm` runtime binary the SDK can auto-start as a local gateway.
+There is no prebuilt package for Windows; Windows hosts build the native addon from source.
+
+The napi-rs `.node` addon itself is loaded at runtime by `native/aa-ffi-node/index.cjs`
+(which resolves `index.node`, or a platform-suffixed `index.*.node`). Consumers who need
+to (re)build it locally can run `pnpm native:build:release` against a Rust toolchain — see
+[Troubleshooting](./troubleshooting.md).
 
 ## Framework adapters and the AdapterRegistry
 
