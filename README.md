@@ -95,8 +95,8 @@ selects ESM or CJS automatically based on how the consumer imports it.
 
 `initAssembly()` registers the LangChain callback handler and auto-wraps the configured
 tools, so each is checked against gateway policy before invocation. For more frameworks
-and the lower-level `withAssembly()` wrapper, see the
-[Examples](https://ai-agent-assembly.github.io/node-sdk/examples) guide.
+and the lower-level `withAssembly()` wrapper, see the **Examples** guide on the
+[documentation site](https://ai-agent-assembly.github.io/node-sdk/).
 
 ## Supported Node.js versions
 
