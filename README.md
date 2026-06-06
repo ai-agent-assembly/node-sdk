@@ -46,33 +46,57 @@ during `postinstall`. No additional build step is required for typical consumers
 
 ## Quickstart
 
+Pass your LangChain-style tools (`{ name, invoke }`) to `initAssembly` under
+`langchain.tools`. Each tool is wrapped **in place** so every `invoke()` is checked
+against gateway policy before it runs.
+
 ### ESM (`import`)
 
 ```ts
-import { initAssembly, withAssembly } from "@agent-assembly/sdk";
-import { ChatOpenAI } from "@langchain/openai";
+import { initAssembly } from "@agent-assembly/sdk";
 
-const ctx = await initAssembly({ gatewayUrl: "http://localhost:7391", agentId: "demo" });
-const governedTools = withAssembly(myTools, { context: ctx });
-const model = new ChatOpenAI({ model: "gpt-4o-mini" }).bindTools(governedTools);
+const searchWeb = {
+  name: "search_web",
+  invoke: async (input: { q: string }) => `results for ${input.q}`,
+};
+
+const ctx = await initAssembly({
+  gatewayUrl: "http://localhost:7391",
+  agentId: "demo",
+  langchain: { tools: { searchWeb } },
+});
+
+await searchWeb.invoke({ q: "agent assembly" }); // governed; throws on policy deny
+await ctx.shutdown();
 ```
 
 ### CJS (`require`)
 
 ```js
-const { initAssembly, withAssembly } = require("@agent-assembly/sdk");
-const { ChatOpenAI } = require("@langchain/openai");
+const { initAssembly } = require("@agent-assembly/sdk");
 
-const ctx = await initAssembly({ gatewayUrl: "http://localhost:7391", agentId: "demo" });
-const governedTools = withAssembly(myTools, { context: ctx });
-const model = new ChatOpenAI({ model: "gpt-4o-mini" }).bindTools(governedTools);
+const searchWeb = {
+  name: "search_web",
+  invoke: async (input) => `results for ${input.q}`,
+};
+
+const ctx = await initAssembly({
+  gatewayUrl: "http://localhost:7391",
+  agentId: "demo",
+  langchain: { tools: { searchWeb } },
+});
+
+await searchWeb.invoke({ q: "agent assembly" });
+await ctx.shutdown();
 ```
 
 Both entrypoints resolve to the same governance pipeline; the package's `exports` field
 selects ESM or CJS automatically based on how the consumer imports it.
 
-`initAssembly()` registers the LangChain callback handler and the AdapterRegistry, so any
-tool wrapped by `withAssembly()` is checked against gateway policy before invocation.
+`initAssembly()` registers the LangChain callback handler and auto-wraps the configured
+tools, so each is checked against gateway policy before invocation. For more frameworks
+and the lower-level `withAssembly()` wrapper, see the
+[Examples](https://ai-agent-assembly.github.io/node-sdk/examples) guide.
 
 ## Supported Node.js versions
 
