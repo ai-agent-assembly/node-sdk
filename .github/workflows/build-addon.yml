@@ -21,7 +21,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # The napi addon embeds aa-sdk-client, whose aa-runtime IPC transport
+        # is Unix-domain sockets (tokio UnixStream/UnixListener, cfg(unix)). It
+        # does not build on Windows, and the SDK ships no Windows native runtime
+        # (see optionalDependencies); Windows consumers use grpc-sidecar mode.
+        os: [ubuntu-latest, macos-latest]
         node-version: [20, 22]
 
     steps:
