@@ -8,6 +8,20 @@
 
 TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 
+## Project status
+
+> **Pre-1.0 / alpha.** The current release line is `0.0.1-alpha.x`, published to npm under
+> the `alpha` dist-tag. The public surface (`initAssembly`, `withAssembly`) is stabilizing
+> but **may change between alpha releases**, and per-platform native packaging is still
+> being hardened. Pin an exact version for reproducible installs and review the
+> [release notes](https://github.com/AI-agent-assembly/node-sdk/releases) before upgrading.
+> Production deployments should track the first `0.1.0` release.
+
+```bash
+pnpm add @agent-assembly/sdk@alpha   # latest alpha
+pnpm add @agent-assembly/sdk@0.0.1-alpha.3   # pin exact
+```
+
 ## Prerequisites
 
 Before installing or contributing, ensure your environment has:
