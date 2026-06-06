@@ -209,3 +209,15 @@ across all SDKs.
 | [go-sdk](https://github.com/AI-agent-assembly/go-sdk) | Sibling SDK for Go. |
 | [Release notes](https://github.com/AI-agent-assembly/node-sdk/releases) | Per-version changelog for this package. |
 | [Organization profile](https://github.com/AI-agent-assembly) | Index of every Agent Assembly repository and its status. |
+
+## Support & security
+
+- **Questions and bug reports** — open an issue on the
+  [node-sdk issue tracker](https://github.com/AI-agent-assembly/node-sdk/issues). Include
+  your Node.js version, OS/arch, and the SDK version (`pnpm why @agent-assembly/sdk`).
+- **Security vulnerabilities** — please do **not** file a public issue. Report privately
+  via the repository's
+  [security advisories](https://github.com/AI-agent-assembly/node-sdk/security/advisories)
+  page so a fix can be coordinated before disclosure.
+- **Contributing** — see [CONTRIBUTING.md](./CONTRIBUTING.md) for environment setup, the
+  adapter-authoring guide, and the test/commit conventions.
