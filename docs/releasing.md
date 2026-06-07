@@ -32,7 +32,7 @@ Both paths resolve a `v*.*.*` tag and reject anything that is not SemVer.
 ## Steps
 
 1. Download the `aasm-<rust-target>.tar.gz` assets from the **matching**
-   `AI-agent-assembly/agent-assembly` GitHub Release.
+   `ai-agent-assembly/agent-assembly` GitHub Release.
 2. Stage each binary into the corresponding `packages/runtime-*/bin/aasm` by Rust target:
    `x86_64-unknown-linux-gnu → runtime-linux-x64`, `aarch64-unknown-linux-gnu →
 runtime-linux-arm64`, `x86_64-apple-darwin → runtime-darwin-x64`,

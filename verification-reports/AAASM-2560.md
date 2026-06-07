@@ -17,7 +17,7 @@
 > [AAASM-2567]: https://lightning-dust-mite.atlassian.net/browse/AAASM-2567
 > [AAASM-2568]: https://lightning-dust-mite.atlassian.net/browse/AAASM-2568
 > [AAASM-2570]: https://lightning-dust-mite.atlassian.net/browse/AAASM-2570
-> [#82]: https://github.com/AI-agent-assembly/node-sdk/pull/82
+> [#82]: https://github.com/ai-agent-assembly/node-sdk/pull/82
 
 ## Sub-task roll-up
 
