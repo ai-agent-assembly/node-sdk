@@ -1,10 +1,10 @@
 # @agent-assembly/sdk
 
 [![npm version](https://img.shields.io/npm/v/@agent-assembly/sdk.svg)](https://www.npmjs.com/package/@agent-assembly/sdk)
-[![CI](https://github.com/AI-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master)](https://github.com/AI-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
+[![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=AI-agent-assembly_node-sdk&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=AI-agent-assembly_node-sdk)
-[![codecov](https://codecov.io/gh/AI-agent-assembly/node-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/AI-agent-assembly/node-sdk)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ai-agent-assembly_node-sdk&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ai-agent-assembly_node-sdk)
+[![codecov](https://codecov.io/gh/ai-agent-assembly/node-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/ai-agent-assembly/node-sdk)
 
 TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 
@@ -14,7 +14,7 @@ TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 > the `alpha` dist-tag. The public surface (`initAssembly`, `withAssembly`) is stabilizing
 > but **may change between alpha releases**, and per-platform native packaging is still
 > being hardened. Pin an exact version for reproducible installs and review the
-> [release notes](https://github.com/AI-agent-assembly/node-sdk/releases) before upgrading.
+> [release notes](https://github.com/ai-agent-assembly/node-sdk/releases) before upgrading.
 > Production deployments should track the first `0.1.0` release.
 
 ```bash
@@ -232,21 +232,21 @@ across all SDKs.
 
 | Project                                                                        | What it is                                                                                                    |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| [agent-assembly](https://github.com/AI-agent-assembly/agent-assembly)          | Core Rust runtime — gateway, policy engine, proxy, eBPF, CLI (`aasm`). The protocol specification lives here. |
+| [agent-assembly](https://github.com/ai-agent-assembly/agent-assembly)          | Core Rust runtime — gateway, policy engine, proxy, eBPF, CLI (`aasm`). The protocol specification lives here. |
 | [Documentation site](https://ai-agent-assembly.github.io/agent-assembly-docs/) | Canonical, cross-repo documentation for the whole platform.                                                   |
-| [python-sdk](https://github.com/AI-agent-assembly/python-sdk)                  | Sibling SDK for Python.                                                                                       |
-| [go-sdk](https://github.com/AI-agent-assembly/go-sdk)                          | Sibling SDK for Go.                                                                                           |
-| [Release notes](https://github.com/AI-agent-assembly/node-sdk/releases)        | Per-version changelog for this package.                                                                       |
-| [Organization profile](https://github.com/AI-agent-assembly)                   | Index of every Agent Assembly repository and its status.                                                      |
+| [python-sdk](https://github.com/ai-agent-assembly/python-sdk)                  | Sibling SDK for Python.                                                                                       |
+| [go-sdk](https://github.com/ai-agent-assembly/go-sdk)                          | Sibling SDK for Go.                                                                                           |
+| [Release notes](https://github.com/ai-agent-assembly/node-sdk/releases)        | Per-version changelog for this package.                                                                       |
+| [Organization profile](https://github.com/ai-agent-assembly)                   | Index of every Agent Assembly repository and its status.                                                      |
 
 ## Support & security
 
 - **Questions and bug reports** — open an issue on the
-  [node-sdk issue tracker](https://github.com/AI-agent-assembly/node-sdk/issues). Include
+  [node-sdk issue tracker](https://github.com/ai-agent-assembly/node-sdk/issues). Include
   your Node.js version, OS/arch, and the SDK version (`pnpm why @agent-assembly/sdk`).
 - **Security vulnerabilities** — please do **not** file a public issue. Report privately
   via the repository's
-  [security advisories](https://github.com/AI-agent-assembly/node-sdk/security/advisories)
+  [security advisories](https://github.com/ai-agent-assembly/node-sdk/security/advisories)
   page so a fix can be coordinated before disclosure.
 - **Contributing** — see [CONTRIBUTING.md](./CONTRIBUTING.md) for environment setup, the
   adapter-authoring guide, and the test/commit conventions.

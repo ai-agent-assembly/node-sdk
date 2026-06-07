@@ -89,7 +89,7 @@ jobs:
           # is published. So `gh release download` is guaranteed to find the
           # assets on the first try — no retry needed.
           gh release download "$RELEASE_TAG" \
-            --repo AI-agent-assembly/agent-assembly \
+            --repo ai-agent-assembly/agent-assembly \
             --pattern "aasm-*.tar.gz" \
             --dir bin-staging
           ls -la bin-staging/

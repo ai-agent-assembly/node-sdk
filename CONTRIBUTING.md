@@ -15,7 +15,7 @@ environment and start hacking on the Node.js SDK for Agent Assembly.
 ### Clone and install
 
 ```bash
-git clone https://github.com/AI-agent-assembly/node-sdk.git
+git clone https://github.com/ai-agent-assembly/node-sdk.git
 cd node-sdk
 pnpm install
 pnpm build

@@ -6,10 +6,10 @@ sidebar_position: 1
 # Introduction
 
 Welcome to the developer documentation for **`@agent-assembly/sdk`** — the TypeScript
-and Node.js SDK for [Agent Assembly](https://github.com/AI-agent-assembly).
+and Node.js SDK for [Agent Assembly](https://github.com/ai-agent-assembly).
 
 This site is the long-form companion to the GitHub repository
-[`AI-agent-assembly/node-sdk`](https://github.com/AI-agent-assembly/node-sdk). The
+[`ai-agent-assembly/node-sdk`](https://github.com/ai-agent-assembly/node-sdk). The
 repository's `README.md` covers installation and a quickstart; this site goes deeper into
 architecture, configuration, framework integration, and the auto-generated API reference.
 
@@ -30,9 +30,9 @@ architecture, configuration, framework integration, and the auto-generated API r
 
 ## Beyond this SDK
 
-- [agent-assembly](https://github.com/AI-agent-assembly/agent-assembly) — the core Rust
+- [agent-assembly](https://github.com/ai-agent-assembly/agent-assembly) — the core Rust
   runtime and the home of the protocol specification.
 - [Canonical documentation site](https://ai-agent-assembly.github.io/agent-assembly-docs/)
   — cross-repo platform documentation.
-- [Organization profile](https://github.com/AI-agent-assembly) — every Agent Assembly
+- [Organization profile](https://github.com/ai-agent-assembly) — every Agent Assembly
   repository and its status.

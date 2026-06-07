@@ -34,9 +34,9 @@
 
 | Sub-task | Title | Status | PR |
 |---|---|---|---|
-| [AAASM-1220] | Scaffold 4 platform runtime sub-packages | Done | [#42](https://github.com/AI-agent-assembly/node-sdk/pull/42) |
-| [AAASM-1221] | Wire optionalDependencies + SDK entrypoint re-export | Done | [#43](https://github.com/AI-agent-assembly/node-sdk/pull/43) |
-| [AAASM-1222] | Implement release-node.yml publish workflow | Done | [#45](https://github.com/AI-agent-assembly/node-sdk/pull/45) |
+| [AAASM-1220] | Scaffold 4 platform runtime sub-packages | Done | [#42](https://github.com/ai-agent-assembly/node-sdk/pull/42) |
+| [AAASM-1221] | Wire optionalDependencies + SDK entrypoint re-export | Done | [#43](https://github.com/ai-agent-assembly/node-sdk/pull/43) |
+| [AAASM-1222] | Implement release-node.yml publish workflow | Done | [#45](https://github.com/ai-agent-assembly/node-sdk/pull/45) |
 | [AAASM-1223] | Verify F113 acceptance | in this report | this PR |
 
 ## Walkthrough vs AAASM-1223 acceptance criteria
@@ -161,7 +161,7 @@ Workflow trace (read from `master @ 8d2f23e`):
 |---|---|
 | 1 | checkout + pnpm + node setup + `pnpm install --frozen-lockfile` |
 | 2 | Resolve tag version — semver-validate; reject non-`v*.*.*` |
-| 3 | `gh release download <tag> --repo AI-agent-assembly/agent-assembly --pattern "aasm-*.tar.gz"` — downloads 4 platform binaries from agent-assembly's matching release (AAASM-1200's output) |
+| 3 | `gh release download <tag> --repo ai-agent-assembly/agent-assembly --pattern "aasm-*.tar.gz"` — downloads 4 platform binaries from agent-assembly's matching release (AAASM-1200's output) |
 | 4 | Per-target `tar -xzf` into `packages/runtime-{platform}/bin/aasm` + `chmod +x` + strip `.gitkeep` placeholder |
 | 5 | Bump `version` in all 5 `package.json` + sync root SDK's `optionalDependencies['@agent-assembly/runtime-*']` to the same version |
 | 6 | `pnpm build` (ESM + CJS dual build) |

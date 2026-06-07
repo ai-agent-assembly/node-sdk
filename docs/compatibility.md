@@ -43,7 +43,7 @@ dual build is produced.
 ## Core runtime
 
 `@agent-assembly/sdk` is a client of the Agent Assembly core runtime
-([agent-assembly](https://github.com/AI-agent-assembly/agent-assembly)) and speaks the
+([agent-assembly](https://github.com/ai-agent-assembly/agent-assembly)) and speaks the
 shared wire protocol to the gateway. The release process keeps the two aligned: each SDK
 release bumps the main package **and** the four `@agent-assembly/runtime-*` packages to the
 same version, and the `aasm` runtime binaries inside those packages are taken from the

@@ -14,7 +14,7 @@ const config: Config = {
   url: "https://ai-agent-assembly.github.io",
   baseUrl: "/node-sdk/",
 
-  organizationName: "AI-agent-assembly",
+  organizationName: "ai-agent-assembly",
   projectName: "node-sdk",
 
   onBrokenLinks: "throw",
@@ -57,7 +57,7 @@ const config: Config = {
           path: "../docs",
           routeBasePath: "/",
           sidebarPath: "./sidebars.ts",
-          editUrl: "https://github.com/AI-agent-assembly/node-sdk/tree/master/",
+          editUrl: "https://github.com/ai-agent-assembly/node-sdk/tree/master/",
         },
         blog: false,
         theme: {
@@ -86,7 +86,7 @@ const config: Config = {
           label: "Docs",
         },
         {
-          href: "https://github.com/AI-agent-assembly/node-sdk",
+          href: "https://github.com/ai-agent-assembly/node-sdk",
           label: "GitHub",
           position: "right",
         },
@@ -105,7 +105,7 @@ const config: Config = {
           items: [
             {
               label: "GitHub",
-              href: "https://github.com/AI-agent-assembly/node-sdk",
+              href: "https://github.com/ai-agent-assembly/node-sdk",
             },
             {
               label: "npm package",
@@ -113,7 +113,7 @@ const config: Config = {
             },
             {
               label: "Issues",
-              href: "https://github.com/AI-agent-assembly/node-sdk/issues",
+              href: "https://github.com/ai-agent-assembly/node-sdk/issues",
             },
           ],
         },
@@ -122,11 +122,11 @@ const config: Config = {
           items: [
             {
               label: "Python SDK",
-              href: "https://github.com/AI-agent-assembly/python-sdk",
+              href: "https://github.com/ai-agent-assembly/python-sdk",
             },
             {
               label: "Go SDK",
-              href: "https://github.com/AI-agent-assembly/go-sdk",
+              href: "https://github.com/ai-agent-assembly/go-sdk",
             },
           ],
         },
