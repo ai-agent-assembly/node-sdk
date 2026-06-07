@@ -55,7 +55,7 @@ jobs:
           files: ./coverage/lcov.info
           flags: unittest
           name: node-sdk-coverage
-          slug: AI-agent-assembly/node-sdk
+          slug: ai-agent-assembly/node-sdk
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
