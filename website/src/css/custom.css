@@ -1,30 +1,57 @@
-/**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
- */
+/* AI Agent Assembly — shared doc brand layer for Docusaurus (node-sdk, inner-document).
+   Install: replace the body of website/src/css/custom.css with this.
+   Set themeConfig.colorMode = { respectPrefersColorScheme: true }.
+   Tokens: design/doc-tokens.md */
 
-/* You can override the default Infima variables here. */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary: #6366f1;
+  --ifm-color-primary-dark: #4f46e5;
+  --ifm-color-primary-darker: #4338ca;
+  --ifm-color-primary-darkest: #3730a3;
+  --ifm-color-primary-light: #818cf8;
+  --ifm-color-primary-lighter: #a5b4fc;
+  --ifm-color-primary-lightest: #c7d2fe;
+
+  --ifm-background-color: #f5f4f0;
+  --ifm-background-surface-color: #ffffff;
+  --ifm-font-color-base: #111827;
+  --ifm-color-emphasis-600: #6b7280;
+  --ifm-toc-border-color: #e5e7eb;
+  --ifm-hr-border-color: #e5e7eb;
+
+  --ifm-font-family-base: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ifm-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --ifm-font-size-base: 17px;
+  --ifm-line-height-base: 1.65;
   --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* readability measure cap on the article body */
+.markdown { max-width: 72ch; }
+
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6366f1;
+  --ifm-color-primary-darker: #4f46e5;
+  --ifm-color-primary-darkest: #4338ca;
+  --ifm-color-primary-light: #a5b4fc;
+  --ifm-color-primary-lighter: #c7d2fe;
+  --ifm-color-primary-lightest: #e0e7ff;
+
+  --ifm-background-color: #0e0e0e;
+  --ifm-background-surface-color: #1a1a1a;
+  --ifm-font-color-base: #ededed;
+  --ifm-color-emphasis-600: #a3a3a3;
+  --ifm-toc-border-color: #2e2e2e;
+  --ifm-hr-border-color: #2e2e2e;
 }
+
+/* Admonitions — 4 types (edge + tint) */
+.theme-admonition-note    { --ifm-alert-background-color: #d6dfee; --ifm-alert-border-color: #1d3a7a; }
+.theme-admonition-tip     { --ifm-alert-background-color: #d4e4d2; --ifm-alert-border-color: #22592a; }
+.theme-admonition-warning { --ifm-alert-background-color: #f5e6c4; --ifm-alert-border-color: #8a5a00; }
+.theme-admonition-danger  { --ifm-alert-background-color: #f6dad6; --ifm-alert-border-color: #b8291e; }
+[data-theme='dark'] .theme-admonition-note    { --ifm-alert-background-color: #16233f; --ifm-alert-border-color: #6e94c2; }
+[data-theme='dark'] .theme-admonition-tip     { --ifm-alert-background-color: #15301a; --ifm-alert-border-color: #5fd17a; }
+[data-theme='dark'] .theme-admonition-warning { --ifm-alert-background-color: #3a2c0a; --ifm-alert-border-color: #e0a92e; }
+[data-theme='dark'] .theme-admonition-danger  { --ifm-alert-background-color: #3a1512; --ifm-alert-border-color: #f08a80; }
