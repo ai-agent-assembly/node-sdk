@@ -176,7 +176,7 @@ tests/
 .github/workflows/
 ```
 
-## Native napi-rs Binding (AAASM-60)
+## Native napi-rs Binding
 
 The `aa-ffi-node` Rust crate is located at `native/aa-ffi-node`.
 
@@ -195,7 +195,7 @@ ubuntu-only debug build on pull requests, and ubuntu + macOS builds on `master` 
 tags. The addon embeds a Unix-domain-socket transport and **does not build on Windows**;
 Windows consumers use `grpc-sidecar` mode.
 
-## Packaging Layout (AAASM-61)
+## Packaging Layout
 
 The package now publishes dual module outputs with explicit conditional exports:
 
