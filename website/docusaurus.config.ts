@@ -5,7 +5,7 @@ import type * as Preset from "@docusaurus/preset-classic";
 const config: Config = {
   title: "@agent-assembly/sdk",
   tagline: "TypeScript and Node.js SDK for Agent Assembly",
-  favicon: "img/favicon.ico",
+  favicon: "img/favicon.png",
 
   future: {
     v4: true,
@@ -68,15 +68,15 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: "img/docusaurus-social-card.jpg",
+    image: "img/social-card.png",
     colorMode: {
       respectPrefersColorScheme: true,
     },
     navbar: {
       title: "@agent-assembly/sdk",
       logo: {
-        alt: "Agent Assembly logo",
-        src: "img/logo.svg",
+        alt: "AI Agent Assembly",
+        src: "img/logo.png",
       },
       items: [
         {
@@ -84,6 +84,29 @@ const config: Config = {
           sidebarId: "docsSidebar",
           position: "left",
           label: "Docs",
+        },
+        {
+          type: "dropdown",
+          label: "SDKs",
+          position: "right",
+          items: [
+            {
+              label: "Docs Hub",
+              href: "https://ai-agent-assembly.github.io/agent-assembly-docs/",
+            },
+            {
+              label: "Python SDK",
+              href: "https://ai-agent-assembly.github.io/python-sdk/",
+            },
+            {
+              label: "Node SDK",
+              href: "https://ai-agent-assembly.github.io/node-sdk/",
+            },
+            {
+              label: "Go SDK",
+              href: "https://ai-agent-assembly.github.io/go-sdk/",
+            },
+          ],
         },
         {
           href: "https://github.com/ai-agent-assembly/node-sdk",
@@ -118,15 +141,23 @@ const config: Config = {
           ],
         },
         {
-          title: "Sibling SDKs",
+          title: "SDKs",
           items: [
             {
+              label: "Docs Hub",
+              href: "https://ai-agent-assembly.github.io/agent-assembly-docs/",
+            },
+            {
               label: "Python SDK",
-              href: "https://github.com/ai-agent-assembly/python-sdk",
+              href: "https://ai-agent-assembly.github.io/python-sdk/",
+            },
+            {
+              label: "Node SDK",
+              href: "https://ai-agent-assembly.github.io/node-sdk/",
             },
             {
               label: "Go SDK",
-              href: "https://github.com/ai-agent-assembly/go-sdk",
+              href: "https://ai-agent-assembly.github.io/go-sdk/",
             },
           ],
         },
