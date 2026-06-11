@@ -64,3 +64,31 @@ Publishing uses npm OIDC Trusted Publishing with `id-token: write` and
 
 The documentation site is published separately by `.github/workflows/publish-docs.yml` on
 pushes to `master` — it is not part of the npm release.
+
+## Documentation versioning
+
+The docs site uses [Docusaurus versioning](https://docusaurus.io/docs/versioning). The
+in-progress docs in `docs/` are the **`current`** version (labelled **"Next"** in the
+version dropdown) and always track `master`. They are *not* frozen.
+
+At each `vX.Y.Z` release, cut an immutable snapshot of the docs **once the release tag is
+final** by running, from the `website/` directory:
+
+```bash
+cd website
+pnpm docusaurus docs:version v0.1.0
+```
+
+This copies the current `docs/` into `website/versioned_docs/version-v0.1.0/`, writes a
+`website/versioned_sidebars/` entry, and appends the version to
+`website/versions.json`. After the first snapshot exists, that version becomes the default
+"latest" served at the site root, while "Next" continues to track `master`.
+
+Guidelines:
+
+- Cut the snapshot **at release time**, named after the release tag (e.g. `v0.1.0`) — not
+  before. Do not freeze in-progress docs early.
+- Commit the generated `versioned_docs/`, `versioned_sidebars/`, and `versions.json`
+  alongside the release.
+- No CI change is needed: `pnpm build` (run by `publish-docs.yml`) builds every version
+  present in `versions.json` automatically.
