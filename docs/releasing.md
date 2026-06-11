@@ -67,28 +67,47 @@ pushes to `master` — it is not part of the npm release.
 
 ## Documentation versioning
 
-The docs site uses [Docusaurus versioning](https://docusaurus.io/docs/versioning). The
-in-progress docs in `docs/` are the **`current`** version (labelled **"Next"** in the
-version dropdown) and always track `master`. They are *not* frozen.
+The docs site uses [Docusaurus versioning](https://docusaurus.io/docs/versioning) to model
+three release **channels** on top of the immutable version snapshots:
 
-At each `vX.Y.Z` release, cut an immutable snapshot of the docs **once the release tag is
-final** by running, from the `website/` directory:
+- **latest (master)** — the in-progress docs in `docs/` (the Docusaurus `current` version).
+  Always tracks `master`, is *never* frozen, is served at `/next/` (not the root, so it
+  never collides with a real cut version), and carries the native `unreleased` banner.
+- **stable** — the newest snapshot cut from a stable tag (`vX.Y.Z`). It is `lastVersion`,
+  served at the site root, and is the default landing page. Its dropdown label is
+  `stable (vX.Y.Z)` and it shows no banner.
+- **pre-release** — the newest snapshot cut from a pre-release tag (`vX.Y.Z-...`). Its
+  dropdown label is `pre-release (vX.Y.Z-...)`. When no stable snapshot exists yet, the
+  pre-release is the default landing instead.
 
-```bash
-cd website
-pnpm docusaurus docs:version v0.1.0
-```
+Older superseded snapshots keep their bare tag as the label and carry the `unmaintained`
+banner pointing readers at the stable channel.
 
-This copies the current `docs/` into `website/versioned_docs/version-v0.1.0/`, writes a
-`website/versioned_sidebars/` entry, and appends the version to
-`website/versions.json`. After the first snapshot exists, that version becomes the default
-"latest" served at the site root, while "Next" continues to track `master`.
+### Channel from tag
 
-Guidelines:
+The release workflow classifies each tag:
 
-- Cut the snapshot **at release time**, named after the release tag (e.g. `v0.1.0`) — not
-  before. Do not freeze in-progress docs early.
-- Commit the generated `versioned_docs/`, `versioned_sidebars/`, and `versions.json`
-  alongside the release.
-- No CI change is needed: `pnpm build` (run by `publish-docs.yml`) builds every version
-  present in `versions.json` automatically.
+- `^v\d+\.\d+\.\d+$` → **stable**
+- `^v\d+\.\d+\.\d+-.+` → **pre-release**
+
+### Automated, release-driven cut
+
+Snapshots are cut **automatically by the release workflow**
+(`.github/workflows/release-node.yml`), not by hand. After the npm publish succeeds — so a
+snapshot is only ever cut on a real, finished release — a `version-docs` job:
+
+1. Runs `pnpm docusaurus docs:version <tag>` from `website/`, freezing today's `docs/`
+   into `website/versioned_docs/version-<tag>/` and appending `<tag>` to `versions.json`.
+2. Regenerates the per-version `label`s and `banner`s and repoints `lastVersion`
+   (newest stable, else newest pre-release) in `website/docusaurus.config.ts`.
+3. Commits the generated `versioned_docs/`, `versioned_sidebars/`, `versions.json` and the
+   config change, and opens a docs-update PR against `master` (the repo's normal flow).
+
+The `current` version always keeps tracking `master` under the **latest (master)** label.
+
+> Cutting a snapshot manually is not part of the normal flow. If you ever need to recover a
+> missed snapshot, run `pnpm docusaurus docs:version <tag>` from `website/` and re-run the
+> label/banner/`lastVersion` regeneration the workflow performs.
+
+No `publish-docs.yml` change is needed: `pnpm build` (run by `publish-docs.yml`) builds
+every version present in `versions.json` automatically.
