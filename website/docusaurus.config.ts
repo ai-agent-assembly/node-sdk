@@ -58,6 +58,24 @@ const config: Config = {
           routeBasePath: "/",
           sidebarPath: "./sidebars.ts",
           editUrl: "https://github.com/ai-agent-assembly/node-sdk/tree/master/",
+          // Documentation versioning (AAASM-2751).
+          //
+          // The in-progress docs under `../docs` are the `current` version and
+          // track `master`. Until the first release snapshot is cut, `current`
+          // is the only version; it is labelled "Next" and served at the site
+          // root so the version dropdown renders and links resolve.
+          //
+          // At the v0.1.0 release, run `pnpm docusaurus docs:version v0.1.0`
+          // (see ../docs/releasing.md). That freezes today's docs into
+          // `website/versioned_docs/version-v0.1.0`, after which `v0.1.0`
+          // becomes the default "latest" version and `current` keeps tracking
+          // master under the "Next" label. Do NOT cut a snapshot before then.
+          versions: {
+            current: {
+              label: "Next",
+              path: "/",
+            },
+          },
         },
         blog: false,
         theme: {
