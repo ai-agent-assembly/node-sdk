@@ -183,17 +183,19 @@ tests/                    # unit + architecture tests
 For how these layers fit together, see the
 [Architecture guide](https://ai-agent-assembly.github.io/node-sdk/architecture).
 
-## Native napi-rs Binding
+## Building the native binding
 
-The `aa-ffi-node` Rust crate is located at `native/aa-ffi-node`.
+Most consumers never build the native binding — a prebuilt binary is installed for their
+platform. You only need this when working on the `aa-ffi-node` Rust crate (at
+`native/aa-ffi-node`) or running on a platform with no prebuild.
 
 Build commands:
 
-- `pnpm native:build` (debug/local)
-- `pnpm native:build:release` (release + platform artifact)
-- `pnpm native:check-types` (strict check for generated napi `.d.ts`)
+- `pnpm native:build` — debug build, for local development.
+- `pnpm native:build:release` — release build that produces the per-platform artifact.
+- `pnpm native:check-types` — strict type-check of the generated napi `index.d.ts`.
 
-Native integration acceptance test:
+Run the native integration acceptance test (skipped unless the binding is built):
 
 - `AA_NATIVE_TEST=1 pnpm vitest run tests/native-napi-integration.test.ts`
 
@@ -202,25 +204,25 @@ ubuntu-only debug build on pull requests, and ubuntu + macOS builds on `master` 
 tags. The addon embeds a Unix-domain-socket transport and **does not build on Windows**;
 Windows consumers use `grpc-sidecar` mode.
 
-## Packaging Layout
+## Packaging layout
 
-The package now publishes dual module outputs with explicit conditional exports:
+The package publishes dual module outputs behind conditional `exports`:
 
 - ESM entry: `./dist/esm/index.js`
 - CJS entry: `./dist/cjs/index.js`
 - Type declarations: `./dist/types/index.d.ts`
 
 The four `@agent-assembly/runtime-*` packages (`runtime-linux-x64`, `runtime-linux-arm64`,
-`runtime-darwin-x64`, `runtime-darwin-arm64`) are declared as `optionalDependencies`,
-`os`/`cpu`-constrained so only the matching platform installs. They carry the `aasm`
-runtime binary; there is no Windows runtime package. The napi-rs `.node` addon is loaded at
-runtime by `native/aa-ffi-node/index.cjs`.
+`runtime-darwin-x64`, `runtime-darwin-arm64`) are declared as `optionalDependencies` and
+constrained by `os`/`cpu`, so only the one matching your platform is installed. Each
+carries the `aasm` runtime binary; there is no Windows runtime package. The napi-rs `.node`
+addon is loaded at runtime by `native/aa-ffi-node/index.cjs`.
 
-Package verification checks include:
+CI verifies the published shape with:
 
-- ESM and CJS entry smoke tests
-- export `types` mapping assertion
-- `npm pack` content and package size guard tests
+- ESM and CJS entry smoke tests,
+- an `exports` `types` mapping assertion, and
+- `npm pack` content and package-size guard tests.
 
 ## Documentation
 
