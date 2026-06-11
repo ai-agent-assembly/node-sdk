@@ -113,37 +113,52 @@ system. The matrix is enforced by `.github/workflows/test-matrix.yml`:
 Older Node.js lines (≤ 16) are unsupported because the napi-rs ABI used by the native
 binding requires Node 18.18 or newer.
 
-## Goal
+## How it works
 
-Provide a thin wrapper around the Agent Assembly Rust runtime through:
+The SDK is a thin TypeScript wrapper around the Agent Assembly Rust runtime. It reaches
+the runtime over one of two transports:
 
-- gRPC sidecar client (default)
-- native in-process binding (napi-rs)
+- a **gRPC sidecar** client that talks to a separate gateway process, or
+- a **native in-process** binding built with napi-rs.
 
-The primary entrypoint is `initAssembly()`, which prepares runtime governance and
-registers framework hooks for supported tool ecosystems.
+`initAssembly()` is the primary entrypoint. It resolves the gateway, registers the agent,
+and installs governance hooks for whichever supported framework it detects, so every tool
+call is checked against policy before it runs.
 
-## Public Entrypoints
+## What the package exports
 
-- `initAssembly(config)`
-- `withAssembly(tools, options)`
+| Export | Purpose |
+| ------ | ------- |
+| `initAssembly(config)` | Set up governance and auto-wire detected frameworks. The main entrypoint. |
+| `withAssembly(tools, options)` | Lower-level wrapper to govern a tool map when you manage the gateway client yourself. |
+| `currentAgentId()`, `runWithAgentId()` | Read and set the active agent id in the async-context lineage store. |
+| `encodeAuditEvent()` / `decodeAuditEvent()` (and the call-stack codecs) | Encode and decode audit events to and from their wire shape. |
+| `findAasmBinary()`, `INSTALL_HINT` | Locate the bundled `aasm` runtime binary and the install hint shown when it is missing. |
+| `ENFORCEMENT_MODES` | The allowed `enforcementMode` values. |
 
-## Policy Matching Constraint
+Type-only exports (`AssemblyConfig`, `AssemblyContext`, `AssemblyMode`, `EnforcementMode`,
+`ToolMap`, and friends) are documented in the
+[API reference](https://ai-agent-assembly.github.io/node-sdk/api-reference).
 
-Vercel AI SDK tools do not expose a `.name` field. Governance policies must match
-by tool description content (or tool map key in wrapper context), not by strict
+## How LangChain tools are blocked
+
+LangChain's `handleToolStart` callback cannot stop a tool from running by its return
+value, so the SDK governs LangChain tools with two cooperating layers:
+
+- **Callback layer** (`AssemblyCallbackHandler`) — tracks deferred denials and redacts
+  output at `handleToolEnd`.
+- **Wrapper layer** (`wrapToolWithAssembly`) — enforces the real pre-execution
+  allow / deny / pending check.
+
+`initAssembly()` registers the callback handler and wraps your configured LangChain tools
+for you, so you do not wire either layer by hand.
+
+## Matching policies to tools
+
+Most frameworks expose a tool `name` that policies match on. **Vercel AI SDK tools do
+not** — they have no `.name` field — so for that framework, write policies that match on
+the tool's description content (or, in `withAssembly`, the tool-map key) instead of a
 framework-level tool name.
-
-## LangChain Blocking Model
-
-LangChain callback `handleToolStart` cannot preempt execution by return value, so
-this SDK applies a two-layer model:
-
-- callback layer (`AssemblyCallbackHandler`) tracks deferred denials and redacts at `handleToolEnd`
-- wrapper layer (`wrapToolWithAssembly`) enforces true pre-execution deny/pending checks
-
-`initAssembly()` auto-registers the callback handler and auto-wraps configured
-LangChain tools.
 
 ## Source layout
 
