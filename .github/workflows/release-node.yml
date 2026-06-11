@@ -38,6 +38,8 @@ jobs:
   publish:
     name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v4.2.2
 
@@ -197,3 +199,67 @@ jobs:
           echo "Publishing main SDK at version=$VERSION dist-tag arg='$DIST_TAG'"
           # shellcheck disable=SC2086
           pnpm publish --access public --no-git-checks $DIST_TAG
+
+  # AAASM-2751: cut the immutable Docusaurus docs snapshot for this release
+  # and repoint the channel metadata. This runs ONLY after `publish` succeeds,
+  # so a snapshot is only ever frozen for a real, finished release — never on a
+  # raw tag. It opens a docs-update PR against master (the repo's normal flow)
+  # rather than pushing to master directly.
+  version-docs:
+    name: Cut docs version snapshot and repoint channels
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      # `publish` resolved + validated this tag against the v*.*.* semver
+      # pattern, so it is safe to use below.
+      RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v4.2.2
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093  # v6.0.8
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install website dependencies
+        # `--ignore-workspace` mirrors publish-docs.yml: without it pnpm 10
+        # inherits the parent workspace and produces no website/node_modules,
+        # so the docusaurus CLI is unavailable.
+        run: pnpm install --no-frozen-lockfile --ignore-workspace
+        working-directory: website
+
+      - name: Cut docs snapshot for the release tag
+        run: pnpm docusaurus docs:version "$RELEASE_TAG"
+        working-directory: website
+
+      - name: Repoint version channels (labels, banners, lastVersion)
+        run: node scripts/version-channels.mjs
+
+      - name: Open docs-version PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="docs/version-${RELEASE_TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add website/versioned_docs website/versioned_sidebars \
+            website/versions.json website/versionChannels.json
+          git commit -m "📸 (docs): Cut docs snapshot for ${RELEASE_TAG} and repoint channels"
+          git push origin "$branch"
+          gh pr create \
+            --base master \
+            --head "$branch" \
+            --title "📸 (docs): Cut docs snapshot for ${RELEASE_TAG}" \
+            --body "Automated docs version snapshot cut by release-node.yml after the npm publish of \`${RELEASE_TAG}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${RELEASE_TAG}\` and repoints the version channels (labels, banners, \`lastVersion\`)."
