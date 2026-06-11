@@ -145,36 +145,28 @@ this SDK applies a two-layer model:
 `initAssembly()` auto-registers the callback handler and auto-wraps configured
 LangChain tools.
 
-## Current Architecture Layout
+## Source layout
 
 ```text
 src/
-  index.ts
-  core/
-    init-assembly.ts
-  adapters/
-    adapter.ts
-    adapter-registry.ts
-    langchain/
-      assembly-callback-handler.ts
-      wrap-tool-with-assembly.ts
-  gateway/
-    client.ts
-  wrappers/
-    with-assembly.ts
-  errors/
-    policy-violation-error.ts
-  types/
-    assembly-mode.ts
-    assembly-config.ts
-    assembly-context.ts
-    gateway-governance.ts
-    langchain-adapter.ts
-    tool-map.ts
-tests/
-  architecture/
-.github/workflows/
+  index.ts                # public entrypoint — re-exports the supported surface
+  core/                   # init-assembly flow + gateway/API-key resolution
+  adapters/               # Adapter interface + AdapterRegistry, LangChain adapter
+  hooks/                  # auto-detection patches (Vercel AI, OpenAI Agents, LangGraph, Mastra)
+  gateway/                # gateway client (gRPC sidecar transport)
+  native/                 # loader for the napi-rs in-process binding
+  wrappers/               # low-level withAssembly() tool wrapper
+  lineage/                # async-context store for parent/child agent lineage
+  audit/                  # audit-event wire encode/decode helpers
+  errors/                 # ConfigurationError, GatewayError, PolicyViolationError, …
+  types/                  # AssemblyConfig, AssemblyContext, AssemblyMode, EnforcementMode, …
+  proto/generated/        # generated protobuf types
+native/aa-ffi-node/       # the Rust napi-rs crate (built into a per-platform .node binary)
+tests/                    # unit + architecture tests
 ```
+
+For how these layers fit together, see the
+[Architecture guide](https://ai-agent-assembly.github.io/node-sdk/architecture).
 
 ## Native napi-rs Binding
 
