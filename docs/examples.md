@@ -50,12 +50,14 @@ either proceeds or throws.
 
 ## `withAssembly` (validated, low-level)
 
-`withAssembly` is the explicit wrapper used when you manage the gateway client yourself.
-It wraps every tool in a map that exposes an `execute` or `invoke` method, **mutating the
-objects in place** and returning the same map:
+`withAssembly` is the explicit, lower-level wrapper for advanced cases where you supply the
+gateway client yourself rather than letting `initAssembly` build and own it. It wraps every
+tool in a map that exposes an `execute` or `invoke` method, **mutating the objects in
+place** and returning the same map. Most applications should prefer `initAssembly`, which
+sets up the client and wiring for you.
 
 ```ts
-import { withAssembly } from "@agent-assembly/sdk";
+import { withAssembly, type WithAssemblyOptions } from "@agent-assembly/sdk";
 
 const tools = {
   search: {
@@ -64,9 +66,13 @@ const tools = {
   }
 };
 
-// `gatewayClient` is required; inject the client you constructed (e.g. the same one you
-// passed to initAssembly via `config.gatewayClient`).
-withAssembly(tools, { gatewayClient, approvalTimeoutMs: 30_000 });
+// `gatewayClient` is required (see WithAssemblyOptions). Provide a client instance —
+// for example one constructed in your own bootstrap code, or a test double in unit tests.
+const options: WithAssemblyOptions = {
+  gatewayClient,
+  approvalTimeoutMs: 30_000
+};
+withAssembly(tools, options);
 
 await tools.search.execute({ query: "hello" }); // now policy-checked
 ```
