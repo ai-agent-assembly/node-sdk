@@ -1,6 +1,6 @@
 # @agent-assembly/sdk
 
-[![npm version](https://img.shields.io/npm/v/@agent-assembly/sdk.svg)](https://www.npmjs.com/package/@agent-assembly/sdk)
+[![npm version](https://img.shields.io/npm/v/@agent-assembly/sdk/alpha.svg)](https://www.npmjs.com/package/@agent-assembly/sdk)
 [![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ai-agent-assembly_node-sdk&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ai-agent-assembly_node-sdk)
