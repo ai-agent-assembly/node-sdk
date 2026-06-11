@@ -98,7 +98,7 @@ time. See [Troubleshooting](./troubleshooting.md) for the recovery paths.
 
 | Value              | Behavior                                                                  |
 | ------------------ | ------------------------------------------------------------------------- |
-| `"auto"`           | Default. Pick the transport automatically.                                |
+| `"auto"`           | Default. Selects the transport automatically; currently the gRPC sidecar. |
 | `"sdk-only"`       | No network layer and no registration event — in-process bookkeeping only. |
 | `"grpc-sidecar"`   | Talk to a separate gateway process over gRPC.                             |
 | `"napi-inprocess"` | Use the in-process napi-rs binding.                                       |
