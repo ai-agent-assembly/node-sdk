@@ -1,8 +1,24 @@
 ---
-sidebar_position: 4
+sidebar_position: 1
 ---
 
-# Examples
+# Guides
+
+Real, end-to-end scenarios. Each section below is self-contained — start with the
+LangChain guide if you are new, then reach for the low-level wrapper or the
+decision/error guide as you need them.
+
+## Overview
+
+- **[LangChain (validated)](#langchain-validated)** — the supported, test-covered path.
+- **[`withAssembly` (low-level)](#withassembly-validated-low-level)** — wrap tools yourself
+  with a gateway client you own.
+- **[Other frameworks (experimental)](#other-frameworks-experimental-auto-detected)** —
+  Vercel AI SDK, OpenAI Agents, LangGraph, Mastra via auto-detection.
+- **[Handling allow / deny decisions and errors](#handling-allow--deny-decisions-and-errors)** —
+  what the wrapped calls throw and how to respond.
+
+## How `initAssembly` finds your framework
 
 `initAssembly()` auto-detects which agent framework you have installed and wires the
 appropriate governance hooks. The snippets below mirror the patterns exercised by the
@@ -106,4 +122,62 @@ console.log(ctx.activeAdapters);
 > key), not by a framework-level tool name.
 
 For the full list of configuration fields used above, see
-[Configuration](./configuration.md).
+[Configuration](../05-configuration/index.md).
+
+## Handling allow / deny decisions and errors
+
+When you wrap a tool — whether through `initAssembly`'s `langchain.tools` or directly
+with `withAssembly` — the gateway is consulted on every call. The outcome shows up as
+ordinary async control flow:
+
+- **Allow.** The wrapped call runs the real tool and returns its result. Nothing extra
+  to handle.
+- **Deny.** The wrapped call **rejects** with a `PolicyViolationError`. The tool body
+  never runs. The error message carries the tool name and the gateway's stated reason.
+- **Pending → resolved.** If the gateway needs a human, the call waits up to
+  `approvalTimeoutMs` for a decision and then either proceeds (approved) or rejects
+  (denied / timed out).
+
+Because these surface as rejected promises, you handle them with a normal
+`try`/`catch`:
+
+```ts
+import { initAssembly } from "@agent-assembly/sdk";
+
+const ctx = await initAssembly({
+  agentId: "demo",
+  langchain: {
+    tools: { searchWeb },
+    approvalTimeoutMs: 30_000 // how long to wait on a "pending" decision
+  }
+});
+
+try {
+  const result = await searchWeb.invoke({ q: "agent assembly" });
+  // allowed — use result
+} catch (err) {
+  // PolicyViolationError on deny, or a timed-out / denied approval.
+  // err.message includes the tool name and the gateway's reason.
+  console.error("tool call blocked:", (err as Error).message);
+}
+```
+
+The SDK throws a small set of named error types (defined under `src/errors/`):
+
+| Error | When it is thrown |
+| --- | --- |
+| `PolicyViolationError` | The gateway denied a tool call, or an approval was denied / timed out. |
+| `ConfigurationError` | A configuration problem before any network activity — e.g. zero-config auto-start could not find the `aasm` binary on `PATH`. |
+| `GatewayError` | The gateway could not be reached or did not become healthy (e.g. an auto-started gateway failed its health check). |
+| `OpTerminatedError` | An in-flight governed operation was terminated. |
+
+In addition, `initAssembly` validates two inputs **before** any network activity and
+throws a `RangeError` for bad values: `delegationReason` longer than 256 characters,
+or an `enforcementMode` outside `"enforce" | "observe" | "disabled"`. This fail-fast
+behavior means a typo can never silently register an agent under the wrong posture.
+
+To run an agent without blocking while you tune policy, register it with
+`enforcementMode: "observe"` — every action proceeds and would-be violations are
+recorded as shadow audit events instead of throwing. See
+[Troubleshooting](../08-troubleshooting/index.md) for the recovery path behind each
+error.
