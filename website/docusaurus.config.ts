@@ -33,7 +33,7 @@ const config: Config = {
       {
         entryPoints: ["../src/index.ts"],
         tsconfig: "../tsconfig.build.json",
-        out: "../docs/api",
+        out: "../docs/06-api-reference/api",
         readme: "none",
         gitRemote: "remote",
         sidebar: {
