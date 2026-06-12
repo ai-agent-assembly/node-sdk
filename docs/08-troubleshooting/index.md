@@ -1,5 +1,5 @@
 ---
-sidebar_position: 6
+sidebar_position: 1
 ---
 
 # Troubleshooting
@@ -7,7 +7,7 @@ sidebar_position: 6
 ## `No gateway found … and 'aasm' is not on PATH`
 
 `initAssembly()` reached the local-default step of
-[gateway resolution](./configuration.md): no `gatewayUrl`
+[gateway resolution](../05-configuration/index.md): no `gatewayUrl`
 was supplied, no `AAASM_GATEWAY_URL` was set, no `~/.aasm/config.yaml` entry was found, and
 nothing answered at `http://localhost:7391`. It then tried to auto-start a gateway but
 could not find the `aasm` binary.
@@ -48,7 +48,7 @@ The config file is parsed only when the optional `js-yaml` dependency is install
 missing `js-yaml`, a missing file, or malformed YAML is treated as "no value" (never an
 error), so resolution silently falls through to the next step. Install `js-yaml` and
 confirm the file is valid YAML with the expected `agent.gateway_url` / `agent.api_key`
-shape shown in [Configuration](./configuration.md).
+shape shown in [Configuration](../05-configuration/index.md).
 
 ## `RangeError` from `initAssembly`
 
@@ -58,7 +58,7 @@ Two inputs are validated before any network activity:
 - `enforcementMode` must be one of `"enforce"`, `"observe"`, `"disabled"`.
 
 A value outside these bounds throws a `RangeError` so a typo can't silently register an
-agent under the wrong governance posture. See [Configuration](./configuration.md).
+agent under the wrong governance posture. See [Configuration](../05-configuration/index.md).
 
 ## `PolicyViolationError` at tool call time
 
@@ -72,4 +72,4 @@ agent without blocking while you tune policy, register it with `enforcementMode:
 `import` resolves the ESM entry and `require` resolves the CJS entry automatically via the
 package's `exports` map. If a bundler or older toolchain misresolves these, confirm it
 honors the `exports` field (rather than the legacy `main`) and see
-[Compatibility](./compatibility.md#module-systems).
+[Compatibility](../07-compatibility-versioning/compatibility.md#module-systems).

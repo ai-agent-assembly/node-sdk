@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 1
 ---
 
 # Configuration
@@ -7,7 +7,7 @@ sidebar_position: 3
 Everything the SDK does starts at `initAssembly(config)`. The `config` argument is
 optional — `initAssembly()` with no arguments is a supported, zero-config call that
 discovers a local gateway automatically. This page documents the full
-[`AssemblyConfig`](./api-reference.md) surface and the order in which `initAssembly()`
+[`AssemblyConfig`](../06-api-reference/index.md) surface and the order in which `initAssembly()`
 applies it.
 
 ## The init flow
@@ -74,7 +74,11 @@ nothing responds, it attempts to auto-start a local gateway by running
 `aasm start --mode local --foreground` (the `aasm` binary must be on `PATH` — install it
 with `npm install -g @agent-assembly/cli`). A `ConfigurationError` is thrown when `aasm`
 is missing, and a `GatewayError` when the auto-started gateway does not become healthy in
-time. See [Troubleshooting](./troubleshooting.md) for the recovery paths.
+time. See [Troubleshooting](../08-troubleshooting/index.md) for the recovery paths.
+
+The `aasm` binary and the gateway it starts are part of the core runtime. For the full
+list of gateway subcommands and flags, see the core
+[CLI Reference](https://ai-agent-assembly.github.io/agent-assembly/latest/cli/overview.html).
 
 ## `AssemblyConfig` fields
 
@@ -98,7 +102,7 @@ time. See [Troubleshooting](./troubleshooting.md) for the recovery paths.
 
 | Value              | Behavior                                                                  |
 | ------------------ | ------------------------------------------------------------------------- |
-| `"auto"`           | Default. Pick the transport automatically.                                |
+| `"auto"`           | Default. Selects the transport automatically; currently the gRPC sidecar. |
 | `"sdk-only"`       | No network layer and no registration event — in-process bookkeeping only. |
 | `"grpc-sidecar"`   | Talk to a separate gateway process over gRPC.                             |
 | `"napi-inprocess"` | Use the in-process napi-rs binding.                                       |
@@ -143,4 +147,4 @@ const ctx = await initAssembly({
 });
 ```
 
-See [Examples](./examples.md) for full framework-integration walkthroughs.
+See [Guides](../04-guides/index.md) for full framework-integration walkthroughs.

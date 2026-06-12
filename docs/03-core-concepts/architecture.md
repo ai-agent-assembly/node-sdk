@@ -2,7 +2,7 @@
 sidebar_position: 2
 ---
 
-# Architecture
+# Architecture: native FFI, adapters, and packaging
 
 `@agent-assembly/sdk` is a TypeScript surface over the Agent Assembly Rust runtime. It
 intentionally separates three concerns: the **native FFI layer** (Rust → JavaScript via
@@ -34,7 +34,7 @@ There is no prebuilt package for Windows; Windows hosts build the native addon f
 The napi-rs `.node` addon itself is loaded at runtime by `native/aa-ffi-node/index.cjs`
 (which resolves `index.node`, or a platform-suffixed `index.*.node`). Consumers who need
 to (re)build it locally can run `pnpm native:build:release` against a Rust toolchain — see
-[Troubleshooting](./troubleshooting.md).
+[Troubleshooting](../08-troubleshooting/index.md).
 
 ## Framework adapters and the AdapterRegistry
 

@@ -113,80 +113,89 @@ system. The matrix is enforced by `.github/workflows/test-matrix.yml`:
 Older Node.js lines (≤ 16) are unsupported because the napi-rs ABI used by the native
 binding requires Node 18.18 or newer.
 
-## Goal
+## How it works
 
-Provide a thin wrapper around the Agent Assembly Rust runtime through:
+The SDK is a thin TypeScript wrapper around the Agent Assembly Rust runtime. It reaches
+the runtime over one of two transports:
 
-- gRPC sidecar client (default)
-- native in-process binding (napi-rs)
+- a **gRPC sidecar** client that talks to a separate gateway process, or
+- a **native in-process** binding built with napi-rs.
 
-The primary entrypoint is `initAssembly()`, which prepares runtime governance and
-registers framework hooks for supported tool ecosystems.
+`initAssembly()` is the primary entrypoint. It resolves the gateway, registers the agent,
+and installs governance hooks for whichever supported framework it detects, so every tool
+call is checked against policy before it runs.
 
-## Public Entrypoints
+## What the package exports
 
-- `initAssembly(config)`
-- `withAssembly(tools, options)`
+| Export | Purpose |
+| ------ | ------- |
+| `initAssembly(config)` | Set up governance and auto-wire detected frameworks. The main entrypoint. |
+| `withAssembly(tools, options)` | Lower-level wrapper to govern a tool map when you manage the gateway client yourself. |
+| `currentAgentId()`, `runWithAgentId()` | Read and set the active agent id in the async-context lineage store. |
+| `encodeAuditEvent()` / `decodeAuditEvent()` (and the call-stack codecs) | Encode and decode audit events to and from their wire shape. |
+| `findAasmBinary()`, `INSTALL_HINT` | Locate the bundled `aasm` runtime binary and the install hint shown when it is missing. |
+| `ENFORCEMENT_MODES` | The allowed `enforcementMode` values. |
 
-## Policy Matching Constraint
+Type-only exports (`AssemblyConfig`, `AssemblyContext`, `AssemblyMode`, `EnforcementMode`,
+`ToolMap`, and friends) are documented in the
+[API reference](https://ai-agent-assembly.github.io/node-sdk/api-reference).
 
-Vercel AI SDK tools do not expose a `.name` field. Governance policies must match
-by tool description content (or tool map key in wrapper context), not by strict
+## How LangChain tools are blocked
+
+LangChain's `handleToolStart` callback cannot stop a tool from running by its return
+value, so the SDK governs LangChain tools with two cooperating layers:
+
+- **Callback layer** (`AssemblyCallbackHandler`) — tracks deferred denials and redacts
+  output at `handleToolEnd`.
+- **Wrapper layer** (`wrapToolWithAssembly`) — enforces the real pre-execution
+  allow / deny / pending check.
+
+`initAssembly()` registers the callback handler and wraps your configured LangChain tools
+for you, so you do not wire either layer by hand.
+
+## Matching policies to tools
+
+Most frameworks expose a tool `name` that policies match on. **Vercel AI SDK tools do
+not** — they have no `.name` field — so for that framework, write policies that match on
+the tool's description content (or, in `withAssembly`, the tool-map key) instead of a
 framework-level tool name.
 
-## LangChain Blocking Model
-
-LangChain callback `handleToolStart` cannot preempt execution by return value, so
-this SDK applies a two-layer model:
-
-- callback layer (`AssemblyCallbackHandler`) tracks deferred denials and redacts at `handleToolEnd`
-- wrapper layer (`wrapToolWithAssembly`) enforces true pre-execution deny/pending checks
-
-`initAssembly()` auto-registers the callback handler and auto-wraps configured
-LangChain tools.
-
-## Current Architecture Layout
+## Source layout
 
 ```text
 src/
-  index.ts
-  core/
-    init-assembly.ts
-  adapters/
-    adapter.ts
-    adapter-registry.ts
-    langchain/
-      assembly-callback-handler.ts
-      wrap-tool-with-assembly.ts
-  gateway/
-    client.ts
-  wrappers/
-    with-assembly.ts
-  errors/
-    policy-violation-error.ts
-  types/
-    assembly-mode.ts
-    assembly-config.ts
-    assembly-context.ts
-    gateway-governance.ts
-    langchain-adapter.ts
-    tool-map.ts
-tests/
-  architecture/
-.github/workflows/
+  index.ts                # public entrypoint — re-exports the supported surface
+  core/                   # init-assembly flow + gateway/API-key resolution
+  adapters/               # Adapter interface + AdapterRegistry, LangChain adapter
+  hooks/                  # auto-detection patches (Vercel AI, OpenAI Agents, LangGraph, Mastra)
+  gateway/                # gateway client (gRPC sidecar transport)
+  native/                 # loader for the napi-rs in-process binding
+  wrappers/               # low-level withAssembly() tool wrapper
+  lineage/                # async-context store for parent/child agent lineage
+  audit/                  # audit-event wire encode/decode helpers
+  errors/                 # ConfigurationError, GatewayError, PolicyViolationError, …
+  types/                  # AssemblyConfig, AssemblyContext, AssemblyMode, EnforcementMode, …
+  proto/generated/        # generated protobuf types
+native/aa-ffi-node/       # the Rust napi-rs crate (built into a per-platform .node binary)
+tests/                    # unit + architecture tests
 ```
 
-## Native napi-rs Binding
+For how these layers fit together, see the
+[Architecture guide](https://ai-agent-assembly.github.io/node-sdk/core-concepts/architecture).
 
-The `aa-ffi-node` Rust crate is located at `native/aa-ffi-node`.
+## Building the native binding
+
+Most consumers never build the native binding — a prebuilt binary is installed for their
+platform. You only need this when working on the `aa-ffi-node` Rust crate (at
+`native/aa-ffi-node`) or running on a platform with no prebuild.
 
 Build commands:
 
-- `pnpm native:build` (debug/local)
-- `pnpm native:build:release` (release + platform artifact)
-- `pnpm native:check-types` (strict check for generated napi `.d.ts`)
+- `pnpm native:build` — debug build, for local development.
+- `pnpm native:build:release` — release build that produces the per-platform artifact.
+- `pnpm native:check-types` — strict type-check of the generated napi `index.d.ts`.
 
-Native integration acceptance test:
+Run the native integration acceptance test (skipped unless the binding is built):
 
 - `AA_NATIVE_TEST=1 pnpm vitest run tests/native-napi-integration.test.ts`
 
@@ -195,25 +204,25 @@ ubuntu-only debug build on pull requests, and ubuntu + macOS builds on `master` 
 tags. The addon embeds a Unix-domain-socket transport and **does not build on Windows**;
 Windows consumers use `grpc-sidecar` mode.
 
-## Packaging Layout
+## Packaging layout
 
-The package now publishes dual module outputs with explicit conditional exports:
+The package publishes dual module outputs behind conditional `exports`:
 
 - ESM entry: `./dist/esm/index.js`
 - CJS entry: `./dist/cjs/index.js`
 - Type declarations: `./dist/types/index.d.ts`
 
 The four `@agent-assembly/runtime-*` packages (`runtime-linux-x64`, `runtime-linux-arm64`,
-`runtime-darwin-x64`, `runtime-darwin-arm64`) are declared as `optionalDependencies`,
-`os`/`cpu`-constrained so only the matching platform installs. They carry the `aasm`
-runtime binary; there is no Windows runtime package. The napi-rs `.node` addon is loaded at
-runtime by `native/aa-ffi-node/index.cjs`.
+`runtime-darwin-x64`, `runtime-darwin-arm64`) are declared as `optionalDependencies` and
+constrained by `os`/`cpu`, so only the one matching your platform is installed. Each
+carries the `aasm` runtime binary; there is no Windows runtime package. The napi-rs `.node`
+addon is loaded at runtime by `native/aa-ffi-node/index.cjs`.
 
-Package verification checks include:
+CI verifies the published shape with:
 
-- ESM and CJS entry smoke tests
-- export `types` mapping assertion
-- `npm pack` content and package size guard tests
+- ESM and CJS entry smoke tests,
+- an `exports` `types` mapping assertion, and
+- `npm pack` content and package-size guard tests.
 
 ## Documentation
 
