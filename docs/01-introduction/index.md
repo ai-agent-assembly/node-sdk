@@ -5,6 +5,12 @@ sidebar_position: 1
 
 # Introduction
 
+**In plain terms:** AI agents take actions on their own — searching the web, calling
+APIs, reading files. This SDK puts a checkpoint in front of those actions so an agent
+can only do what your rules allow, and so there's a record of everything it did. You add
+it to an agent built in Node.js with a few lines of code; you don't have to rewrite the
+agent.
+
 **`@agent-assembly/sdk`** is the TypeScript and Node.js SDK for
 [Agent Assembly](https://github.com/ai-agent-assembly). It lets you put a
 governance layer in front of the AI agents you build in Node — so every tool an
