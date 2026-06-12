@@ -52,7 +52,10 @@ fit, read **[Core Concepts](../03-core-concepts/index.md)**.
 ## Beyond this SDK
 
 - [agent-assembly](https://github.com/ai-agent-assembly/agent-assembly) — the core Rust
-  runtime and the home of the protocol specification.
+  runtime and the home of the protocol specification. Its
+  [documentation site](https://ai-agent-assembly.github.io/agent-assembly/) is the best
+  place to understand the gateway, the policy engine, and the three interception layers
+  this SDK plugs into.
 - [Canonical documentation hub](https://ai-agent-assembly.github.io/agent-assembly-docs/)
   — cross-repo platform documentation and the core↔SDK compatibility matrix.
 - [Organization profile](https://github.com/ai-agent-assembly) — every Agent Assembly

@@ -22,6 +22,12 @@ flowchart LR
 You call `initAssembly(...)` once. From then on, the tools you handed it are wrapped
 so the gateway evaluates each call before it executes.
 
+The gateway, the policy engine, and the audit trail live in the core runtime. For the
+platform-level picture — how the gateway renders decisions and how this SDK relates to
+the sidecar-proxy and eBPF layers — see the core
+[Architecture](https://ai-agent-assembly.github.io/agent-assembly/latest/architecture/) and
+[Security Model](https://ai-agent-assembly.github.io/agent-assembly/latest/security/overview.html) docs.
+
 ## The napi-rs native FFI
 
 The SDK does not re-implement governance in TypeScript. The actual transport to the

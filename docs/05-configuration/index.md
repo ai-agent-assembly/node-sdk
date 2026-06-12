@@ -76,6 +76,10 @@ with `npm install -g @agent-assembly/cli`). A `ConfigurationError` is thrown whe
 is missing, and a `GatewayError` when the auto-started gateway does not become healthy in
 time. See [Troubleshooting](../08-troubleshooting/index.md) for the recovery paths.
 
+The `aasm` binary and the gateway it starts are part of the core runtime. For the full
+list of gateway subcommands and flags, see the core
+[CLI Reference](https://ai-agent-assembly.github.io/agent-assembly/latest/cli/overview.html).
+
 ## `AssemblyConfig` fields
 
 | Field              | Type                     | Default                       | Purpose                                                                                         |
