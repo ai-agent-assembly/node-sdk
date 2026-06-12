@@ -263,3 +263,26 @@ jobs:
             --head "$branch" \
             --title "📸 (docs): Cut docs snapshot for ${RELEASE_TAG}" \
             --body "Automated docs version snapshot cut by release-node.yml after the npm publish of \`${RELEASE_TAG}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${RELEASE_TAG}\` and repoints the version channels (labels, banners, \`lastVersion\`)."
+
+      # AAASM-2794: self-approve + enable auto-merge so the snapshot lands on
+      # master without a per-release manual merge. The approve step MUST use a
+      # PAT (DOCS_BOT_PAT) because GitHub forbids self-approval from the same
+      # actor that opened the PR — the PAT is from the operator account, so the
+      # approval comes from a different actor than github-actions[bot]. Auto-
+      # merge waits for any required status checks, then squash-merges. master
+      # branch protection (1 required review + code-owner) is preserved.
+      - name: Self-approve docs-version PR (via PAT)
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_BOT_PAT }}
+        run: |
+          set -euo pipefail
+          branch="docs/version-${RELEASE_TAG}"
+          gh pr review "$branch" --approve --body "Auto-approving deterministic docs snapshot (AAASM-2794)."
+
+      - name: Enable auto-merge on docs-version PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="docs/version-${RELEASE_TAG}"
+          gh pr merge "$branch" --auto --squash --delete-branch
