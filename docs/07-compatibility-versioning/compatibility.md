@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 1
 ---
 
 # Compatibility
@@ -25,7 +25,7 @@ feedback.
 Prebuilt platform runtime packages (`@agent-assembly/runtime-*`) are published for
 **linux-x64, linux-arm64, darwin-x64, and darwin-arm64**. There is no prebuilt package for
 Windows: Windows hosts are tested in CI but build the native addon from source, which
-requires a Rust toolchain. See [Troubleshooting](./troubleshooting.md).
+requires a Rust toolchain. See [Troubleshooting](../08-troubleshooting/index.md).
 
 ## Package manager
 
@@ -37,7 +37,7 @@ contributing to this repository requires pnpm.
 
 The package ships both ESM and CJS entries with conditional `exports`. `import` resolves to
 `dist/esm/`, `require` resolves to `dist/cjs/`, and TypeScript consumers in either module
-system resolve `dist/types/index.d.ts`. See [Architecture](./architecture.md) for how the
+system resolve `dist/types/index.d.ts`. See [Architecture](../03-core-concepts/architecture.md) for how the
 dual build is produced.
 
 ## Core runtime
@@ -56,3 +56,8 @@ Practical guidance:
   version-matched.
 - Because the project is **pre-1.0**, the wire protocol may change between minor versions.
   Pin an exact SDK version and upgrade the SDK and any standalone gateway together.
+
+The cross-repo **core ↔ SDK compatibility matrix** — which SDK versions pair with which
+core runtime releases across all language SDKs — is published on the
+[Agent Assembly documentation hub](https://ai-agent-assembly.github.io/agent-assembly-docs/).
+Consult it when running a standalone gateway you upgrade independently of the SDK.
