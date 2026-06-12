@@ -24,11 +24,12 @@ const config: Config = {
   projectName: "node-sdk",
 
   onBrokenLinks: "throw",
+  onBrokenAnchors: "throw",
 
   markdown: {
     mermaid: true,
     hooks: {
-      onBrokenMarkdownLinks: "warn",
+      onBrokenMarkdownLinks: "throw",
     },
   },
   themes: ["@docusaurus/theme-mermaid"],
@@ -64,6 +65,11 @@ const config: Config = {
           routeBasePath: "/",
           sidebarPath: "./sidebars.ts",
           editUrl: "https://github.com/ai-agent-assembly/node-sdk/tree/master/",
+          // Per-page git "Last updated" date + committer (AAASM-2747).
+          // Docusaurus derives both from `git log` for each doc file, so the
+          // publish-docs workflow checks out full history (`fetch-depth: 0`).
+          showLastUpdateTime: true,
+          showLastUpdateAuthor: true,
           // Channel-based documentation versioning (AAASM-2751).
           //
           // The docs site models three release "channels" on top of
