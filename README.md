@@ -1,10 +1,13 @@
 # @agent-assembly/sdk
 
-[![npm version](https://img.shields.io/npm/v/@agent-assembly/sdk/alpha.svg)](https://www.npmjs.com/package/@agent-assembly/sdk)
-[![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=AI-agent-assembly_node-sdk&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=AI-agent-assembly_node-sdk)
-[![codecov](https://codecov.io/gh/ai-agent-assembly/node-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/ai-agent-assembly/node-sdk)
+[![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
+[![Docs](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml)
+[![npm version](https://img.shields.io/npm/v/@agent-assembly/sdk/alpha?logo=npm)](https://www.npmjs.com/package/@agent-assembly/sdk/v/alpha)
+[![Coverage](https://img.shields.io/codecov/c/github/ai-agent-assembly/node-sdk?logo=codecov)](https://codecov.io/gh/ai-agent-assembly/node-sdk)
+[![Quality Gate](https://img.shields.io/sonar/quality_gate/AI-agent-assembly_node-sdk?server=https%3A%2F%2Fsonarcloud.io&logo=sonarcloud)](https://sonarcloud.io/summary/new_code?id=AI-agent-assembly_node-sdk)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?logo=apache)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A518.18-339933?logo=nodedotjs)](https://github.com/ai-agent-assembly/node-sdk/blob/master/package.json)
+[![Code style](https://img.shields.io/badge/style-eslint-4B32C3?logo=eslint)](https://github.com/ai-agent-assembly/node-sdk/blob/master/eslint.config.mjs)
 
 TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 
