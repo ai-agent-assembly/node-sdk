@@ -1,0 +1,9 @@
+{
+  "lastVersion": "current",
+  "versions": {
+    "current": {
+      "label": "latest (master)",
+      "banner": "unreleased"
+    }
+  }
+}
