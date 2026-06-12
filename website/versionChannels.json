@@ -1,9 +1,14 @@
 {
-  "lastVersion": "current",
+  "lastVersion": "v0.0.1-alpha.6",
   "versions": {
     "current": {
       "label": "latest (master)",
+      "path": "/next/",
       "banner": "unreleased"
+    },
+    "v0.0.1-alpha.6": {
+      "label": "pre-release (v0.0.1-alpha.6)",
+      "banner": "none"
     }
   }
 }
