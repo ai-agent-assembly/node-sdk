@@ -181,7 +181,7 @@ tests/                    # unit + architecture tests
 ```
 
 For how these layers fit together, see the
-[Architecture guide](https://ai-agent-assembly.github.io/node-sdk/architecture).
+[Architecture guide](https://ai-agent-assembly.github.io/node-sdk/core-concepts/architecture).
 
 ## Building the native binding
 
