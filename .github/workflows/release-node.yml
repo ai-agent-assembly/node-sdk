@@ -79,6 +79,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
           DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
+          DISPATCH_PUBLISH_MODE: ${{ inputs.publish_mode }}
           DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -93,10 +94,14 @@ jobs:
               echo "::notice::binary_source_tag omitted; defaulting to latest agent-assembly release: $binary_source_tag"
             fi
             npm_version="$DISPATCH_NPM_VERSION"
+            publish_mode="$DISPATCH_PUBLISH_MODE"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
             # Coordinated release path. Both come from the same dispatched tag.
+            # publish_mode is hard-coded to 'all' — coordinated releases always
+            # publish the full 5-package set.
             binary_source_tag="$DISPATCH_PAYLOAD_TAG"
             npm_version="${DISPATCH_PAYLOAD_TAG#v}"
+            publish_mode="all"
           else
             echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
             exit 1
@@ -111,7 +116,8 @@ jobs:
           fi
           echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
           echo "npm_version=${npm_version}" >> "$GITHUB_OUTPUT"
-          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version}"
+          echo "publish_mode=${publish_mode}" >> "$GITHUB_OUTPUT"
+          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode}"
 
       - name: Download aasm binaries from agent-assembly release
         env:
