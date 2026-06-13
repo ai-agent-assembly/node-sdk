@@ -205,6 +205,25 @@ jobs:
           # up in the published tarball alongside the real binary.
           rm -f packages/*/bin/.gitkeep
 
+      # AAASM-2854: main-only mode — bump ONLY the root package.json's version
+      # field. Leaves optionalDependencies['@agent-assembly/runtime-*'] pins
+      # untouched so the published SDK keeps resolving to the existing runtime
+      # sub-packages on npm.
+      - name: Bump main SDK version only (main-only mode)
+        if: steps.tag.outputs.publish_mode == 'main-only'
+        env:
+          VERSION: ${{ steps.tag.outputs.npm_version }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.VERSION;
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          pkg.version = version;
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          console.log(`bumped package.json -> ${version}`);
+          NODE
+
       - name: Bump versions across the 5 packages
         env:
           VERSION: ${{ steps.tag.outputs.npm_version }}
