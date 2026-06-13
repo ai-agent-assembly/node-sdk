@@ -34,7 +34,7 @@ on:
         required: false
         type: string
       publish_mode:
-        description: "Which packages to publish. 'all' = main SDK + 4 runtime sub-packages (coordinated release). 'main-only' = only @agent-assembly/sdk (SDK hotfix mode). AAASM-2852: accepted but unused until AAASM-2854 gates the publish steps."
+        description: "Which packages to publish. 'all' = main SDK + 4 runtime sub-packages (coordinated release). 'main-only' = only @agent-assembly/sdk (SDK hotfix mode)."
         required: true
         type: choice
         default: "all"
@@ -51,11 +51,6 @@ jobs:
     name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
     runs-on: ubuntu-latest
     outputs:
-      # AAASM-2853: tag mirrors binary_source_tag for back-compat with the
-      # version-docs job. AAASM-2855 refactors version-docs to use
-      # binary_source_tag + npm_version directly, after which this alias
-      # can be removed.
-      tag: ${{ steps.tag.outputs.binary_source_tag }}
       binary_source_tag: ${{ steps.tag.outputs.binary_source_tag }}
       npm_version: ${{ steps.tag.outputs.npm_version }}
       publish_mode: ${{ steps.tag.outputs.publish_mode }}
@@ -316,20 +311,18 @@ jobs:
   version-docs:
     name: Cut docs version snapshot and repoint channels
     needs: publish
-    # AAASM-2854: skip on main-only because today this job cuts a snapshot
-    # labelled by publish.outputs.tag (= binary_source_tag), which collides
-    # with the prior coordinated release's snapshot. AAASM-2855 refactors
-    # version-docs to use npm_version (distinct per main-only release) and
-    # will drop this gate.
-    if: needs.publish.outputs.publish_mode == 'all'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
     env:
-      # `publish` resolved + validated this tag against the v*.*.* semver
-      # pattern, so it is safe to use below.
-      RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+      # `publish` resolved + validated these against semver, so they are safe
+      # to use below. NPM_VERSION drives the Docusaurus snapshot label (it is
+      # what users see in the dropdown + URL); BINARY_SOURCE_TAG is carried
+      # purely as metadata so the docs-version PR records which agent-assembly
+      # Release the bundled aasm binaries came from.
+      NPM_VERSION: ${{ needs.publish.outputs.npm_version }}
+      BINARY_SOURCE_TAG: ${{ needs.publish.outputs.binary_source_tag }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v4.2.2
         with:
@@ -353,7 +346,7 @@ jobs:
         working-directory: website
 
       - name: Cut docs snapshot for the release tag
-        run: pnpm docusaurus docs:version "$RELEASE_TAG"
+        run: pnpm docusaurus docs:version "$NPM_VERSION"
         working-directory: website
 
       - name: Repoint version channels (labels, banners, lastVersion)
@@ -364,19 +357,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          branch="docs/version-${RELEASE_TAG}"
+          branch="docs/version-${NPM_VERSION}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
           git add website/versioned_docs website/versioned_sidebars \
             website/versions.json website/versionChannels.json
-          git commit -m "📸 (docs): Cut docs snapshot for ${RELEASE_TAG} and repoint channels"
+          git commit -m "📸 (docs): Cut docs snapshot for ${NPM_VERSION} and repoint channels"
           git push origin "$branch"
           gh pr create \
             --base master \
             --head "$branch" \
-            --title "📸 (docs): Cut docs snapshot for ${RELEASE_TAG}" \
-            --body "Automated docs version snapshot cut by release-node.yml after the npm publish of \`${RELEASE_TAG}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${RELEASE_TAG}\` and repoints the version channels (labels, banners, \`lastVersion\`)."
+            --title "📸 (docs): Cut docs snapshot for ${NPM_VERSION}" \
+            --body "Automated docs version snapshot cut by release-node.yml after the npm publish of \`${NPM_VERSION}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${NPM_VERSION}\` and repoints the version channels (labels, banners, \`lastVersion\`).%0A%0ABundled aasm: \`${BINARY_SOURCE_TAG}\` (the agent-assembly Release whose per-platform binaries were bundled into the @agent-assembly/runtime-* sub-packages for this npm publish)."
 
       # AAASM-2794: self-approve + enable auto-merge so the snapshot lands on
       # master without a per-release manual merge. The approve step MUST use a
@@ -390,7 +383,7 @@ jobs:
           GH_TOKEN: ${{ secrets.DOCS_BOT_PAT }}
         run: |
           set -euo pipefail
-          branch="docs/version-${RELEASE_TAG}"
+          branch="docs/version-${NPM_VERSION}"
           gh pr review "$branch" --approve --body "Auto-approving deterministic docs snapshot (AAASM-2794)."
 
       - name: Enable auto-merge on docs-version PR
@@ -398,5 +391,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          branch="docs/version-${RELEASE_TAG}"
+          branch="docs/version-${NPM_VERSION}"
           gh pr merge "$branch" --auto --squash --delete-branch

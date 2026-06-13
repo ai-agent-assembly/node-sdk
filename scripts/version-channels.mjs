@@ -36,8 +36,13 @@ import {readFileSync, writeFileSync, existsSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 
-const STABLE_RE = /^v\d+\.\d+\.\d+$/;
-const PRERELEASE_RE = /^v\d+\.\d+\.\d+-.+$/;
+// Tags may be either `vX.Y.Z[-pre]` (the historical agent-assembly
+// release-tag form used before AAASM-2855) or `X.Y.Z[-pre]` (the npm
+// version form adopted by AAASM-2855's version-docs refactor). Make the
+// leading `v` optional so both representations classify into the same
+// channel.
+const STABLE_RE = /^v?\d+\.\d+\.\d+$/;
+const PRERELEASE_RE = /^v?\d+\.\d+\.\d+-.+$/;
 
 export function channelOf(tag) {
   if (STABLE_RE.test(tag)) return "stable";

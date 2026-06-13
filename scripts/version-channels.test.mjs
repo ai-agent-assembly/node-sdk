@@ -44,6 +44,15 @@ test("channelOf classifies stable vs pre-release", () => {
   assert.equal(channelOf("v0.1.0-rc.1"), "pre-release");
 });
 
+// AAASM-2855: version-docs now labels snapshots by the npm version
+// (`X.Y.Z[-pre]`, no leading `v`) instead of the agent-assembly release
+// tag (`vX.Y.Z[-pre]`). Both forms must classify into the same channel.
+test("channelOf handles npm-version form (no leading v)", () => {
+  assert.equal(channelOf("0.0.2"), "stable");
+  assert.equal(channelOf("0.1.0-rc.1"), "pre-release");
+  assert.equal(channelOf("0.0.1-alpha.8.1"), "pre-release");
+});
+
 // Scenario 1: pre-releases ahead of the only stable -> pre-release shown.
 test("scenario 1: pre-release ahead of stable is the headline channel", () => {
   const snapshots = [
