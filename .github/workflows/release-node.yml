@@ -357,7 +357,7 @@ jobs:
         working-directory: website
 
       - name: Cut docs snapshot for the release tag
-        run: pnpm docusaurus docs:version "$RELEASE_TAG"
+        run: pnpm docusaurus docs:version "$NPM_VERSION"
         working-directory: website
 
       - name: Repoint version channels (labels, banners, lastVersion)
@@ -368,18 +368,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          branch="docs/version-${RELEASE_TAG}"
+          branch="docs/version-${NPM_VERSION}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
           git add website/versioned_docs website/versioned_sidebars \
             website/versions.json website/versionChannels.json
-          git commit -m "📸 (docs): Cut docs snapshot for ${RELEASE_TAG} and repoint channels"
+          git commit -m "📸 (docs): Cut docs snapshot for ${NPM_VERSION} and repoint channels"
           git push origin "$branch"
           gh pr create \
             --base master \
             --head "$branch" \
-            --title "📸 (docs): Cut docs snapshot for ${RELEASE_TAG}" \
+            --title "📸 (docs): Cut docs snapshot for ${NPM_VERSION}" \
             --body "Automated docs version snapshot cut by release-node.yml after the npm publish of \`${RELEASE_TAG}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${RELEASE_TAG}\` and repoints the version channels (labels, banners, \`lastVersion\`)."
 
       # AAASM-2794: self-approve + enable auto-merge so the snapshot lands on
@@ -394,7 +394,7 @@ jobs:
           GH_TOKEN: ${{ secrets.DOCS_BOT_PAT }}
         run: |
           set -euo pipefail
-          branch="docs/version-${RELEASE_TAG}"
+          branch="docs/version-${NPM_VERSION}"
           gh pr review "$branch" --approve --body "Auto-approving deterministic docs snapshot (AAASM-2794)."
 
       - name: Enable auto-merge on docs-version PR
@@ -402,5 +402,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          branch="docs/version-${RELEASE_TAG}"
+          branch="docs/version-${NPM_VERSION}"
           gh pr merge "$branch" --auto --squash --delete-branch
