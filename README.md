@@ -248,7 +248,7 @@ across all SDKs.
 | [Documentation site](https://ai-agent-assembly.github.io/agent-assembly-docs/) | Canonical, cross-repo documentation for the whole platform.                                                   |
 | [python-sdk](https://github.com/ai-agent-assembly/python-sdk)                  | Sibling SDK for Python.                                                                                       |
 | [go-sdk](https://github.com/ai-agent-assembly/go-sdk)                          | Sibling SDK for Go.                                                                                           |
-| [agent-assembly-examples](https://github.com/AI-agent-assembly/agent-assembly-examples) | Runnable examples — learn by running small, framework-specific Node.js/TypeScript (and Python/Go) samples for policy enforcement, approvals, audit, trace, and runtime workflows. |
+| [agent-assembly-examples](https://github.com/ai-agent-assembly/agent-assembly-examples) | Runnable examples — learn by running small, framework-specific Node.js/TypeScript (and Python/Go) samples for policy enforcement, approvals, audit, trace, and runtime workflows. |
 | [Release notes](https://github.com/ai-agent-assembly/node-sdk/releases)        | Per-version changelog for this package.                                                                       |
 | [Organization profile](https://github.com/ai-agent-assembly)                   | Index of every Agent Assembly repository and its status.                                                      |
 
