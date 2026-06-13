@@ -77,6 +77,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_TAG: ${{ inputs.release_tag }}
           DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
+          DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
           DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
         run: |
           set -euo pipefail
@@ -86,9 +87,14 @@ jobs:
             # during the transition window. Once release_tag is removed, this
             # fallback collapses to just DISPATCH_BINARY_TAG.
             binary_source_tag="${DISPATCH_BINARY_TAG:-$DISPATCH_TAG}"
+            # AAASM-2853: npm_version falls back to the stripped-v form of
+            # release_tag during the transition window. Once release_tag is
+            # removed, this collapses to just DISPATCH_NPM_VERSION.
+            npm_version="${DISPATCH_NPM_VERSION:-${DISPATCH_TAG#v}}"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
             tag="$DISPATCH_PAYLOAD_TAG"
             binary_source_tag="$DISPATCH_PAYLOAD_TAG"
+            npm_version="${DISPATCH_PAYLOAD_TAG#v}"
           else
             echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
             exit 1
@@ -100,7 +106,8 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag=${tag} version=${tag#v} binary_source_tag=${binary_source_tag}"
+          echo "npm_version=${npm_version}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=${tag} version=${tag#v} binary_source_tag=${binary_source_tag} npm_version=${npm_version}"
 
       - name: Download aasm binaries from agent-assembly release
         env:
