@@ -181,6 +181,7 @@ jobs:
           ls -la bin-staging/
 
       - name: Stage runtime binaries into runtime-* sub-packages
+        if: steps.tag.outputs.publish_mode == 'all'
         run: |
           set -euo pipefail
           # Map Rust target triples to the matching node-sdk runtime
