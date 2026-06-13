@@ -134,14 +134,51 @@ call is checked against policy before it runs.
 | ------ | ------- |
 | `initAssembly(config)` | Set up governance and auto-wire detected frameworks. The main entrypoint. |
 | `withAssembly(tools, options)` | Lower-level wrapper to govern a tool map when you manage the gateway client yourself. |
+| `createNoopGatewayClient(mode)` | Build an allow-all `GatewayClient` for offline demos and tests, or as a base to wrap. |
+| `PolicyViolationError` | Thrown by a governed tool when the gateway client denies the call. |
 | `currentAgentId()`, `runWithAgentId()` | Read and set the active agent id in the async-context lineage store. |
 | `encodeAuditEvent()` / `decodeAuditEvent()` (and the call-stack codecs) | Encode and decode audit events to and from their wire shape. |
 | `findAasmBinary()`, `INSTALL_HINT` | Locate the bundled `aasm` runtime binary and the install hint shown when it is missing. |
 | `ENFORCEMENT_MODES` | The allowed `enforcementMode` values. |
 
 Type-only exports (`AssemblyConfig`, `AssemblyContext`, `AssemblyMode`, `EnforcementMode`,
-`ToolMap`, and friends) are documented in the
-[API reference](https://ai-agent-assembly.github.io/node-sdk/api-reference).
+`ToolMap`, `GatewayClient`, the `Gateway*` governance types, and friends) are documented in
+the [API reference](https://ai-agent-assembly.github.io/node-sdk/api-reference).
+
+## Governing tools offline
+
+`withAssembly(tools, options)` needs a `GatewayClient`. For offline demos, tests, or custom
+in-process policies you can build one yourself — no running gateway required:
+
+```ts
+import {
+  createNoopGatewayClient,
+  withAssembly,
+  type GatewayClient
+} from "@agent-assembly/sdk";
+
+// Allow-all client — handy for offline smoke tests:
+withAssembly(
+  { search: { description: "Search", execute: async (q: string) => `result:${q}` } },
+  { gatewayClient: createNoopGatewayClient("sdk-only") }
+);
+
+// Or enforce your own in-process policy by implementing the GatewayClient interface:
+const policyClient: GatewayClient = {
+  mode: "sdk-only",
+  start: async () => undefined,
+  close: async () => undefined,
+  check: async (request) =>
+    request.toolName === "delete_file"
+      ? { denied: true, reason: "blocked by local policy" }
+      : { denied: false },
+  waitForApproval: async () => ({ denied: false }),
+  record: async () => undefined,
+  recordResult: async () => undefined,
+  scanPrompts: async () => undefined
+};
+// A governed tool throws `PolicyViolationError` when `check` denies it.
+```
 
 ## How LangChain tools are blocked
 

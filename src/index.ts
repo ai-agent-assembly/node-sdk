@@ -26,3 +26,14 @@ export { currentAgentId, runWithAgentId } from "./lineage/index.js";
 // `@agent-assembly/sdk/runtime` subpath export to avoid colliding with
 // the gateway-based `initAssembly` re-exported above.
 export { INSTALL_HINT, findAasmBinary } from "./runtime.js";
+export type { GatewayClient } from "./gateway/index.js";
+export type {
+  GatewayApprovalResult,
+  GatewayCheckRequest,
+  GatewayDecision,
+  GatewayPromptScan,
+  GatewayRecordEvent,
+  GatewayResultRecord
+} from "./types/index.js";
+export { createNoopGatewayClient } from "./gateway/index.js";
+export { PolicyViolationError } from "./errors/index.js";
