@@ -30,7 +30,7 @@ on:
         required: true
         type: string
       binary_source_tag:
-        description: "agent-assembly tag whose aasm-* binaries to bundle into the 4 runtime sub-packages (e.g. v0.0.1-alpha.8). Defaults to latest agent-assembly Release. AAASM-2852: accepted but unused until AAASM-2853 wires it through."
+        description: "agent-assembly tag whose aasm-* binaries to bundle into the 4 runtime sub-packages (e.g. v0.0.1-alpha.8). Defaults to latest agent-assembly Release."
         required: false
         type: string
       publish_mode:
@@ -41,10 +41,6 @@ on:
         options:
           - all
           - main-only
-      release_tag:
-        description: "[DEPRECATED — removal scheduled for AAASM-2853] agent-assembly release tag to consume (e.g. v0.0.1). Use npm_version + binary_source_tag instead going forward."
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -81,7 +77,6 @@ jobs:
         id: tag
         env:
           EVENT_NAME: ${{ github.event_name }}
-          DISPATCH_TAG: ${{ inputs.release_tag }}
           DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
           DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
           DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
@@ -89,34 +84,21 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            tag="$DISPATCH_TAG"
-            # AAASM-2853: binary_source_tag resolution on workflow_dispatch.
-            # Precedence: explicit DISPATCH_BINARY_TAG > deprecated DISPATCH_TAG
-            # (release_tag fallback during the transition window) > latest
-            # agent-assembly release. Once release_tag is removed, this
-            # collapses to DISPATCH_BINARY_TAG > latest-release.
+            # Operator path. Precedence for binary_source_tag: explicit
+            # DISPATCH_BINARY_TAG > latest agent-assembly release.
             if [[ -n "${DISPATCH_BINARY_TAG:-}" ]]; then
               binary_source_tag="$DISPATCH_BINARY_TAG"
-            elif [[ -n "${DISPATCH_TAG:-}" ]]; then
-              binary_source_tag="$DISPATCH_TAG"
             else
               binary_source_tag=$(gh release view --repo ai-agent-assembly/agent-assembly --json tagName --jq .tagName)
-              echo "::notice::binary_source_tag and release_tag both omitted; defaulting to latest agent-assembly release: $binary_source_tag"
+              echo "::notice::binary_source_tag omitted; defaulting to latest agent-assembly release: $binary_source_tag"
             fi
-            # AAASM-2853: npm_version falls back to the stripped-v form of
-            # release_tag during the transition window. Once release_tag is
-            # removed, this collapses to just DISPATCH_NPM_VERSION.
-            npm_version="${DISPATCH_NPM_VERSION:-${DISPATCH_TAG#v}}"
+            npm_version="$DISPATCH_NPM_VERSION"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
-            tag="$DISPATCH_PAYLOAD_TAG"
+            # Coordinated release path. Both come from the same dispatched tag.
             binary_source_tag="$DISPATCH_PAYLOAD_TAG"
             npm_version="${DISPATCH_PAYLOAD_TAG#v}"
           else
             echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
-            exit 1
-          fi
-          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "::error::tag '$tag' does not match v*.*.* (semver) pattern"
             exit 1
           fi
           if [[ ! "$binary_source_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
