@@ -316,12 +316,6 @@ jobs:
   version-docs:
     name: Cut docs version snapshot and repoint channels
     needs: publish
-    # AAASM-2854: skip on main-only because today this job cuts a snapshot
-    # labelled by publish.outputs.tag (= binary_source_tag), which collides
-    # with the prior coordinated release's snapshot. AAASM-2855 refactors
-    # version-docs to use npm_version (distinct per main-only release) and
-    # will drop this gate.
-    if: needs.publish.outputs.publish_mode == 'all'
     runs-on: ubuntu-latest
     permissions:
       contents: write
