@@ -127,11 +127,9 @@ jobs:
             echo "::error::npm_version '$npm_version' does not match X.Y.Z semver pattern (must NOT include leading v)"
             exit 1
           fi
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
           echo "npm_version=${npm_version}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag=${tag} version=${tag#v} binary_source_tag=${binary_source_tag} npm_version=${npm_version}"
+          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version}"
 
       - name: Download aasm binaries from agent-assembly release
         env:
