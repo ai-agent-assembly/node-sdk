@@ -36,3 +36,4 @@ export type {
   GatewayResultRecord
 } from "./types/index.js";
 export { createNoopGatewayClient } from "./gateway/index.js";
+export { PolicyViolationError } from "./errors/index.js";
