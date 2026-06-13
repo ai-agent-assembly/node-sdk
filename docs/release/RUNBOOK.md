@@ -152,6 +152,16 @@ For SDK-only hotfix runs, only the first command should return a value;
 the four runtime sub-packages stay at their previous `binary_source_tag`
 version on npm.
 
+### Post-release checks
+
+- [ ] **AAASM-2855 carryover:** verify the docs-version PR's snapshot
+  directory is named `version-<npm_version>` (e.g.
+  `website/versioned_docs/version-0.0.1-alpha.8/`) — **NOT**
+  `version-v0.0.1-alpha.8`. AAASM-2855 intentionally dropped the leading
+  `v` so the snapshot label matches the npm semver; if you see the `v`
+  back, the AAASM-2855 refactor regressed somewhere in the
+  `version-docs` job.
+
 ## 4. Recovery — when a publish fails
 
 npm publishes are effectively immutable. A failed publish that uploaded
