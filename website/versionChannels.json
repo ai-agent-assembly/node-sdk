@@ -13,6 +13,18 @@
     "v0.0.1-alpha.7": {
       "label": "v0.0.1-alpha.7",
       "banner": "unmaintained"
+    },
+    "v0.0.1-alpha.6": {
+      "label": "v0.0.1-alpha.6",
+      "banner": "unmaintained"
+    },
+    "v0.0.1-alpha.4": {
+      "label": "v0.0.1-alpha.4",
+      "banner": "unmaintained"
+    },
+    "v0.0.1-alpha.3": {
+      "label": "v0.0.1-alpha.3",
+      "banner": "unmaintained"
     }
   }
 }
