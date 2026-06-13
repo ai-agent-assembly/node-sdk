@@ -25,6 +25,10 @@ on:
     types: [agent-assembly-release-published]
   workflow_dispatch:
     inputs:
+      npm_version:
+        description: "Version to publish to npm (e.g. 0.0.1-alpha.8.1, 0.0.1-alpha.9, 0.0.2). AAASM-2852: accepted but unused until AAASM-2853 wires it through."
+        required: false
+        type: string
       release_tag:
         description: "agent-assembly release tag to consume (e.g. v0.0.1). Required for manual dispatch."
         required: true
