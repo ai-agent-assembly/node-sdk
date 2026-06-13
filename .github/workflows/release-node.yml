@@ -136,6 +136,49 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode} dry_run=${dry_run}"
 
+      # AAASM-2854: main-only mode — bump the root package.json's version
+      # field AND rewrite optionalDependencies['@agent-assembly/runtime-*']
+      # so the published SDK resolves to the existing runtime sub-packages on
+      # npm.
+      #
+      # AAASM-2867: derive the runtime-* version from `binary_source_tag`
+      # (with the leading `v` stripped) rather than leaving the pnpm
+      # `workspace:*` marker in place. Master's root package.json keeps
+      # `workspace:*` for local development resolution, which is unresolvable
+      # on npm — without this rewrite the published SDK would carry
+      # `workspace:*` in optionalDependencies and `npm install` would fail.
+      #
+      # This step must run BEFORE the pre-flight check (also AAASM-2867)
+      # so the pre-flight reads the rewritten version pins rather than
+      # the `workspace:*` marker that lives on master.
+      - name: Bump main SDK version only (main-only mode)
+        if: steps.tag.outputs.publish_mode == 'main-only'
+        env:
+          VERSION: ${{ steps.tag.outputs.npm_version }}
+          BINARY_SOURCE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.VERSION;
+          const binarySourceTag = process.env.BINARY_SOURCE_TAG;
+          // Strip leading 'v' to get the runtime sub-package version, which on
+          // npm matches the agent-assembly tag's body for coordinated releases
+          // (e.g. binary_source_tag=v0.0.1-alpha.8 => runtime-*@0.0.1-alpha.8).
+          const runtimeVersion = binarySourceTag.replace(/^v/, "");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          pkg.version = version;
+          if (pkg.optionalDependencies) {
+            for (const dep of Object.keys(pkg.optionalDependencies)) {
+              if (dep.startsWith("@agent-assembly/runtime-")) {
+                pkg.optionalDependencies[dep] = runtimeVersion;
+              }
+            }
+          }
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          console.log(`bumped package.json -> version=${version} runtime-*=${runtimeVersion}`);
+          NODE
+
       # AAASM-2854: Pre-flight gate for main-only mode. The SDK hotfix path
       # reuses the @agent-assembly/runtime-* sub-packages already on npm
       # (their versions pinned in this repo's package.json optionalDependencies).
@@ -143,6 +186,10 @@ jobs:
       # forgot to publish them, or the pin points at a future release — fail
       # fast here rather than ship a broken main SDK that resolves to nothing
       # at install time.
+      #
+      # AAASM-2867: this step runs AFTER the main-only Bump step, so the
+      # `optionalDependencies` it reads are the post-rewrite real versions
+      # (derived from `binary_source_tag`), not master's `workspace:*` marker.
       - name: Pre-flight verify runtime sub-packages exist on npm
         if: steps.tag.outputs.publish_mode == 'main-only'
         run: |
@@ -222,25 +269,6 @@ jobs:
           # Strip the AAASM-1220 .gitkeep placeholders so they don't end
           # up in the published tarball alongside the real binary.
           rm -f packages/*/bin/.gitkeep
-
-      # AAASM-2854: main-only mode — bump ONLY the root package.json's version
-      # field. Leaves optionalDependencies['@agent-assembly/runtime-*'] pins
-      # untouched so the published SDK keeps resolving to the existing runtime
-      # sub-packages on npm.
-      - name: Bump main SDK version only (main-only mode)
-        if: steps.tag.outputs.publish_mode == 'main-only'
-        env:
-          VERSION: ${{ steps.tag.outputs.npm_version }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require("node:fs");
-          const version = process.env.VERSION;
-          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          pkg.version = version;
-          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
-          console.log(`bumped package.json -> ${version}`);
-          NODE
 
       - name: Bump versions across the 5 packages
         if: steps.tag.outputs.publish_mode == 'all'
