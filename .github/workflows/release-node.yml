@@ -41,6 +41,11 @@ on:
         options:
           - all
           - main-only
+      dry-run:
+        description: "Skip the npm publish steps and the docs-version snapshot. Builds run normally; nothing reaches the registry or master. Defaults to false so today's dispatch behavior is unchanged."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
