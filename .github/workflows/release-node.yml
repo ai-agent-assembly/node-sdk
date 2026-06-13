@@ -340,6 +340,11 @@ jobs:
   version-docs:
     name: Cut docs version snapshot and repoint channels
     needs: publish
+    # AAASM-2862: don't cut an immutable docs snapshot for a version that
+    # was never published. Skip the entire docs-version job when the
+    # publish job ran in dry-run mode. repository_dispatch hard-codes
+    # dry_run='false' upstream so coordinated releases still cut snapshots.
+    if: needs.publish.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
