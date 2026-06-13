@@ -380,7 +380,7 @@ jobs:
             --base master \
             --head "$branch" \
             --title "📸 (docs): Cut docs snapshot for ${NPM_VERSION}" \
-            --body "Automated docs version snapshot cut by release-node.yml after the npm publish of \`${RELEASE_TAG}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${RELEASE_TAG}\` and repoints the version channels (labels, banners, \`lastVersion\`)."
+            --body "Automated docs version snapshot cut by release-node.yml after the npm publish of \`${NPM_VERSION}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${NPM_VERSION}\` and repoints the version channels (labels, banners, \`lastVersion\`).%0A%0ABundled aasm: \`${BINARY_SOURCE_TAG}\` (the agent-assembly Release whose per-platform binaries were bundled into the @agent-assembly/runtime-* sub-packages for this npm publish)."
 
       # AAASM-2794: self-approve + enable auto-merge so the snapshot lands on
       # master without a per-release manual merge. The approve step MUST use a
