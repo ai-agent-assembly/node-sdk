@@ -151,6 +151,8 @@ OK: @agent-assembly/runtime-linux-arm64@0.0.1-alpha.8 exists on npm
 
 The pre-flight iterates all 4 entries and emits the exact AC-prescribed error string for the one missing pin; exit 1 stops the job at the pre-flight step (no download / stage / bump / build / publish step ran). No npm publish occurred.
 
+**Operator note for future reproductions (AAASM-2866):** to get `pnpm install --frozen-lockfile` past `ERR_PNPM_OUTDATED_LOCKFILE` on the bad-pin temp branch, two prep commits on the temp branch were needed — regenerate `pnpm-lock.yaml` after the `package.json` edit, then inject a placeholder lockfile entry for the bad-version pin (mark `optional` + cpu/os-pinned so pnpm doesn't actually fetch it). Without those, the workflow fails at the `pnpm install` step BEFORE the pre-flight step ever runs, which would obscure what the F1 verification is meant to demonstrate. Both prep commits live only on the deleted temp branch — they are NOT in this report repo.
+
 **Verdict: ✅** Fail-fast on bad runtime-* pin works as designed (live-confirmed).
 
 ### F3 — invalid `npm_version` rejection
