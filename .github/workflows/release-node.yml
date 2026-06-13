@@ -34,7 +34,7 @@ on:
         required: false
         type: string
       publish_mode:
-        description: "Which packages to publish. 'all' = main SDK + 4 runtime sub-packages (coordinated release). 'main-only' = only @agent-assembly/sdk (SDK hotfix mode). AAASM-2852: accepted but unused until AAASM-2854 gates the publish steps."
+        description: "Which packages to publish. 'all' = main SDK + 4 runtime sub-packages (coordinated release). 'main-only' = only @agent-assembly/sdk (SDK hotfix mode)."
         required: true
         type: choice
         default: "all"
