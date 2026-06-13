@@ -283,7 +283,11 @@ jobs:
       # phase produces "no matching version" warnings during the brief
       # window before all sub-packages land on the registry.
       - name: Publish 4 runtime sub-packages
-        if: steps.tag.outputs.publish_mode == 'all'
+        # AAASM-2862: combine the existing publish_mode gate with a dry_run
+        # gate. workflow_dispatch with dry-run=true must skip every step
+        # that mutates the npm registry; coordinated repository_dispatch
+        # hard-codes dry_run='false' upstream so this stays a no-op there.
+        if: steps.tag.outputs.publish_mode == 'all' && steps.tag.outputs.dry_run != 'true'
         env:
           NPM_CONFIG_PROVENANCE: "true"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
