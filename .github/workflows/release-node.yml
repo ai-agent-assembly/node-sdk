@@ -42,7 +42,7 @@ on:
           - all
           - main-only
       release_tag:
-        description: "agent-assembly release tag to consume (e.g. v0.0.1). Required for manual dispatch."
+        description: "[DEPRECATED — removal scheduled for AAASM-2853] agent-assembly release tag to consume (e.g. v0.0.1). Use npm_version + binary_source_tag instead going forward."
         required: true
         type: string
 
