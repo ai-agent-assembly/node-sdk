@@ -174,7 +174,7 @@ jobs:
 
       - name: Bump versions across the 5 packages
         env:
-          VERSION: ${{ steps.tag.outputs.version }}
+          VERSION: ${{ steps.tag.outputs.npm_version }}
         run: |
           set -euo pipefail
           node <<'NODE'
