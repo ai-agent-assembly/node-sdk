@@ -310,6 +310,12 @@ jobs:
           done
 
       - name: Publish main @agent-assembly/sdk
+        # AAASM-2862: this step previously had no `if:` (it runs in BOTH
+        # publish_mode='all' and 'main-only'). Gate ONLY on dry_run so
+        # both modes still skip cleanly when the operator dispatches with
+        # dry-run=true. repository_dispatch hard-codes dry_run='false' so
+        # coordinated releases continue to publish.
+        if: steps.tag.outputs.dry_run != 'true'
         env:
           NPM_CONFIG_PROVENANCE: "true"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
