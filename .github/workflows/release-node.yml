@@ -223,23 +223,43 @@ jobs:
           # up in the published tarball alongside the real binary.
           rm -f packages/*/bin/.gitkeep
 
-      # AAASM-2854: main-only mode — bump ONLY the root package.json's version
-      # field. Leaves optionalDependencies['@agent-assembly/runtime-*'] pins
-      # untouched so the published SDK keeps resolving to the existing runtime
-      # sub-packages on npm.
+      # AAASM-2854: main-only mode — bump the root package.json's version
+      # field AND rewrite optionalDependencies['@agent-assembly/runtime-*']
+      # so the published SDK resolves to the existing runtime sub-packages on
+      # npm.
+      #
+      # AAASM-2867: derive the runtime-* version from `binary_source_tag`
+      # (with the leading `v` stripped) rather than leaving the pnpm
+      # `workspace:*` marker in place. Master's root package.json keeps
+      # `workspace:*` for local development resolution, which is unresolvable
+      # on npm — without this rewrite the published SDK would carry
+      # `workspace:*` in optionalDependencies and `npm install` would fail.
       - name: Bump main SDK version only (main-only mode)
         if: steps.tag.outputs.publish_mode == 'main-only'
         env:
           VERSION: ${{ steps.tag.outputs.npm_version }}
+          BINARY_SOURCE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
         run: |
           set -euo pipefail
           node <<'NODE'
           const fs = require("node:fs");
           const version = process.env.VERSION;
+          const binarySourceTag = process.env.BINARY_SOURCE_TAG;
+          // Strip leading 'v' to get the runtime sub-package version, which on
+          // npm matches the agent-assembly tag's body for coordinated releases
+          // (e.g. binary_source_tag=v0.0.1-alpha.8 => runtime-*@0.0.1-alpha.8).
+          const runtimeVersion = binarySourceTag.replace(/^v/, "");
           const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
           pkg.version = version;
+          if (pkg.optionalDependencies) {
+            for (const dep of Object.keys(pkg.optionalDependencies)) {
+              if (dep.startsWith("@agent-assembly/runtime-")) {
+                pkg.optionalDependencies[dep] = runtimeVersion;
+              }
+            }
+          }
           fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
-          console.log(`bumped package.json -> ${version}`);
+          console.log(`bumped package.json -> version=${version} runtime-*=${runtimeVersion}`);
           NODE
 
       - name: Bump versions across the 5 packages
