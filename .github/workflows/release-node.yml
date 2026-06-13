@@ -58,6 +58,7 @@ jobs:
       tag: ${{ steps.tag.outputs.binary_source_tag }}
       binary_source_tag: ${{ steps.tag.outputs.binary_source_tag }}
       npm_version: ${{ steps.tag.outputs.npm_version }}
+      publish_mode: ${{ steps.tag.outputs.publish_mode }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v4.2.2
 
@@ -79,6 +80,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
           DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
+          DISPATCH_PUBLISH_MODE: ${{ inputs.publish_mode }}
           DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -93,10 +95,14 @@ jobs:
               echo "::notice::binary_source_tag omitted; defaulting to latest agent-assembly release: $binary_source_tag"
             fi
             npm_version="$DISPATCH_NPM_VERSION"
+            publish_mode="$DISPATCH_PUBLISH_MODE"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
             # Coordinated release path. Both come from the same dispatched tag.
+            # publish_mode is hard-coded to 'all' — coordinated releases always
+            # publish the full 5-package set.
             binary_source_tag="$DISPATCH_PAYLOAD_TAG"
             npm_version="${DISPATCH_PAYLOAD_TAG#v}"
+            publish_mode="all"
           else
             echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
             exit 1
@@ -109,11 +115,57 @@ jobs:
             echo "::error::npm_version '$npm_version' does not match X.Y.Z semver pattern (must NOT include leading v)"
             exit 1
           fi
-          echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
-          echo "npm_version=${npm_version}" >> "$GITHUB_OUTPUT"
-          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version}"
+          {
+            echo "binary_source_tag=${binary_source_tag}"
+            echo "npm_version=${npm_version}"
+            echo "publish_mode=${publish_mode}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode}"
+
+      # AAASM-2854: Pre-flight gate for main-only mode. The SDK hotfix path
+      # reuses the @agent-assembly/runtime-* sub-packages already on npm
+      # (their versions pinned in this repo's package.json optionalDependencies).
+      # If any of those pinned versions does not exist on npm — e.g. operator
+      # forgot to publish them, or the pin points at a future release — fail
+      # fast here rather than ship a broken main SDK that resolves to nothing
+      # at install time.
+      - name: Pre-flight verify runtime sub-packages exist on npm
+        if: steps.tag.outputs.publish_mode == 'main-only'
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const { execSync } = require("node:child_process");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const opt = pkg.optionalDependencies ?? {};
+          const runtimePkgs = Object.entries(opt).filter(([name]) =>
+            name.startsWith("@agent-assembly/runtime-"),
+          );
+          if (runtimePkgs.length === 0) {
+            console.error(
+              "::error::no @agent-assembly/runtime-* entries in optionalDependencies — " +
+              "main-only mode requires existing runtime sub-packages to reuse",
+            );
+            process.exit(1);
+          }
+          let failed = false;
+          for (const [name, version] of runtimePkgs) {
+            try {
+              execSync(`npm view ${name}@${version} version`, { stdio: "pipe" });
+              console.log(`OK: ${name}@${version} exists on npm`);
+            } catch {
+              console.error(
+                `::error::main-only publish blocked — ${name}@${version} is not on npm. ` +
+                `Use publish_mode=all to publish the runtime sub-packages alongside the SDK.`,
+              );
+              failed = true;
+            }
+          }
+          if (failed) process.exit(1);
+          NODE
 
       - name: Download aasm binaries from agent-assembly release
+        if: steps.tag.outputs.publish_mode == 'all'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
@@ -131,6 +183,7 @@ jobs:
           ls -la bin-staging/
 
       - name: Stage runtime binaries into runtime-* sub-packages
+        if: steps.tag.outputs.publish_mode == 'all'
         run: |
           set -euo pipefail
           # Map Rust target triples to the matching node-sdk runtime
@@ -156,7 +209,27 @@ jobs:
           # up in the published tarball alongside the real binary.
           rm -f packages/*/bin/.gitkeep
 
+      # AAASM-2854: main-only mode — bump ONLY the root package.json's version
+      # field. Leaves optionalDependencies['@agent-assembly/runtime-*'] pins
+      # untouched so the published SDK keeps resolving to the existing runtime
+      # sub-packages on npm.
+      - name: Bump main SDK version only (main-only mode)
+        if: steps.tag.outputs.publish_mode == 'main-only'
+        env:
+          VERSION: ${{ steps.tag.outputs.npm_version }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.VERSION;
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          pkg.version = version;
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          console.log(`bumped package.json -> ${version}`);
+          NODE
+
       - name: Bump versions across the 5 packages
+        if: steps.tag.outputs.publish_mode == 'all'
         env:
           VERSION: ${{ steps.tag.outputs.npm_version }}
         run: |
@@ -196,6 +269,7 @@ jobs:
       # phase produces "no matching version" warnings during the brief
       # window before all sub-packages land on the registry.
       - name: Publish 4 runtime sub-packages
+        if: steps.tag.outputs.publish_mode == 'all'
         env:
           NPM_CONFIG_PROVENANCE: "true"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -242,6 +316,12 @@ jobs:
   version-docs:
     name: Cut docs version snapshot and repoint channels
     needs: publish
+    # AAASM-2854: skip on main-only because today this job cuts a snapshot
+    # labelled by publish.outputs.tag (= binary_source_tag), which collides
+    # with the prior coordinated release's snapshot. AAASM-2855 refactors
+    # version-docs to use npm_version (distinct per main-only release) and
+    # will drop this gate.
+    if: needs.publish.outputs.publish_mode == 'all'
     runs-on: ubuntu-latest
     permissions:
       contents: write
