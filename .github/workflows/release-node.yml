@@ -267,6 +267,7 @@ jobs:
       # phase produces "no matching version" warnings during the brief
       # window before all sub-packages land on the registry.
       - name: Publish 4 runtime sub-packages
+        if: steps.tag.outputs.publish_mode == 'all'
         env:
           NPM_CONFIG_PROVENANCE: "true"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
