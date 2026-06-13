@@ -34,7 +34,7 @@ The verification matrix's happy-path rows (R1, R2, H1, H2) would publish real ve
 | H1 | node-sdk | `workflow_dispatch` | `npm_version=0.0.1-alpha.8.1`, `binary_source_tag=v0.0.1-alpha.8`, `publish_mode=main-only` | Only main SDK publishes at `0.0.1-alpha.8.1`; runtime steps SKIPPED | ✅ Static — traced |
 | H2 | node-sdk | `workflow_dispatch` | same but `publish_mode=all` | 5 packages bump + publish at `0.0.1-alpha.8.1` | ✅ Static — traced |
 | H3 | python-sdk | `workflow_dispatch` | `pypi_version=0.0.1a8.post1`, `binary_source_tag=v0.0.1-alpha.8`, `dry-run=true` | wheel built, no upload | ✅ Static — see python-sdk report |
-| F1 | node-sdk | `workflow_dispatch` | `publish_mode=main-only` + runtime pin to non-existent version | Pre-flight fails fast | ✅ Static — traced |
+| F1 | node-sdk | `workflow_dispatch` | `publish_mode=main-only` + runtime pin to non-existent version | Pre-flight fails fast | ✅ Live — [F1.log](./F1.log) |
 | F2 | python-sdk | `workflow_dispatch` | `dry-run=false`, no `pypi_version` | Resolve fails fast | ✅ Static — see python-sdk report |
 | F3 | node-sdk | `workflow_dispatch` | `npm_version=foo.bar` | Resolve validation fails | ✅ Static — traced |
 | F4 | python-sdk | `workflow_dispatch` | `pypi_version=0.0.1-alpha.8.1` (hyphen) | PEP 440 validation fails | ✅ Static — see python-sdk report |
@@ -132,7 +132,26 @@ The verification matrix's happy-path rows (R1, R2, H1, H2) would publish real ve
 
 **Trace source:** Commit `8e97711` (`✨ (release-node): Add pre-flight check that runtime sub-packages exist on npm`) — see review comment on PR #113.
 
-**Verdict: ✅** Fail-fast on bad runtime-* pin works as designed.
+**Live verification (AAASM-2865):** dispatched the workflow against a temporary branch (`verify/AAASM-2865/f1-live`, since deleted) whose root `package.json` `optionalDependencies` set `runtime-linux-x64` to `99.99.99-fake` and left the other 3 runtime-* pinned at the existing `0.0.1-alpha.8` publish. Inputs: `npm_version=0.0.1-alpha.8.1`, `binary_source_tag=v0.0.1-alpha.8`, `publish_mode=main-only`.
+
+- Dispatched run: <https://github.com/ai-agent-assembly/node-sdk/actions/runs/27471607887>
+- Captured log: [`F1.log`](./F1.log)
+
+Key excerpt from the captured log (pre-flight step output):
+
+```
+Resolved binary_source_tag=v0.0.1-alpha.8 npm_version=0.0.1-alpha.8.1 publish_mode=main-only
+...
+OK: @agent-assembly/runtime-darwin-arm64@0.0.1-alpha.8 exists on npm
+OK: @agent-assembly/runtime-darwin-x64@0.0.1-alpha.8 exists on npm
+OK: @agent-assembly/runtime-linux-arm64@0.0.1-alpha.8 exists on npm
+##[error]main-only publish blocked — @agent-assembly/runtime-linux-x64@99.99.99-fake is not on npm. Use publish_mode=all to publish the runtime sub-packages alongside the SDK.
+##[error]Process completed with exit code 1.
+```
+
+The pre-flight iterates all 4 entries and emits the exact AC-prescribed error string for the one missing pin; exit 1 stops the job at the pre-flight step (no download / stage / bump / build / publish step ran). No npm publish occurred.
+
+**Verdict: ✅** Fail-fast on bad runtime-* pin works as designed (live-confirmed).
 
 ### F3 — invalid `npm_version` rejection
 
@@ -160,8 +179,8 @@ All 5 node-sdk rows trace through the SAME Resolve step at master HEAD. The `pub
 
 ## Limitations acknowledged
 
-- **No live dispatch:** would publish real versions or burn CI minutes. Verdaccio / TestPyPI / fork-with-registry setup is out of scope here. Adding a `dry-run` boolean input on node-sdk (parity with python-sdk) would enable safe live H1/H2/F1 verification in a follow-up.
-- **F1 setup invasive:** verifying F1 live requires committing a deliberately bad `optionalDependencies` pin to a feature branch + dispatching against it. Static trace through the pre-flight code is the lower-cost alternative.
+- **No live dispatch for happy-path rows:** would publish real versions or burn CI minutes. Verdaccio / TestPyPI / fork-with-registry setup is out of scope here. Adding a `dry-run` boolean input on node-sdk (parity with python-sdk) would enable safe live H1/H2 verification in a follow-up.
+- **F1 setup invasive but completed:** AAASM-2865 closed this row's "Live ✅" cell by dispatching against a temp `verify/AAASM-2865/f1-live` branch with a deliberately bad pin. The temp branch was deleted after the failing-run log was captured to `F1.log`. Static trace through the pre-flight code remains in this report for self-contained reading.
 - **Snapshot label observable for coordinated releases:** the AAASM-2855 callout (`version-v0.0.1-alpha.8` → `version-0.0.1-alpha.8`) is documented in PR #114's review. Worth verifying on the next coordinated release tag fire.
 
 ## Sign-off

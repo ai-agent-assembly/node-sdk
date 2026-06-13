@@ -1,0 +1,126 @@
+# AAASM-2851 / F1 — live verification log
+#
+# Dispatched run: https://github.com/ai-agent-assembly/node-sdk/actions/runs/27471607887
+# Job ID:         81203426168
+# Workflow:       .github/workflows/release-node.yml
+# Trigger:        workflow_dispatch
+# Dispatch ref:   verify/AAASM-2865/f1-live  (temp branch off remote/master @ 707818d, deleted after capture)
+# Inputs:
+#   npm_version       = 0.0.1-alpha.8.1
+#   binary_source_tag = v0.0.1-alpha.8
+#   publish_mode      = main-only
+# Branch tip commit (bad-pin commit):
+#   ef93b3a (verify): Set bad runtime-linux-x64 pin to demonstrate F1 pre-flight failure
+# Branch package.json optionalDependencies (excerpt):
+#   {
+#     "@agent-assembly/runtime-darwin-arm64": "0.0.1-alpha.8",   <- exists on npm
+#     "@agent-assembly/runtime-darwin-x64":   "0.0.1-alpha.8",   <- exists on npm
+#     "@agent-assembly/runtime-linux-arm64":  "0.0.1-alpha.8",   <- exists on npm
+#     "@agent-assembly/runtime-linux-x64":    "99.99.99-fake"    <- does NOT exist on npm
+#   }
+# Result:           failure (exit code 1 at the pre-flight step — no publish step ever ran)
+# Captured from:    gh api repos/AI-agent-assembly/node-sdk/actions/jobs/81203426168/logs
+#
+# Trim window:      lines 225..320 of the raw job log — covers the full Resolve step,
+#                   full Pre-flight step (script body + loop output + error annotation),
+#                   and the trailing exit code + post-job cleanup markers. Steps before
+#                   (checkout / pnpm setup / setup-node / pnpm install --frozen-lockfile)
+#                   are omitted; they all passed. Steps after were skipped because of the
+#                   non-zero exit at pre-flight.
+
+2026-06-13T15:55:38.1131048Z ##[group]Run set -euo pipefail
+2026-06-13T15:55:38.1131428Z [36;1mset -euo pipefail[0m
+2026-06-13T15:55:38.1131750Z [36;1mif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then[0m
+2026-06-13T15:55:38.1132225Z [36;1m  # Operator path. Precedence for binary_source_tag: explicit[0m
+2026-06-13T15:55:38.1132697Z [36;1m  # DISPATCH_BINARY_TAG > latest agent-assembly release.[0m
+2026-06-13T15:55:38.1133436Z [36;1m  if [[ -n "${DISPATCH_BINARY_TAG:-}" ]]; then[0m
+2026-06-13T15:55:38.1133793Z [36;1m    binary_source_tag="$DISPATCH_BINARY_TAG"[0m
+2026-06-13T15:55:38.1134092Z [36;1m  else[0m
+2026-06-13T15:55:38.1134562Z [36;1m    binary_source_tag=$(gh release view --repo ai-agent-assembly/agent-assembly --json tagName --jq .tagName)[0m
+2026-06-13T15:55:38.1135325Z [36;1m    echo "::notice::binary_source_tag omitted; defaulting to latest agent-assembly release: $binary_source_tag"[0m
+2026-06-13T15:55:38.1135841Z [36;1m  fi[0m
+2026-06-13T15:55:38.1136097Z [36;1m  npm_version="$DISPATCH_NPM_VERSION"[0m
+2026-06-13T15:55:38.1136441Z [36;1m  publish_mode="$DISPATCH_PUBLISH_MODE"[0m
+2026-06-13T15:55:38.1136812Z [36;1melif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then[0m
+2026-06-13T15:55:38.1137270Z [36;1m  # Coordinated release path. Both come from the same dispatched tag.[0m
+2026-06-13T15:55:38.1137778Z [36;1m  # publish_mode is hard-coded to 'all' — coordinated releases always[0m
+2026-06-13T15:55:38.1138187Z [36;1m  # publish the full 5-package set.[0m
+2026-06-13T15:55:38.1138520Z [36;1m  binary_source_tag="$DISPATCH_PAYLOAD_TAG"[0m
+2026-06-13T15:55:38.1138873Z [36;1m  npm_version="${DISPATCH_PAYLOAD_TAG#v}"[0m
+2026-06-13T15:55:38.1139181Z [36;1m  publish_mode="all"[0m
+2026-06-13T15:55:38.1139426Z [36;1melse[0m
+2026-06-13T15:55:38.1139957Z [36;1m  echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"[0m
+2026-06-13T15:55:38.1140547Z [36;1m  exit 1[0m
+2026-06-13T15:55:38.1140755Z [36;1mfi[0m
+2026-06-13T15:55:38.1141044Z [36;1mif [[ ! "$binary_source_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then[0m
+2026-06-13T15:55:38.1141595Z [36;1m  echo "::error::binary_source_tag '$binary_source_tag' does not match v*.*.* (semver) pattern"[0m
+2026-06-13T15:55:38.1142062Z [36;1m  exit 1[0m
+2026-06-13T15:55:38.1142263Z [36;1mfi[0m
+2026-06-13T15:55:38.1142523Z [36;1mif [[ ! "$npm_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then[0m
+2026-06-13T15:55:38.1143306Z [36;1m  echo "::error::npm_version '$npm_version' does not match X.Y.Z semver pattern (must NOT include leading v)"[0m
+2026-06-13T15:55:38.1143813Z [36;1m  exit 1[0m
+2026-06-13T15:55:38.1144015Z [36;1mfi[0m
+2026-06-13T15:55:38.1144211Z [36;1m{[0m
+2026-06-13T15:55:38.1144458Z [36;1m  echo "binary_source_tag=${binary_source_tag}"[0m
+2026-06-13T15:55:38.1144799Z [36;1m  echo "npm_version=${npm_version}"[0m
+2026-06-13T15:55:38.1145119Z [36;1m  echo "publish_mode=${publish_mode}"[0m
+2026-06-13T15:55:38.1145423Z [36;1m} >> "$GITHUB_OUTPUT"[0m
+2026-06-13T15:55:38.1145924Z [36;1mecho "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode}"[0m
+2026-06-13T15:55:38.1178238Z shell: /usr/bin/bash -e {0}
+2026-06-13T15:55:38.1178661Z env:
+2026-06-13T15:55:38.1178933Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-06-13T15:55:38.1179323Z   NPM_CONFIG_USERCONFIG: /home/runner/work/_temp/.npmrc
+2026-06-13T15:55:38.1179672Z   NODE_AUTH_TOKEN: XXXXX-XXXXX-XXXXX-XXXXX
+2026-06-13T15:55:38.1179968Z   EVENT_NAME: workflow_dispatch
+2026-06-13T15:55:38.1180231Z   DISPATCH_BINARY_TAG: v0.0.1-alpha.8
+2026-06-13T15:55:38.1180518Z   DISPATCH_NPM_VERSION: 0.0.1-alpha.8.1
+2026-06-13T15:55:38.1180797Z   DISPATCH_PUBLISH_MODE: main-only
+2026-06-13T15:55:38.1181058Z   DISPATCH_PAYLOAD_TAG: 
+2026-06-13T15:55:38.1184085Z   GH_TOKEN: ***
+2026-06-13T15:55:38.1184322Z ##[endgroup]
+2026-06-13T15:55:38.1239537Z Resolved binary_source_tag=v0.0.1-alpha.8 npm_version=0.0.1-alpha.8.1 publish_mode=main-only
+2026-06-13T15:55:38.1284918Z ##[group]Run set -euo pipefail
+2026-06-13T15:55:38.1285341Z [36;1mset -euo pipefail[0m
+2026-06-13T15:55:38.1285618Z [36;1mnode <<'NODE'[0m
+2026-06-13T15:55:38.1285872Z [36;1mconst fs = require("node:fs");[0m
+2026-06-13T15:55:38.1286241Z [36;1mconst { execSync } = require("node:child_process");[0m
+2026-06-13T15:55:38.1286701Z [36;1mconst pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));[0m
+2026-06-13T15:55:38.1287134Z [36;1mconst opt = pkg.optionalDependencies ?? {};[0m
+2026-06-13T15:55:38.1287550Z [36;1mconst runtimePkgs = Object.entries(opt).filter(([name]) =>[0m
+2026-06-13T15:55:38.1287962Z [36;1m  name.startsWith("@agent-assembly/runtime-"),[0m
+2026-06-13T15:55:38.1288298Z [36;1m);[0m
+2026-06-13T15:55:38.1288521Z [36;1mif (runtimePkgs.length === 0) {[0m
+2026-06-13T15:55:38.1288800Z [36;1m  console.error([0m
+2026-06-13T15:55:38.1289192Z [36;1m    "::error::no @agent-assembly/runtime-* entries in optionalDependencies — " +[0m
+2026-06-13T15:55:38.1289772Z [36;1m    "main-only mode requires existing runtime sub-packages to reuse",[0m
+2026-06-13T15:55:38.1290157Z [36;1m  );[0m
+2026-06-13T15:55:38.1290375Z [36;1m  process.exit(1);[0m
+2026-06-13T15:55:38.1290622Z [36;1m}[0m
+2026-06-13T15:55:38.1290830Z [36;1mlet failed = false;[0m
+2026-06-13T15:55:38.1291128Z [36;1mfor (const [name, version] of runtimePkgs) {[0m
+2026-06-13T15:55:38.1291433Z [36;1m  try {[0m
+2026-06-13T15:55:38.1291750Z [36;1m    execSync(`npm view ${name}@${version} version`, { stdio: "pipe" });[0m
+2026-06-13T15:55:38.1292200Z [36;1m    console.log(`OK: ${name}@${version} exists on npm`);[0m
+2026-06-13T15:55:38.1292539Z [36;1m  } catch {[0m
+2026-06-13T15:55:38.1293002Z [36;1m    console.error([0m
+2026-06-13T15:55:38.1293415Z [36;1m      `::error::main-only publish blocked — ${name}@${version} is not on npm. ` +[0m
+2026-06-13T15:55:38.1293990Z [36;1m      `Use publish_mode=all to publish the runtime sub-packages alongside the SDK.`,[0m
+2026-06-13T15:55:38.1294427Z [36;1m    );[0m
+2026-06-13T15:55:38.1294641Z [36;1m    failed = true;[0m
+2026-06-13T15:55:38.1294873Z [36;1m  }[0m
+2026-06-13T15:55:38.1295067Z [36;1m}[0m
+2026-06-13T15:55:38.1295280Z [36;1mif (failed) process.exit(1);[0m
+2026-06-13T15:55:38.1295556Z [36;1mNODE[0m
+2026-06-13T15:55:38.1323507Z shell: /usr/bin/bash -e {0}
+2026-06-13T15:55:38.1323771Z env:
+2026-06-13T15:55:38.1324041Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-06-13T15:55:38.1324441Z   NPM_CONFIG_USERCONFIG: /home/runner/work/_temp/.npmrc
+2026-06-13T15:55:38.1324793Z   NODE_AUTH_TOKEN: XXXXX-XXXXX-XXXXX-XXXXX
+2026-06-13T15:55:38.1325075Z ##[endgroup]
+2026-06-13T15:55:39.0118463Z OK: @agent-assembly/runtime-darwin-arm64@0.0.1-alpha.8 exists on npm
+2026-06-13T15:55:39.4744643Z OK: @agent-assembly/runtime-darwin-x64@0.0.1-alpha.8 exists on npm
+2026-06-13T15:55:39.9372533Z OK: @agent-assembly/runtime-linux-arm64@0.0.1-alpha.8 exists on npm
+2026-06-13T15:55:40.4725459Z ##[error]main-only publish blocked — @agent-assembly/runtime-linux-x64@99.99.99-fake is not on npm. Use publish_mode=all to publish the runtime sub-packages alongside the SDK.
+2026-06-13T15:55:40.4741266Z ##[error]Process completed with exit code 1.
+2026-06-13T15:55:40.4858027Z Post job cleanup.
+2026-06-13T15:55:40.6272451Z Pruning is unnecessary.
