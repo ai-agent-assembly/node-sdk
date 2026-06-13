@@ -35,3 +35,4 @@ export type {
   GatewayRecordEvent,
   GatewayResultRecord
 } from "./types/index.js";
+export { createNoopGatewayClient } from "./gateway/index.js";
