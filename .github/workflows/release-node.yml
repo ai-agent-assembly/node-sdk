@@ -163,6 +163,7 @@ jobs:
           NODE
 
       - name: Download aasm binaries from agent-assembly release
+        if: steps.tag.outputs.publish_mode == 'all'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
