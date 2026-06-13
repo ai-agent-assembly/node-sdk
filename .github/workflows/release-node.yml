@@ -55,7 +55,11 @@ jobs:
     name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.tag.outputs.tag }}
+      # AAASM-2853: tag mirrors binary_source_tag for back-compat with the
+      # version-docs job. AAASM-2855 refactors version-docs to use
+      # binary_source_tag + npm_version directly, after which this alias
+      # can be removed.
+      tag: ${{ steps.tag.outputs.binary_source_tag }}
       binary_source_tag: ${{ steps.tag.outputs.binary_source_tag }}
       npm_version: ${{ steps.tag.outputs.npm_version }}
     steps:
