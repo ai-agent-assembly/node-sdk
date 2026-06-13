@@ -26,8 +26,8 @@ on:
   workflow_dispatch:
     inputs:
       npm_version:
-        description: "Version to publish to npm (e.g. 0.0.1-alpha.8.1, 0.0.1-alpha.9, 0.0.2). AAASM-2852: accepted but unused until AAASM-2853 wires it through."
-        required: false
+        description: "Version to publish to npm (e.g. 0.0.1-alpha.8.1, 0.0.1-alpha.9, 0.0.2)."
+        required: true
         type: string
       binary_source_tag:
         description: "agent-assembly tag whose aasm-* binaries to bundle into the 4 runtime sub-packages (e.g. v0.0.1-alpha.8). Defaults to latest agent-assembly Release. AAASM-2852: accepted but unused until AAASM-2853 wires it through."
