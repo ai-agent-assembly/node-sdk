@@ -227,6 +227,7 @@ jobs:
           NODE
 
       - name: Bump versions across the 5 packages
+        if: steps.tag.outputs.publish_mode == 'all'
         env:
           VERSION: ${{ steps.tag.outputs.npm_version }}
         run: |
