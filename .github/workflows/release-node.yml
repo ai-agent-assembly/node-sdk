@@ -26,25 +26,21 @@ on:
   workflow_dispatch:
     inputs:
       npm_version:
-        description: "Version to publish to npm (e.g. 0.0.1-alpha.8.1, 0.0.1-alpha.9, 0.0.2). AAASM-2852: accepted but unused until AAASM-2853 wires it through."
-        required: false
+        description: "Version to publish to npm (e.g. 0.0.1-alpha.8.1, 0.0.1-alpha.9, 0.0.2)."
+        required: true
         type: string
       binary_source_tag:
-        description: "agent-assembly tag whose aasm-* binaries to bundle into the 4 runtime sub-packages (e.g. v0.0.1-alpha.8). Defaults to latest agent-assembly Release. AAASM-2852: accepted but unused until AAASM-2853 wires it through."
+        description: "agent-assembly tag whose aasm-* binaries to bundle into the 4 runtime sub-packages (e.g. v0.0.1-alpha.8). Defaults to latest agent-assembly Release."
         required: false
         type: string
       publish_mode:
         description: "Which packages to publish. 'all' = main SDK + 4 runtime sub-packages (coordinated release). 'main-only' = only @agent-assembly/sdk (SDK hotfix mode). AAASM-2852: accepted but unused until AAASM-2854 gates the publish steps."
-        required: false
+        required: true
         type: choice
         default: "all"
         options:
           - all
           - main-only
-      release_tag:
-        description: "[DEPRECATED — removal scheduled for AAASM-2853] agent-assembly release tag to consume (e.g. v0.0.1). Use npm_version + binary_source_tag instead going forward."
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -55,7 +51,13 @@ jobs:
     name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.tag.outputs.tag }}
+      # AAASM-2853: tag mirrors binary_source_tag for back-compat with the
+      # version-docs job. AAASM-2855 refactors version-docs to use
+      # binary_source_tag + npm_version directly, after which this alias
+      # can be removed.
+      tag: ${{ steps.tag.outputs.binary_source_tag }}
+      binary_source_tag: ${{ steps.tag.outputs.binary_source_tag }}
+      npm_version: ${{ steps.tag.outputs.npm_version }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v4.2.2
 
@@ -75,30 +77,46 @@ jobs:
         id: tag
         env:
           EVENT_NAME: ${{ github.event_name }}
-          DISPATCH_TAG: ${{ inputs.release_tag }}
+          DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
+          DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
           DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            tag="$DISPATCH_TAG"
+            # Operator path. Precedence for binary_source_tag: explicit
+            # DISPATCH_BINARY_TAG > latest agent-assembly release.
+            if [[ -n "${DISPATCH_BINARY_TAG:-}" ]]; then
+              binary_source_tag="$DISPATCH_BINARY_TAG"
+            else
+              binary_source_tag=$(gh release view --repo ai-agent-assembly/agent-assembly --json tagName --jq .tagName)
+              echo "::notice::binary_source_tag omitted; defaulting to latest agent-assembly release: $binary_source_tag"
+            fi
+            npm_version="$DISPATCH_NPM_VERSION"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
-            tag="$DISPATCH_PAYLOAD_TAG"
+            # Coordinated release path. Both come from the same dispatched tag.
+            binary_source_tag="$DISPATCH_PAYLOAD_TAG"
+            npm_version="${DISPATCH_PAYLOAD_TAG#v}"
           else
             echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
             exit 1
           fi
-          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "::error::tag '$tag' does not match v*.*.* (semver) pattern"
+          if [[ ! "$binary_source_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::binary_source_tag '$binary_source_tag' does not match v*.*.* (semver) pattern"
             exit 1
           fi
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag=${tag} version=${tag#v}"
+          if [[ ! "$npm_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::npm_version '$npm_version' does not match X.Y.Z semver pattern (must NOT include leading v)"
+            exit 1
+          fi
+          echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
+          echo "npm_version=${npm_version}" >> "$GITHUB_OUTPUT"
+          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version}"
 
       - name: Download aasm binaries from agent-assembly release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          RELEASE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
         run: |
           set -euo pipefail
           mkdir -p bin-staging
@@ -140,7 +158,7 @@ jobs:
 
       - name: Bump versions across the 5 packages
         env:
-          VERSION: ${{ steps.tag.outputs.version }}
+          VERSION: ${{ steps.tag.outputs.npm_version }}
         run: |
           set -euo pipefail
           node <<'NODE'
