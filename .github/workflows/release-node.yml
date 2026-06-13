@@ -113,6 +113,10 @@ jobs:
             echo "::error::tag '$tag' does not match v*.*.* (semver) pattern"
             exit 1
           fi
+          if [[ ! "$binary_source_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::binary_source_tag '$binary_source_tag' does not match v*.*.* (semver) pattern"
+            exit 1
+          fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
