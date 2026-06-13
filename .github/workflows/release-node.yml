@@ -81,6 +81,7 @@ jobs:
           DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
           DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
           DISPATCH_PUBLISH_MODE: ${{ inputs.publish_mode }}
+          DISPATCH_DRY_RUN: ${{ inputs.dry-run }}
           DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -96,6 +97,11 @@ jobs:
             fi
             npm_version="$DISPATCH_NPM_VERSION"
             publish_mode="$DISPATCH_PUBLISH_MODE"
+            # `dry-run` input is a boolean — workflow_dispatch sends 'true'
+            # or 'false' (string-form on the env). Default is false, so the
+            # legacy dispatch behavior is preserved when the operator does
+            # not tick the checkbox.
+            dry_run="$DISPATCH_DRY_RUN"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
             # Coordinated release path. Both come from the same dispatched tag.
             # publish_mode is hard-coded to 'all' — coordinated releases always
@@ -103,6 +109,12 @@ jobs:
             binary_source_tag="$DISPATCH_PAYLOAD_TAG"
             npm_version="${DISPATCH_PAYLOAD_TAG#v}"
             publish_mode="all"
+            # Coordinated releases from agent-assembly's notify-downstream job
+            # must ALWAYS publish for real. Hard-coding dry_run='false' here
+            # makes this regression-safe: even if a future workflow change
+            # adds a new dry-run code path, repository_dispatch will continue
+            # to publish.
+            dry_run="false"
           else
             echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
             exit 1
@@ -119,8 +131,9 @@ jobs:
             echo "binary_source_tag=${binary_source_tag}"
             echo "npm_version=${npm_version}"
             echo "publish_mode=${publish_mode}"
+            echo "dry_run=${dry_run}"
           } >> "$GITHUB_OUTPUT"
-          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode}"
+          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode} dry_run=${dry_run}"
 
       # AAASM-2854: Pre-flight gate for main-only mode. The SDK hotfix path
       # reuses the @agent-assembly/runtime-* sub-packages already on npm
