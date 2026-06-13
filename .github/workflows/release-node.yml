@@ -132,7 +132,7 @@ jobs:
       - name: Download aasm binaries from agent-assembly release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          RELEASE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
         run: |
           set -euo pipefail
           mkdir -p bin-staging
