@@ -3,6 +3,9 @@
 [![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
 [![Docs](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml)
 [![npm version](https://img.shields.io/npm/v/@agent-assembly/sdk/alpha?logo=npm)](https://www.npmjs.com/package/@agent-assembly/sdk/v/alpha)
+[![TypeScript types](https://img.shields.io/npm/types/@agent-assembly/sdk?logo=typescript)](https://www.npmjs.com/package/@agent-assembly/sdk)
+[![Bundle size](https://img.shields.io/bundlephobia/min/@agent-assembly/sdk?logo=webpack&label=min)](https://bundlephobia.com/package/@agent-assembly/sdk)
+[![Downloads](https://img.shields.io/npm/dm/@agent-assembly/sdk?logo=npm&label=downloads%2Fmo)](https://www.npmjs.com/package/@agent-assembly/sdk)
 [![Coverage](https://img.shields.io/codecov/c/github/ai-agent-assembly/node-sdk?logo=codecov)](https://codecov.io/gh/ai-agent-assembly/node-sdk)
 [![Quality Gate](https://img.shields.io/sonar/quality_gate/AI-agent-assembly_node-sdk?server=https%3A%2F%2Fsonarcloud.io&logo=sonarcloud)](https://sonarcloud.io/summary/new_code?id=AI-agent-assembly_node-sdk)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?logo=apache)](./LICENSE)
@@ -21,8 +24,9 @@ TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 > Production deployments should track the first `0.1.0` release.
 
 ```bash
-pnpm add @agent-assembly/sdk@alpha   # latest alpha
-pnpm add @agent-assembly/sdk@0.0.1-alpha.3   # pin exact
+pnpm add @agent-assembly/sdk@alpha             # latest alpha (tracks @alpha dist-tag)
+pnpm add @agent-assembly/sdk@<X.Y.Z-alpha.N>   # pin exact — replace the placeholder with the
+                                               # desired version from npmjs.com/package/@agent-assembly/sdk
 ```
 
 ## Prerequisites
