@@ -76,13 +76,19 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_TAG: ${{ inputs.release_tag }}
+          DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
           DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             tag="$DISPATCH_TAG"
+            # AAASM-2853: binary_source_tag falls back to release_tag (deprecated)
+            # during the transition window. Once release_tag is removed, this
+            # fallback collapses to just DISPATCH_BINARY_TAG.
+            binary_source_tag="${DISPATCH_BINARY_TAG:-$DISPATCH_TAG}"
           elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
             tag="$DISPATCH_PAYLOAD_TAG"
+            binary_source_tag="$DISPATCH_PAYLOAD_TAG"
           else
             echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
             exit 1
@@ -93,7 +99,8 @@ jobs:
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag=${tag} version=${tag#v}"
+          echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=${tag} version=${tag#v} binary_source_tag=${binary_source_tag}"
 
       - name: Download aasm binaries from agent-assembly release
         env:
