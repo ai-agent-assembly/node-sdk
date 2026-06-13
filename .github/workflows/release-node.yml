@@ -115,9 +115,11 @@ jobs:
             echo "::error::npm_version '$npm_version' does not match X.Y.Z semver pattern (must NOT include leading v)"
             exit 1
           fi
-          echo "binary_source_tag=${binary_source_tag}" >> "$GITHUB_OUTPUT"
-          echo "npm_version=${npm_version}" >> "$GITHUB_OUTPUT"
-          echo "publish_mode=${publish_mode}" >> "$GITHUB_OUTPUT"
+          {
+            echo "binary_source_tag=${binary_source_tag}"
+            echo "npm_version=${npm_version}"
+            echo "publish_mode=${publish_mode}"
+          } >> "$GITHUB_OUTPUT"
           echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode}"
 
       # AAASM-2854: Pre-flight gate for main-only mode. The SDK hotfix path
