@@ -24,8 +24,9 @@ TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 > Production deployments should track the first `0.1.0` release.
 
 ```bash
-pnpm add @agent-assembly/sdk@alpha   # latest alpha
-pnpm add @agent-assembly/sdk@0.0.1-alpha.3   # pin exact
+pnpm add @agent-assembly/sdk@alpha             # latest alpha (tracks @alpha dist-tag)
+pnpm add @agent-assembly/sdk@<X.Y.Z-alpha.N>   # pin exact — replace the placeholder with the
+                                               # desired version from npmjs.com/package/@agent-assembly/sdk
 ```
 
 ## Prerequisites
