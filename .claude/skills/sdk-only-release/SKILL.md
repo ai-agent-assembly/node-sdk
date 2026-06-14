@@ -304,6 +304,31 @@ shape. Verify all three before declaring the run complete:
 - Workflow run is green; no operator follow-up is required for the publish
   itself.
 
+## What's auto-handled (do NOT manually run)
+
+The workflow owns four operations end-to-end. Operators must not
+duplicate them manually — hand-runs collide with the workflow's state
+machine and produce the same class of failure seen in AAASM-2867.
+
+- **`npm publish` for `@agent-assembly/sdk` or any runtime sub-package.**
+  The workflow's Publish step handles every push to the registry.
+  `dry-run=true` skips the actual push; `dry-run=false` runs it.
+  Never call `npm publish` from a local terminal during an SDK-only
+  release.
+- **`git tag` creation.** There is **no** new git tag for an SDK-only
+  release. The `agent-assembly` `release.yml` flow owns tagging; do
+  not invoke it for an SDK republish.
+- **The docs-version snapshot / cross-repo docs cascade.** The
+  `deploy_release_documentation` job is gated on `repository_dispatch`
+  (AAASM-2868). It does **not** fire from `workflow_dispatch`. If
+  this SDK release needs documentation refresh, the operator triggers
+  the docs build manually — do not work around the gate.
+- **Editing `optionalDependencies` in `package.json` by hand.** The
+  workflow's **Bump main SDK version only** step rewrites every
+  `@agent-assembly/runtime-*` entry from `workspace:*` to the
+  `binary_source_tag-no-v` pin. Hand-edits race the Bump step and
+  produce stale or inconsistent pins. Trust the workflow.
+
 ## Known quirks (encode these — do not relearn them)
 
 ### Bump step must run before Pre-flight
