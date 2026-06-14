@@ -4,30 +4,44 @@ sidebar_position: 1
 
 # Examples
 
-Runnable, end-to-end Node examples live in the central
+This section walks through the runnable Node examples that ship in the central
 [`agent-assembly-examples`](https://github.com/ai-agent-assembly/agent-assembly-examples)
-repository, under its [`node/`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node)
-directory. Each example is a self-contained project with its own `README` that lists the
-exact install and run steps.
+repository, under its
+[`node/`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node)
+directory. Each example is a self-contained TypeScript project with its own `README`;
+the pages here explain what each one demonstrates, how the governance flow works, and
+walk through the real source.
 
-Every example uses the same wrapping pattern documented in the
-[Guides](../04-guides/index.md): you call `initAssembly()` once to start governance (it
-auto-detects your agent framework), and either pass your tools through `initAssembly` or
-wrap them explicitly with `withAssembly()` so each tool call is policy-checked before it
-runs. The examples differ only in which framework (or none) they integrate with.
+## The shared governance pattern
+
+Every Node example uses the same wrapping pattern documented in the
+[Guides](../04-guides/index.md): you wrap your tools with `withAssembly()` so each
+tool call is policy-checked **before** it runs. A denied call never executes its tool
+body — `withAssembly` throws a `PolicyViolationError` whose message carries the tool
+name and the policy's reason.
+
+To keep the examples deterministic and runnable offline in CI, each one supplies a
+small in-process `GatewayClient` (`mode: "sdk-only"`) that enforces a local
+allow/deny policy without a running gateway. The examples differ only in which
+framework (or none) defines the tools that `withAssembly` governs.
+
+Before running any example, see
+[Preparing the runtime environment](./setup.md) for the shared prerequisites,
+install/run commands, and mock vs. real-provider mode.
 
 ## Node examples
 
-| Example | What it demonstrates |
-| --- | --- |
-| [`custom-tool-policy`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/custom-tool-policy) | Tool-policy governance with no agent framework. |
-| [`langchain-js-basic-agent`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/langchain-js-basic-agent) | A governed LangChain.js ReAct agent. |
-| [`langgraph-js`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/langgraph-js) | Governance over a LangGraph.js state graph. |
-| [`mastra`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/mastra) | Mastra framework integration. |
-| [`openai-node-tool-policy`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/openai-node-tool-policy) | OpenAI Node SDK tool-policy enforcement. |
-| [`vercel-ai`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/vercel-ai) | Vercel AI SDK governance hook. |
+| Example | Framework | Page | Source |
+| --- | --- | --- | --- |
+| `custom-tool-policy` | — (none) | [Custom tool policy](./custom-tool-policy.md) | [dir](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/custom-tool-policy) |
+| `openai-node-tool-policy` | OpenAI Node SDK | [OpenAI Node tool policy](./openai-node-tool-policy.md) | [dir](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/openai-node-tool-policy) |
+| `langchain-js-basic-agent` | LangChain.js | [LangChain.js basic agent](./langchain-js-basic-agent.md) | [dir](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/langchain-js-basic-agent) |
+| `vercel-ai` | Vercel AI SDK | [Vercel AI SDK](./vercel-ai.md) | [dir](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/vercel-ai) |
+| `langgraph-js` | LangGraph.js | [LangGraph.js](./langgraph-js.md) | [dir](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/langgraph-js) |
+| `mastra` | Mastra | [Mastra](./mastra.md) | [dir](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/mastra) |
 
-For full run steps, follow the `README` inside each example directory.
+For the exact run steps, follow the per-example pages above or the `README` inside
+each example directory.
 
 ## Cross-cutting scenarios
 
