@@ -131,7 +131,31 @@ exist on the `@agent-assembly/sdk` registry entry — npm publishes are
 effectively immutable within minutes of upload, so re-publishing the
 same version is treated as a fatal user error rather than a no-op.
 
-## 3. Verification
+## 3. Automatic aa-sdk-client pin bump (from agent-assembly)
+
+After each `agent-assembly` release, `agent-assembly`'s `release.yml`
+(`update-node-sdk-ffi-pin` job) **auto-opens a bot PR on this repo** that
+bumps the `aa-sdk-client` git-SHA pin in `native/aa-ffi-node/Cargo.toml` to
+the just-tagged commit.
+
+A few things to keep in mind about that PR:
+
+- **Merging it does NOT republish the npm package.** `release-node.yml`
+  triggers only on `repository_dispatch`
+  (`agent-assembly-release-published`) and `workflow_dispatch` — never on
+  `push`. The npm publish already happened at agent-assembly tag time via
+  the coordinated `repository_dispatch` fan-out (section 1).
+- The bump PR is **source-sync only**: it keeps the FFI shim's pinned
+  `aa-sdk-client` current so the next release — or any from-source build —
+  compiles against the right revision.
+- To avoid the one-cycle source lag (the SDK published at vX was built from
+  the *previous* pin), merge the bump PR **before** the next agent-assembly
+  tag is cut.
+
+See `agent-assembly/docs/release/RUNBOOK.md` sections 3 and 8 for the
+dispatcher and source-pin contract on the agent-assembly side.
+
+## 4. Verification
 
 After the workflow completes, verify on the npm registry:
 
@@ -162,7 +186,7 @@ version on npm.
   back, the AAASM-2855 refactor regressed somewhere in the
   `version-docs` job.
 
-## 4. Recovery — when a publish fails
+## 5. Recovery — when a publish fails
 
 npm publishes are effectively immutable. A failed publish that uploaded
 partial state (e.g. some runtime sub-packages but not `@agent-assembly/sdk`)
