@@ -66,7 +66,34 @@ cases:
 Cross-reference: [`docs/release/RUNBOOK.md`](../../../docs/release/RUNBOOK.md)
 § "SDK-only release".
 
-## The four `workflow_dispatch` input axes
+## How to use
+
+Dispatch `release-node.yml` from the `node-sdk` repository with
+`workflow_dispatch`. The canonical invocation is:
+
+```bash
+gh workflow run release-node.yml \
+  --repo ai-agent-assembly/node-sdk \
+  --ref master \
+  -f npm_version=<X> \
+  -f binary_source_tag=<Y> \
+  -f publish_mode=main-only \
+  -f dry-run=true
+```
+
+Three operator-side rules govern every dispatch:
+
+1. **Dry-run first, always.** Re-dispatch with `dry-run=false` only after
+   the dry-run is green and the Pre-flight output (especially the
+   `optionalDependencies` rewrite) has been reviewed.
+2. **Authenticated terminal for `npm dist-tag add`.** The workflow does
+   not run `npm dist-tag add`; the operator runs it from their own
+   npm-authenticated shell after the publish completes. The skill
+   names the command but does not invoke it.
+3. **`publish_mode=main-only` for SDK-only releases.** `all` is reserved
+   for coordinated `agent-assembly` releases that re-cut binaries.
+
+### The four `workflow_dispatch` input axes
 
 `release-node.yml`'s `workflow_dispatch` exposes four inputs. **Each one
 controls a distinct axis**; coupling them by accident is the source of every
@@ -83,7 +110,7 @@ common mistake.
 `binary_source_tag` differ; `publish_mode=main-only`; do `dry-run=true`
 first, then `dry-run=false`.
 
-## Pre-conditions (verify before dispatching)
+### Pre-conditions (verify before dispatching)
 
 Run these checks first. Do not dispatch without all three.
 
@@ -114,7 +141,7 @@ Run these checks first. Do not dispatch without all three.
    the first attempt of any new `npm_version`, this is your first run; the
    second run flips `dry-run=false`.)
 
-## Executable plan
+### Executable plan
 
 1. **Dispatch the dry-run.**
 
