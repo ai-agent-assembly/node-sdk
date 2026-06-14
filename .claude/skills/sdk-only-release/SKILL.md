@@ -1,6 +1,6 @@
 ---
 name: sdk-only-release
-description: Publish an SDK-only @agent-assembly/sdk release (no agent-assembly core bump) via release-node.yml workflow_dispatch.
+description: Publish an SDK-only @agent-assembly/sdk release via the release-node.yml workflow_dispatch, without cutting a new agent-assembly core tag. Use when the Node SDK needs a republish for any reason that does not change the core binaries — a new SDK feature, refactor, dependency bump, bug fix, doc rebuild, or pre-release iteration — by supplying npm_version, binary_source_tag, publish_mode, and a dry-run-first dispatch.
 ---
 
 # sdk-only-release
