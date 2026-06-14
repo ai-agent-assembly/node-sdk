@@ -1,9 +1,8 @@
 import { createRequire } from "node:module";
 import type { Adapter } from "../adapters/adapter.js";
-import {
+import type {
   AssemblyCallbackHandler,
-  wrapToolWithAssembly,
-  type WrapToolWithAssemblyOptions
+  WrapToolWithAssemblyOptions
 } from "../adapters/langchain/index.js";
 import { createNoopGatewayClient, type GatewayClient } from "../gateway/client.js";
 import { createNativeClient, type NativeClient } from "../native/client.js";
@@ -121,30 +120,34 @@ function ensureLangChainTools(config: AssemblyConfig): Record<string, LangChainT
   return config.langchain.tools;
 }
 
-function registerLangChainHandler(
+async function registerLangChainHandler(
   config: AssemblyConfig,
   client: GatewayClient,
   frameworks: readonly string[]
-): AssemblyCallbackHandler | undefined {
+): Promise<AssemblyCallbackHandler | undefined> {
   if (!frameworks.includes("langchain-js") && !config.langchain) {
     return undefined;
   }
 
+  // Lazy-load the LangChain adapter only on the langchain code path so importing
+  // the SDK (and using withAssembly) never pulls in the optional @langchain/core.
+  const { AssemblyCallbackHandler } = await import("../adapters/langchain/index.js");
   const callbacks = ensureLangChainCallbacks(config);
   const handler = new AssemblyCallbackHandler(client);
   callbacks.push(handler);
   return handler;
 }
 
-function wrapLangChainTools(
+async function wrapLangChainTools(
   config: AssemblyConfig,
   client: GatewayClient,
   frameworks: readonly string[]
-): string[] {
+): Promise<string[]> {
   if (!frameworks.includes("langchain-js") && !config.langchain) {
     return [];
   }
 
+  const { wrapToolWithAssembly } = await import("../adapters/langchain/index.js");
   const tools = ensureLangChainTools(config);
   const wrapperOptions: WrapToolWithAssemblyOptions = {
     ...(config.langchain?.approvalTimeoutMs
@@ -249,8 +252,8 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
   }
 
-  const langChainHandler = registerLangChainHandler(resolvedConfig, client, frameworks);
-  const wrappedLangChainTools = wrapLangChainTools(resolvedConfig, client, frameworks);
+  const langChainHandler = await registerLangChainHandler(resolvedConfig, client, frameworks);
+  const wrappedLangChainTools = await wrapLangChainTools(resolvedConfig, client, frameworks);
   const vercelAiSdkPatched = await patchDetectedVercelAiSdk(client, frameworks, resolvedConfig.agentId);
   const openAIAgentsPatched = await patchDetectedOpenAIAgents(client, frameworks);
   const langGraphPatched = await patchDetectedLangGraph(frameworks, resolvedConfig.agentId);
