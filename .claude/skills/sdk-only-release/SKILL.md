@@ -13,6 +13,23 @@ This skill codifies the dispatch interface that landed via the AAASM-2851
 chain (AAASM-2862–2867 alpha-8.1 validation). The mechanism is identical for
 every SDK-only publish — **the trigger reason is broader than "hotfix"**.
 
+## Quick reference — canonical invocation
+
+```bash
+gh workflow run release-node.yml \
+  --repo ai-agent-assembly/node-sdk \
+  --ref master \
+  -f npm_version=<X> \
+  -f binary_source_tag=<Y> \
+  -f publish_mode=main-only \
+  -f dry-run=true
+```
+
+Replace `<X>` with the bare semver to publish (no leading `v`) and `<Y>`
+with the existing `agent-assembly` tag (with leading `v`) whose binaries
+should back the runtime sub-package pins. Always run with `dry-run=true`
+first; re-dispatch with `dry-run=false` once the dry-run is green.
+
 ## When to use this skill
 
 An SDK-only release is valid whenever the JavaScript / TypeScript surface of
