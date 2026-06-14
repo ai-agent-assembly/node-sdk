@@ -255,6 +255,39 @@ the skill named the command but did **not** run it:
 npm dist-tag add @agent-assembly/sdk@0.0.1-alpha.8.1 alpha
 ```
 
+## What's expected when done
+
+A successful SDK-only release leaves the npm registry in a precise
+shape. Verify all three before declaring the run complete:
+
+1. **`@agent-assembly/sdk@<X>` is queryable on the registry.**
+
+   ```bash
+   npm view @agent-assembly/sdk@<X>
+   ```
+
+   Returns the new version's metadata (publish timestamp, integrity
+   hash, `optionalDependencies` block pinned to `<binary_source_tag-no-v>`).
+
+2. **The 4 runtime sub-packages were NOT republished.** Because the
+   dispatch ran with `publish_mode=main-only`, no new versions of
+   `@agent-assembly/runtime-{linux-x64,linux-arm64,darwin-x64,darwin-arm64}`
+   should appear:
+
+   ```bash
+   for plat in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
+     npm view "@agent-assembly/runtime-${plat}" versions --json | tail -3
+   done
+   ```
+
+   The `<X>` version must not be present in any of the four lists.
+
+3. **The docs cascade did NOT fire.** This is correct behaviour —
+   `workflow_dispatch` does not emit `repository_dispatch`, so the
+   `deploy_release_documentation` job (AAASM-2868 / AAASM-2869) stays
+   idle. If documentation needs to refresh for this SDK-only release,
+   the operator manually triggers the docs build separately.
+
 ## Post-conditions
 
 - **dist-tag promotion is a separate, operator-driven step.** If `<X>` should
