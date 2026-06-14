@@ -30,11 +30,13 @@ with the existing `agent-assembly` tag (with leading `v`) whose binaries
 should back the runtime sub-package pins. Always run with `dry-run=true`
 first; re-dispatch with `dry-run=false` once the dry-run is green.
 
-## When to use this skill
+## When to use
 
-An SDK-only release is valid whenever the JavaScript / TypeScript surface of
-`@agent-assembly/sdk` needs a new published version and the `aasm` binary +
-the 4 runtime sub-packages on npm are healthy. Common cases:
+Use this skill whenever `@agent-assembly/sdk` needs a republish for **any
+reason that does not require cutting a new `agent-assembly` tag**. The
+JavaScript / TypeScript surface needs a new published version and the
+`aasm` binary + the 4 runtime sub-packages on npm are healthy. Common
+cases:
 
 - **Hotfix** — bug fix in `src/`, no Rust change.
 - **New SDK feature** — TS-only feature that does not touch the protocol.
@@ -45,9 +47,21 @@ the 4 runtime sub-packages on npm are healthy. Common cases:
 - **Pre-release iteration** — `0.0.1-alpha.8.1`, `.2`, … between coordinated
   releases.
 
-If the change touches the `aasm` binary, any shared Rust crate, or a
-wire-protocol surface, **do not use this skill** — run the coordinated
-`agent-assembly` release instead so the runtime sub-packages re-publish.
+## When NOT to use
+
+- **A new `agent-assembly` tag is being cut.** The upstream `release.yml`
+  fires the `repository_dispatch` that drives a full coordinated SDK
+  republish (and the docs cascade) automatically. Manually dispatching
+  this skill at the same time double-publishes and conflicts on the
+  npm version slot.
+- **The change touches the `aasm` binary, a shared Rust crate, or a
+  wire-protocol surface.** The runtime sub-packages must re-publish in
+  lockstep with the binary — run the coordinated `agent-assembly`
+  release flow so all five npm packages move together.
+- **Operator wants to bump only the runtime binaries.** This is not an
+  SDK-only release; do not pick `publish_mode=all` to chase it. Cut a
+  new `agent-assembly` tag so the binaries are sourced authoritatively
+  from a GitHub Release.
 
 Cross-reference: [`docs/release/RUNBOOK.md`](../../../docs/release/RUNBOOK.md)
 § "SDK-only release".
