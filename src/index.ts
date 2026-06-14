@@ -37,3 +37,8 @@ export type {
 } from "./types/index.js";
 export { createNoopGatewayClient } from "./gateway/index.js";
 export { PolicyViolationError } from "./errors/index.js";
+// Per-framework governance patch hooks (AAASM-2922). The curated public
+// surface lives in src/hooks/index.ts; re-export it here and via the
+// `@agent-assembly/sdk/hooks` subpath so consumers can apply a single
+// framework's hook manually.
+export * from "./hooks/index.js";

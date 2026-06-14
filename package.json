@@ -22,6 +22,11 @@
       "import": "./dist/esm/index.js",
       "require": "./dist/cjs/index.js",
       "types": "./dist/types/index.d.ts"
+    },
+    "./hooks": {
+      "import": "./dist/esm/hooks/index.js",
+      "require": "./dist/cjs/hooks/index.js",
+      "types": "./dist/types/hooks/index.d.ts"
     }
   },
   "scripts": {
