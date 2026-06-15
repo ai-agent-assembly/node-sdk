@@ -59,6 +59,34 @@ doc rebuild for a published JS API, or pre-release iteration
 Cross-reference: [`docs/release/RUNBOOK.md`](../../../docs/release/RUNBOOK.md)
 § "SDK-only release".
 
+## Release-coordination SOP — when agent-assembly is ALSO releasing
+
+This is the canonical ordering rule operators MUST follow whenever `agent-assembly` is cutting a release in the same version cycle as this SDK. Codified after the 2026-06-15 incident (AAASM-3007).
+
+### Case A — agent-assembly is ALSO releasing this version cycle
+
+The SDK release MUST wait. Required order:
+
+1. Cut the `agent-assembly` tag (e.g. `v0.0.1-beta.3`) and wait for its `Release` workflow to complete (build → publish → `notify-downstream`).
+2. Wait for the auto-bump PR (`bot/aa-ffi-pin-<tag>`) to open on this repo (AAASM-2883 for node/python; AAASM-3006 extends the same fan-out to go-sdk).
+3. Review + merge the auto-bump PR. This brings `master` in line with the `aa-sdk-client` SHA carried by the new agent-assembly tag.
+4. ONLY THEN cut the SDK tag (matching version) — by tag-push OR `workflow_dispatch` — to fire this skill.
+
+Do NOT pre-publish the SDK tag against the previous agent-assembly content. Doing so:
+
+- Burns the version slot on the registry (npm / PyPI refuse re-publish).
+- Means users installing that SDK version get content that does NOT carry the agent-assembly fix they expect.
+
+### Case B — SDK-only release (no agent-assembly cut in this cycle)
+
+This skill may be triggered freely via `workflow_dispatch`. No coordination required, because the existing `aa-sdk-client` SHA pin on `master` is already what we want to ship.
+
+### Why this SOP exists (the 2026-06-15 incident)
+
+On 2026-06-15 02:21 UTC, `@agent-assembly/sdk@0.0.1-beta.2` was published to npm via `workflow_dispatch` while `agent-assembly`'s latest release was still `v0.0.1-beta.1` (pre-AAASM-3000 IPC fix). The bundle on npm at version `0.0.1-beta.2` therefore does NOT carry the AAASM-3000 fix that users would reasonably expect from that version label. Same incident on PyPI at 02:22 UTC.
+
+The fix is operator discipline (this SOP), not a workflow-code restriction — `workflow_dispatch` is kept open for legitimate Case B releases.
+
 ## How to use
 
 Dispatch `release-node.yml` from the `node-sdk` repository with
