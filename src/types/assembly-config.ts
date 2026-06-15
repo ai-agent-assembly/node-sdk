@@ -12,6 +12,14 @@ export interface AssemblyConfig {
    */
   gatewayUrl?: string;
   /**
+   * Control-plane HTTP base URL. When set, the gateway client routes its HTTP
+   * traffic here instead of ``gatewayUrl``; when omitted it falls back to the
+   * resolved ``gatewayUrl`` (backwards-compatible). ``initAssembly`` also reads
+   * the ``AA_CONTROL_PLANE_URL`` environment variable as a fallback when this
+   * field is not set. The gRPC transport continues to use ``gatewayUrl``.
+   */
+  controlPlaneUrl?: string;
+  /**
    * API key. When omitted, ``initAssembly`` resolves it via
    * AAASM_API_KEY, the config file, or defaults to an empty string
    * (local mode is unauth-accepting).
