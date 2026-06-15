@@ -10,6 +10,12 @@ import type { AssemblyMode } from "../types/assembly-mode.js";
 
 export interface GatewayClient {
   readonly mode: AssemblyMode;
+  /**
+   * Base URL for the client's HTTP routes. Resolved by ``initAssembly`` to
+   * ``controlPlaneUrl`` when set, otherwise to ``gatewayUrl``. Undefined when
+   * the client is constructed without a URL (e.g. a bare no-op test client).
+   */
+  readonly httpBaseUrl?: string;
   start: () => Promise<void>;
   close: () => Promise<void>;
   check: (request: GatewayCheckRequest) => Promise<GatewayDecision>;
@@ -23,9 +29,13 @@ export interface GatewayClient {
   scanPrompts: (scan: GatewayPromptScan) => Promise<void>;
 }
 
-export function createNoopGatewayClient(mode: AssemblyMode): GatewayClient {
+export function createNoopGatewayClient(
+  mode: AssemblyMode,
+  httpBaseUrl?: string
+): GatewayClient {
   return {
     mode,
+    ...(httpBaseUrl !== undefined ? { httpBaseUrl } : {}),
     start: async () => undefined,
     close: async () => undefined,
     check: async () => ({ denied: false, pending: false }),
