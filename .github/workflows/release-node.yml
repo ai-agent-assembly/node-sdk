@@ -55,6 +55,9 @@ jobs:
   publish:
     name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # AAASM-2955: create the git tag + GitHub Release for the published version
+      id-token: write  # npm OIDC Trusted Publishing + SLSA provenance
     outputs:
       binary_source_tag: ${{ steps.tag.outputs.binary_source_tag }}
       npm_version: ${{ steps.tag.outputs.npm_version }}
@@ -359,6 +362,39 @@ jobs:
           echo "Publishing main SDK at version=$VERSION dist-tag arg='$DIST_TAG'"
           # shellcheck disable=SC2086
           pnpm publish --access public --no-git-checks $DIST_TAG
+
+      # AAASM-2955: cut a git tag + GitHub Release at the published npm
+      # version so the README "GitHub release" badge tracks the current
+      # release. Runs only on the real-publish path (dry-run skips it, same
+      # gate as the publish steps above). Idempotent: if the tag/release
+      # already exists (e.g. a workflow_dispatch re-run for a partial
+      # publish), it is left untouched rather than failing the job.
+      - name: Cut git tag + GitHub Release for published version
+        if: steps.tag.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_VERSION: ${{ steps.tag.outputs.npm_version }}
+          BINARY_SOURCE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
+        run: |
+          set -euo pipefail
+          tag="v${NPM_VERSION}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::GitHub Release $tag already exists — leaving it untouched (idempotent re-run)."
+            exit 0
+          fi
+          # Mark pre-release for any SemVer pre-release identifier (e.g.
+          # 0.0.1-beta.1); a bare X.Y.Z is a stable release.
+          prerelease_flag=""
+          if [[ "$NPM_VERSION" == *-* ]]; then
+            prerelease_flag="--prerelease"
+          fi
+          # shellcheck disable=SC2086
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$tag" \
+            $prerelease_flag \
+            --notes "node-sdk @agent-assembly/sdk@${NPM_VERSION} (bundled aasm binaries from agent-assembly ${BINARY_SOURCE_TAG})."
 
   # AAASM-2751: cut the immutable Docusaurus docs snapshot for this release
   # and repoint the channel metadata. This runs ONLY after `publish` succeeds,
