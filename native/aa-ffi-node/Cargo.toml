@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 # `rev`); advisory preflight arrives transitively via its default `preflight`
 # feature. AAASM-2559 will formalize a published/pinned distribution + a
 # standalone-build CI smoke check on the agent-assembly side.
-aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "cfb7342bbbda6224a6f0f10d52776f75ba6cb78b", package = "aa-sdk-client" }
+aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "0aa9c945511d010457535c20704f7f42d59f2126", package = "aa-sdk-client" }
 napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "3"
 serde_json = "1"
