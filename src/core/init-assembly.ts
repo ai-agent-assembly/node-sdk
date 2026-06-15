@@ -26,6 +26,11 @@ import { resolveApiKey, resolveGatewayUrl } from "./gateway-resolver.js";
 
 const requireFromCwd = createRequire(`${process.cwd()}/`);
 
+/** Env-var fallback for ``gatewayUrl`` read at ``initAssembly`` entry. */
+export const ENV_GATEWAY_URL = "AA_GATEWAY_URL";
+/** Env-var fallback for ``controlPlaneUrl`` read at ``initAssembly`` entry. */
+export const ENV_CONTROL_PLANE_URL = "AA_CONTROL_PLANE_URL";
+
 function buildRegistrationEvent(config: AssemblyConfig): Record<string, string> {
   const event: Record<string, string> = { event_type: "register" };
   if (config.parentAgentId !== undefined) event.parent_agent_id = config.parentAgentId;
@@ -46,7 +51,10 @@ export function createClient(config: AssemblyConfig): GatewayClient {
     return config.gatewayClient;
   }
 
-  return createNoopGatewayClient(mode);
+  // HTTP routes use controlPlaneUrl when set, otherwise fall back to the
+  // resolved gatewayUrl so pre-feature callers keep their existing base URL.
+  const httpBaseUrl = config.controlPlaneUrl ?? config.gatewayUrl;
+  return createNoopGatewayClient(mode, httpBaseUrl);
 }
 
 function isPackageInstalled(packageName: string): boolean {
@@ -225,12 +233,17 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
   // Auto-populate parentAgentId from the async context store when not explicitly provided.
   // This allows child agents spawned inside framework hooks to inherit lineage automatically.
   const resolvedParentAgentId = config.parentAgentId ?? currentAgentId();
-  const resolvedGatewayUrl = await resolveGatewayUrl(config.gatewayUrl);
+  // Env-var fallbacks read at entry: explicit config field > env-var > the
+  // downstream resolver chain (which may itself error if required and absent).
+  const gatewayUrlInput = config.gatewayUrl ?? process.env[ENV_GATEWAY_URL];
+  const controlPlaneUrlInput = config.controlPlaneUrl ?? process.env[ENV_CONTROL_PLANE_URL];
+  const resolvedGatewayUrl = await resolveGatewayUrl(gatewayUrlInput);
   const resolvedApiKey = await resolveApiKey(config.apiKey);
   const resolvedConfig: AssemblyConfig = {
     ...config,
     gatewayUrl: resolvedGatewayUrl,
     apiKey: resolvedApiKey,
+    ...(controlPlaneUrlInput !== undefined ? { controlPlaneUrl: controlPlaneUrlInput } : {}),
     ...(resolvedParentAgentId ? { parentAgentId: resolvedParentAgentId } : {})
   };
 
