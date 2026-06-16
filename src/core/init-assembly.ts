@@ -237,7 +237,13 @@ async function patchDetectedOpenAIAgents(
   return patchOpenAIAgents({ gatewayClient: client });
 }
 
-export async function initAssembly(config: AssemblyConfig = {}): Promise<AssemblyContext> {
+/**
+ * Validate caller-supplied `initAssembly` config, throwing `RangeError` on the
+ * two fields that can arrive malformed from non-TS callers (plain JS, JSON
+ * config, dynamic input). Extracted to keep `initAssembly` below the cognitive
+ * complexity threshold; behaviour-preserving.
+ */
+function validateConfig(config: AssemblyConfig): void {
   if (config.delegationReason !== undefined && config.delegationReason.length > 256) {
     throw new RangeError("delegationReason must be <= 256 characters");
   }
@@ -249,6 +255,66 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
       `enforcementMode must be one of: ${ENFORCEMENT_MODES.join(", ")} (got: ${String(config.enforcementMode)})`
     );
   }
+}
+
+/** Outcome of running every framework patch/detect path during `initAssembly`. */
+interface FrameworkPatchResult {
+  langChainHandler: AssemblyCallbackHandler | undefined;
+  wrappedLangChainTools: string[];
+  vercelAiSdkPatched: boolean;
+  openAIAgentsPatched: boolean;
+  langGraphPatched: boolean;
+  mastraPatched: boolean;
+}
+
+/**
+ * Run every framework detect-and-patch path for the resolved config. Extracted
+ * from `initAssembly` to keep its cognitive complexity below threshold;
+ * behaviour-preserving (same calls, same order).
+ */
+async function applyFrameworkPatches(
+  config: AssemblyConfig,
+  client: GatewayClient,
+  frameworks: readonly string[]
+): Promise<FrameworkPatchResult> {
+  const langChainHandler = await registerLangChainHandler(config, client, frameworks);
+  const wrappedLangChainTools = await wrapLangChainTools(config, client, frameworks);
+  const vercelAiSdkPatched = await patchDetectedVercelAiSdk(client, frameworks, config.agentId);
+  const openAIAgentsPatched = await patchDetectedOpenAIAgents(client, frameworks);
+  const langGraphPatched = await patchDetectedLangGraph(frameworks, config.agentId);
+  const mastraPatched = await patchDetectedMastra(frameworks, config.agentId);
+
+  return {
+    langChainHandler,
+    wrappedLangChainTools,
+    vercelAiSdkPatched,
+    openAIAgentsPatched,
+    langGraphPatched,
+    mastraPatched
+  };
+}
+
+/**
+ * Build the deduped list of active adapter ids from the registered adapters plus
+ * whichever framework patches actually took effect. Extracted from
+ * `initAssembly` to keep its cognitive complexity below threshold.
+ */
+function buildActiveAdapters(adapters: readonly Adapter[], patches: FrameworkPatchResult): string[] {
+  return [
+    ...new Set([
+      ...adapters.map((adapter) => adapter.id),
+      ...(patches.langChainHandler ? ["langchain-js"] : []),
+      ...(patches.wrappedLangChainTools.length > 0 ? ["langchain-js"] : []),
+      ...(patches.vercelAiSdkPatched ? ["vercel-ai-sdk"] : []),
+      ...(patches.openAIAgentsPatched ? ["openai-agents"] : []),
+      ...(patches.langGraphPatched ? ["langgraph-js"] : []),
+      ...(patches.mastraPatched ? ["mastra"] : [])
+    ])
+  ];
+}
+
+export async function initAssembly(config: AssemblyConfig = {}): Promise<AssemblyContext> {
+  validateConfig(config);
   // Auto-populate parentAgentId from the async context store when not explicitly provided.
   // This allows child agents spawned inside framework hooks to inherit lineage automatically.
   const resolvedParentAgentId = config.parentAgentId ?? currentAgentId();
@@ -284,29 +350,10 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
   }
 
-  const langChainHandler = await registerLangChainHandler(resolvedConfig, client, frameworks);
-  const wrappedLangChainTools = await wrapLangChainTools(resolvedConfig, client, frameworks);
-  const vercelAiSdkPatched = await patchDetectedVercelAiSdk(
-    client,
-    frameworks,
-    resolvedConfig.agentId
-  );
-  const openAIAgentsPatched = await patchDetectedOpenAIAgents(client, frameworks);
-  const langGraphPatched = await patchDetectedLangGraph(frameworks, resolvedConfig.agentId);
-  const mastraPatched = await patchDetectedMastra(frameworks, resolvedConfig.agentId);
+  const patches = await applyFrameworkPatches(resolvedConfig, client, frameworks);
 
   return {
-    activeAdapters: [
-      ...new Set([
-        ...adapters.map((adapter) => adapter.id),
-        ...(langChainHandler ? ["langchain-js"] : []),
-        ...(wrappedLangChainTools.length > 0 ? ["langchain-js"] : []),
-        ...(vercelAiSdkPatched ? ["vercel-ai-sdk"] : []),
-        ...(openAIAgentsPatched ? ["openai-agents"] : []),
-        ...(langGraphPatched ? ["langgraph-js"] : []),
-        ...(mastraPatched ? ["mastra"] : [])
-      ])
-    ],
+    activeAdapters: buildActiveAdapters(adapters, patches),
     ...(resolvedConfig.parentAgentId !== undefined && {
       parentAgentId: resolvedConfig.parentAgentId
     }),
