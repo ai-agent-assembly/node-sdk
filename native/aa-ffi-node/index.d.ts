@@ -28,6 +28,35 @@ export declare function connect(socketPath: string): Promise<ClientHandle>
 export declare function disconnect(handle: ClientHandle): Promise<void>
 
 /**
+ * A policy verdict returned to JS.
+ *
+ * `decision` is one of `"allow"`, `"deny"`, `"pending"`, `"redact"`; `reason`
+ * is the human-readable explanation from the policy engine (or the fail-open
+ * note when the runtime did not answer).
+ */
+export interface PolicyDecision {
+  decision: string
+  reason: string
+}
+
+/**
+ * Synchronously query the runtime for a policy decision on an action.
+ *
+ * The JS query object is translated into a `CheckActionRequest` (agent id,
+ * action type, and — for tool calls — tool name / source / args) and handed
+ * to [`AssemblyClient::query_policy`], which blocks the calling thread for up
+ * to 5s waiting on the runtime's `CheckActionResponse`.
+ *
+ * **Fail-open:** the SDK is advisory, not a security boundary. If the runtime
+ * is unreachable or too slow ([`SdkClientError::QueryFailed`]), this returns a
+ * non-deny `"allow"` so a missing or degraded runtime never blocks the agent —
+ * the proxy / eBPF layers remain authoritative. Any other client error
+ * (poisoned lock, closed channel, session already shut down) is a genuine
+ * local fault and surfaces as a typed error.
+ */
+export declare function queryPolicy(handle: ClientHandle, query: any): PolicyDecision
+
+/**
  * Ship a captured event to the runtime.
  *
  * The JS event object is translated to the shared client's
