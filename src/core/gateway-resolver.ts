@@ -16,7 +16,10 @@ import { ConfigurationError, GatewayError } from "../errors/index.js";
  * Resolution precedence (highest first):
  *
  *   1. Explicit field on the AssemblyConfig
- *   2. Environment variable (AAASM_GATEWAY_URL / AAASM_API_KEY)
+ *   2. Environment variable — canonical ``AA_GATEWAY_URL`` / ``AA_API_KEY``,
+ *      with the legacy ``AAASM_GATEWAY_URL`` / ``AAASM_API_KEY`` names accepted
+ *      as deprecated aliases (a one-time warning is logged when a legacy name
+ *      supplies the value)
  *   3. Config file (~/.aasm/config.yaml, optional js-yaml soft dep)
  *   4. Local default: probe http://localhost:7391, auto-start if absent
  */
@@ -27,8 +30,51 @@ export const DEFAULT_PROBE_TIMEOUT_MS = 500;
 export const DEFAULT_AUTO_START_TIMEOUT_MS = 5000;
 export const DEFAULT_CONFIG_FILE_PATH = "~/.aasm/config.yaml";
 
-export const ENV_GATEWAY_URL = "AAASM_GATEWAY_URL";
-export const ENV_API_KEY = "AAASM_API_KEY";
+export const ENV_GATEWAY_URL = "AA_GATEWAY_URL";
+export const ENV_API_KEY = "AA_API_KEY";
+
+/**
+ * Deprecated environment-variable names, kept as backwards-compatible aliases.
+ *
+ * When one of these supplies a value (and the canonical ``AA_*`` name is unset)
+ * a one-time deprecation warning is emitted via ``readEnvWithDeprecation``.
+ */
+export const LEGACY_ENV_GATEWAY_URL = "AAASM_GATEWAY_URL";
+export const LEGACY_ENV_API_KEY = "AAASM_API_KEY";
+
+/**
+ * Tracks which legacy env-var names have already produced a deprecation
+ * warning so the message is logged at most once per name per process.
+ */
+const _warnedLegacyEnv = new Set<string>();
+
+/**
+ * Read an environment variable preferring the canonical ``AA_*`` name and
+ * falling back to a deprecated ``AAASM_*`` alias.
+ *
+ * Returns ``undefined`` when neither name is set. When the value comes from
+ * the legacy alias, a deprecation warning is logged exactly once per legacy
+ * name (guarded by ``_warnedLegacyEnv``) directing the user to the canonical
+ * name.
+ */
+function readEnvWithDeprecation(canonicalName: string, legacyName: string): string | undefined {
+  const canonical = process.env[canonicalName];
+  if (canonical) return canonical;
+
+  const legacy = process.env[legacyName];
+  if (legacy) {
+    if (!_warnedLegacyEnv.has(legacyName)) {
+      _warnedLegacyEnv.add(legacyName);
+      console.warn(
+        `[agent-assembly] ${legacyName} is deprecated and will be removed in a ` +
+          `future release. Use ${canonicalName} instead.`
+      );
+    }
+    return legacy;
+  }
+
+  return undefined;
+}
 
 export const AASM_AUTO_START_ARGV = ["start", "--mode", "local", "--foreground"] as const;
 
@@ -159,7 +205,12 @@ const _seams = {
   autoStartGateway: autoStartGateway,
 };
 
-export const __testing = { _seams };
+export const __testing = {
+  _seams,
+  resetLegacyEnvWarnings: (): void => {
+    _warnedLegacyEnv.clear();
+  },
+};
 
 /**
  * Spawn ``aasm start --mode local --foreground`` and wait until ``/healthz``
@@ -205,7 +256,7 @@ export async function autoStartGateway(
 export async function resolveGatewayUrl(explicit?: string): Promise<string> {
   if (explicit) return explicit;
 
-  const fromEnv = process.env[ENV_GATEWAY_URL];
+  const fromEnv = readEnvWithDeprecation(ENV_GATEWAY_URL, LEGACY_ENV_GATEWAY_URL);
   if (fromEnv) return fromEnv;
 
   const config = await _seams.loadConfigFile();
@@ -233,7 +284,7 @@ export async function resolveGatewayUrl(explicit?: string): Promise<string> {
 export async function resolveApiKey(explicit?: string): Promise<string> {
   if (explicit) return explicit;
 
-  const fromEnv = process.env[ENV_API_KEY];
+  const fromEnv = readEnvWithDeprecation(ENV_API_KEY, LEGACY_ENV_API_KEY);
   if (fromEnv) return fromEnv;
 
   const config = await _seams.loadConfigFile();
