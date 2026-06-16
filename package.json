@@ -102,7 +102,9 @@
   "pnpm": {
     "overrides": {
       "fast-uri": "^3.1.2",
-      "esbuild": ">=0.28.1"
+      "esbuild": ">=0.28.1",
+      "protobufjs": "^7.6.1",
+      "ws": ">=8.21.0"
     }
   }
 }
