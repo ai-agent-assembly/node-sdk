@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 interface MockBinding {
   connect: ReturnType<typeof vi.fn>;
   sendEvent: ReturnType<typeof vi.fn>;
+  // Native `queryPolicy` is synchronous and returns a `{decision, reason}`
+  // verdict (AAASM-3047), mirroring the napi shim's `PolicyDecision`.
   queryPolicy: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
 }
@@ -19,9 +21,7 @@ async function loadNativeClientWithBinding(bindingFactory: () => MockBinding) {
   return import("../src/native/client.js");
 }
 
-async function loadNativeClientWithRequire(
-  requireFactory: () => (path: string) => unknown
-) {
+async function loadNativeClientWithRequire(requireFactory: () => (path: string) => unknown) {
   vi.resetModules();
   vi.doMock("node:module", () => ({
     createRequire: () => requireFactory()
@@ -44,7 +44,7 @@ describe("createNativeClient", () => {
       const binding = {
         connect: vi.fn(async () => ({ id: "handle-cache" })),
         sendEvent: vi.fn(() => undefined),
-        queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+        queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
         disconnect: vi.fn(async () => undefined)
       } satisfies MockBinding;
 
@@ -84,7 +84,7 @@ describe("createNativeClient", () => {
     const mod = await loadNativeClientWithBinding(() => ({
       connect: vi.fn(async () => ({})),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     }));
 
@@ -102,11 +102,11 @@ describe("createNativeClient", () => {
     await expect(client.close()).resolves.toBeUndefined();
   });
 
-  it("loads binding and connects in napi-inprocess mode; queryPolicy defers neutrally", async () => {
+  it("napi-inprocess: queryPolicy connects and maps a runtime DENY verdict", async () => {
     const binding = {
       connect: vi.fn(async () => ({ id: "handle-1" })),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: true, reason: "blocked" })),
+      queryPolicy: vi.fn(() => ({ decision: "deny", reason: "blocked" })),
       disconnect: vi.fn(async () => undefined)
     } satisfies MockBinding;
 
@@ -118,17 +118,64 @@ describe("createNativeClient", () => {
       mode: "napi-inprocess"
     });
 
-    // The SDK is not a policy authority: queryPolicy resolves neutral and never
-    // consults the native binding, even when the binding would report a denial.
-    await expect(client.queryPolicy({ action: "check" })).resolves.toEqual({
-      denied: false,
-      pending: false
+    // AAASM-3050: queryPolicy now consults the native runtime and maps its
+    // authoritative verdict. A "deny" surfaces as a blocking decision.
+    const query = { agent_id: "agent-1", action_type: "tool_call", tool_name: "rm" };
+    await expect(client.queryPolicy(query)).resolves.toEqual({
+      denied: true,
+      pending: false,
+      reason: "blocked"
     });
-    expect(binding.queryPolicy).not.toHaveBeenCalled();
+    expect(binding.queryPolicy).toHaveBeenCalledWith({ id: "handle-1" }, query);
 
     expect(binding.connect).toHaveBeenCalledWith("/tmp/aa.sock");
     await expect(client.close()).resolves.toBeUndefined();
     expect(binding.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("napi-inprocess: maps a runtime ALLOW verdict to a neutral decision", async () => {
+    const binding = {
+      connect: vi.fn(async () => ({ id: "handle-allow" })),
+      sendEvent: vi.fn(() => undefined),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "ok" })),
+      disconnect: vi.fn(async () => undefined)
+    } satisfies MockBinding;
+
+    const mod = await loadNativeClientWithBinding(() => binding);
+    const client = mod.createNativeClient({
+      gateway: "/tmp/aa.sock",
+      apiKey: "test-key",
+      mode: "napi-inprocess"
+    });
+
+    await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+      denied: false,
+      pending: false
+    });
+    await client.close();
+  });
+
+  it("napi-inprocess: maps a runtime PENDING verdict to the approval path", async () => {
+    const binding = {
+      connect: vi.fn(async () => ({ id: "handle-pending" })),
+      sendEvent: vi.fn(() => undefined),
+      queryPolicy: vi.fn(() => ({ decision: "pending", reason: "awaiting approval" })),
+      disconnect: vi.fn(async () => undefined)
+    } satisfies MockBinding;
+
+    const mod = await loadNativeClientWithBinding(() => binding);
+    const client = mod.createNativeClient({
+      gateway: "/tmp/aa.sock",
+      apiKey: "test-key",
+      mode: "napi-inprocess"
+    });
+
+    await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+      denied: false,
+      pending: true,
+      reason: "awaiting approval"
+    });
+    await client.close();
   });
 
   it("maps connect failure to NativeConnectError", async () => {
@@ -137,7 +184,7 @@ describe("createNativeClient", () => {
         throw new Error("AA_ERR_CONNECT:socketPath cannot be empty");
       }),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     }));
 
@@ -147,7 +194,9 @@ describe("createNativeClient", () => {
       mode: "napi-inprocess"
     });
 
-    await expect(client.queryPolicy({ action: "check" })).rejects.toBeInstanceOf(mod.NativeConnectError);
+    await expect(client.queryPolicy({ action: "check" })).rejects.toBeInstanceOf(
+      mod.NativeConnectError
+    );
   });
 
   it("maps non-Error connect failures to a generic Error", async () => {
@@ -156,7 +205,7 @@ describe("createNativeClient", () => {
         throw "broken-connect";
       }),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     }));
 
@@ -176,7 +225,7 @@ describe("createNativeClient", () => {
         throw unknownError;
       }),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     }));
 
@@ -195,7 +244,7 @@ describe("createNativeClient", () => {
       sendEvent: vi.fn(() => {
         throw new Error("AA_ERR_SEND_EVENT:queue closed");
       }),
-      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     } satisfies MockBinding;
 
@@ -226,7 +275,7 @@ describe("createNativeClient", () => {
       sendEvent: vi.fn(() => {
         throw new Error("AA_ERR_SEND_EVENT:queue closed");
       }),
-      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     } satisfies MockBinding;
 
@@ -253,7 +302,7 @@ describe("createNativeClient", () => {
     const binding = {
       connect: vi.fn(async () => ({ id: "handle-4" })),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => {
         throw new Error("AA_ERR_DISCONNECT:disconnect failed");
       })
@@ -276,7 +325,7 @@ describe("createNativeClient", () => {
     const binding = {
       connect: vi.fn(async () => ({ id: "unused" })),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     } satisfies MockBinding;
 
@@ -298,7 +347,7 @@ describe("createNativeClient", () => {
       sendEvent: vi.fn(() => {
         throw new Error("AA_ERR_SEND_EVENT:queue closed");
       }),
-      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     } satisfies MockBinding;
 
@@ -319,7 +368,7 @@ describe("createNativeClient", () => {
     const binding = {
       connect: vi.fn(async () => ({ id: "handle-5" })),
       sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(async () => ({ denied: false, pending: false })),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
     } satisfies MockBinding;
 
