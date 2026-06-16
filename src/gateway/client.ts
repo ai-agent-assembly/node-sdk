@@ -7,6 +7,7 @@ import type {
   GatewayResultRecord
 } from "../types/gateway-governance.js";
 import type { AssemblyMode } from "../types/assembly-mode.js";
+import type { NativeClient } from "../native/client.js";
 
 export interface GatewayClient {
   readonly mode: AssemblyMode;
@@ -29,16 +30,83 @@ export interface GatewayClient {
   scanPrompts: (scan: GatewayPromptScan) => Promise<void>;
 }
 
-export function createNoopGatewayClient(
-  mode: AssemblyMode,
-  httpBaseUrl?: string
-): GatewayClient {
+export function createNoopGatewayClient(mode: AssemblyMode, httpBaseUrl?: string): GatewayClient {
   return {
     mode,
     ...(httpBaseUrl !== undefined ? { httpBaseUrl } : {}),
     start: async () => undefined,
     close: async () => undefined,
     check: async () => ({ denied: false, pending: false }),
+    waitForApproval: async () => ({ denied: false }),
+    record: async () => undefined,
+    recordResult: async () => undefined,
+    scanPrompts: async () => undefined
+  };
+}
+
+/**
+ * Translate a governance check request into the native `queryPolicy` query
+ * shape (AAASM-3047). The runtime reads `agent_id`, `action_type`, and — for
+ * tool calls — `tool_name` / `args`.
+ */
+function toNativeQuery(
+  request: GatewayCheckRequest,
+  agentId: string | undefined
+): Record<string, unknown> {
+  const query: Record<string, unknown> = {
+    agent_id: agentId ?? "",
+    action_type: request.action
+  };
+  if (request.toolName !== undefined) {
+    query.tool_name = request.toolName;
+  }
+  if (request.args !== undefined) {
+    query.args = request.args;
+  }
+  return query;
+}
+
+/**
+ * Gateway client backed by the in-process native runtime (AAASM-3050).
+ *
+ * `check()` asks a reachable `aa-runtime` for an authoritative verdict via the
+ * native `queryPolicy` primitive and maps it onto a `GatewayDecision`:
+ *   - `deny`    → `{ denied: true }`  (the wrapper throws `PolicyViolationError`)
+ *   - `pending` → `{ pending: true }` (routes to the approval path)
+ *   - allow / redact / unspecified → `{ denied: false }`
+ *
+ * **Fail-open (security-critical):** the SDK is advisory, not a security
+ * boundary. The native primitive already returns `allow` when the runtime is
+ * unreachable or too slow; on top of that, any local fault while querying is
+ * swallowed here and resolves neutral, so a missing or degraded runtime never
+ * blocks the agent. The proxy / eBPF layers remain authoritative.
+ */
+export function createNativeGatewayClient(
+  mode: AssemblyMode,
+  nativeClient: NativeClient,
+  agentId?: string,
+  httpBaseUrl?: string
+): GatewayClient {
+  return {
+    mode,
+    ...(httpBaseUrl !== undefined ? { httpBaseUrl } : {}),
+    start: async () => undefined,
+    close: async () => {
+      await nativeClient.close();
+    },
+    check: async (request: GatewayCheckRequest): Promise<GatewayDecision> => {
+      try {
+        const verdict = await nativeClient.queryPolicy(toNativeQuery(request, agentId));
+        return {
+          denied: verdict.denied ?? false,
+          pending: verdict.pending ?? false,
+          ...(verdict.reason !== undefined ? { reason: verdict.reason } : {})
+        };
+      } catch {
+        // Fail open: a local fault talking to the runtime must never block.
+        return { denied: false, pending: false };
+      }
+    },
     waitForApproval: async () => ({ denied: false }),
     record: async () => undefined,
     recordResult: async () => undefined,

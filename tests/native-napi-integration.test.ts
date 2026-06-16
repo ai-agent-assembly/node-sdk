@@ -17,13 +17,26 @@ const RUN_NATIVE_TESTS =
 
 const describeNative = RUN_NATIVE_TESTS ? describe : describe.skip;
 
-// Wire tags from aa-sdk-client's codec. The SDK writes inbound tags
-// (heartbeat / event-report / policy-query); the runtime replies with an Ack.
+// Wire tags from aa-sdk-client's codec. The SDK writes outbound tags
+// (heartbeat / event-report / policy-query); the runtime replies with an Ack to
+// heartbeats and event-reports, and with a PolicyResponse to a policy-query.
 const TAG_POLICY_QUERY = 1;
 const TAG_EVENT_REPORT = 2;
 const TAG_HEARTBEAT = 4;
 const TAG_ACK = 3;
+// Inbound (runtime → SDK) policy-response tag.
+const TAG_POLICY_RESPONSE = 1;
 const ACK_FRAME = Buffer.from([TAG_ACK, 0x00]);
+// A `CheckActionResponse { decision: ALLOW }` — proto field 1 (varint) = 1.
+// Framed as [tag, length-delimiter varint, body]; the 2-byte body fits in a
+// single-byte length varint. The runtime answers a policy-query with this,
+// NOT an Ack — an Ack would leave the SDK's query blocked until its 5s timeout.
+const POLICY_RESPONSE_ALLOW_FRAME = Buffer.from([
+  TAG_POLICY_RESPONSE,
+  0x02,
+  0x08,
+  0x01
+]);
 
 /**
  * Read a prost varint starting at `start`. Returns the decoded value and the
@@ -57,9 +70,11 @@ interface MockRuntime {
 /**
  * Minimal mock of the aa-runtime UDS endpoint. It speaks just enough of the
  * wire codec to keep the shared client's background IPC thread alive — ACKing
- * every heartbeat / event-report / policy-query frame and counting the
- * event-report frames it receives. It performs no scanning or redaction; that
- * is the authoritative runtime's job, not the SDK's.
+ * every heartbeat / event-report frame, answering a policy-query with an
+ * allow `PolicyResponse` (as the real runtime does — an Ack would leave the
+ * query blocked until its 5s timeout), and counting the event-report frames it
+ * receives. It performs no scanning or redaction; that is the authoritative
+ * runtime's job, not the SDK's.
  */
 function startMockRuntime(socketPath: string): Promise<MockRuntime> {
   let events = 0;
@@ -82,8 +97,13 @@ function startMockRuntime(socketPath: string): Promise<MockRuntime> {
           const frameEnd = offset + 1 + varint.bytes + varint.value;
           if (frameEnd > buf.length) break;
           offset = frameEnd;
-          if (tag === TAG_EVENT_REPORT) events += 1;
-          sock.write(ACK_FRAME);
+          if (tag === TAG_EVENT_REPORT) {
+            events += 1;
+            sock.write(ACK_FRAME);
+          } else {
+            // A policy-query is answered with a PolicyResponse, not an Ack.
+            sock.write(POLICY_RESPONSE_ALLOW_FRAME);
+          }
           continue;
         }
         // Unknown tag — drop a byte so the parser cannot stall.

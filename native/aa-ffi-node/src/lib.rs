@@ -96,12 +96,15 @@ pub struct PolicyDecision {
   pub reason: String,
 }
 
-/// Synchronously query the runtime for a policy decision on an action.
+/// Query the runtime for a policy decision on an action.
 ///
 /// The JS query object is translated into a `CheckActionRequest` (agent id,
 /// action type, and — for tool calls — tool name / source / args) and handed
-/// to [`AssemblyClient::query_policy`], which blocks the calling thread for up
-/// to 5s waiting on the runtime's `CheckActionResponse`.
+/// to [`AssemblyClient::query_policy`], which blocks its calling thread for up
+/// to 5s waiting on the runtime's `CheckActionResponse`. That blocking call is
+/// run on a `spawn_blocking` task — exactly like [`disconnect`] — so the napi
+/// async runtime stays free and the **Node event loop is never blocked** while
+/// a slow runtime is answering.
 ///
 /// **Fail-open:** the SDK is advisory, not a security boundary. When the
 /// runtime does not return a decision — it is too slow or the connection
@@ -111,10 +114,15 @@ pub struct PolicyDecision {
 /// proxy / eBPF layers remain authoritative). Only a genuine local fault
 /// (a poisoned lock) surfaces as a typed error.
 #[napi]
-pub fn query_policy(handle: &ClientHandle, query: Value) -> Result<PolicyDecision> {
+pub async fn query_policy(handle: &ClientHandle, query: Value) -> Result<PolicyDecision> {
   let request = translate_query(query);
+  let client = Arc::clone(&handle.inner);
 
-  match handle.inner.query_policy(request) {
+  let outcome = tokio::task::spawn_blocking(move || client.query_policy(request))
+    .await
+    .map_err(|err| typed_error(ERR_QUERY_POLICY, &err.to_string()))?;
+
+  match outcome {
     Ok(response) => Ok(PolicyDecision {
       decision: decision_to_str(response.decision).to_string(),
       reason: response.reason,
@@ -304,21 +312,19 @@ mod tests {
       inner: Arc::new(AssemblyClient::new(ipc, Vec::new())),
     };
 
-    // query_policy blocks the calling thread, so run it off the async runtime.
-    let result = tokio::task::spawn_blocking(move || {
-      query_policy(
-        &handle,
-        json!({
-          "agent_id": "agent-1",
-          "action_type": "tool_call",
-          "tool_name": "run_python",
-          "tool_source": "langchain",
-          "args": { "code": "print(1)" },
-        }),
-      )
-    })
-    .await
-    .unwrap();
+    // query_policy is async (it offloads the blocking wait to spawn_blocking),
+    // so await it directly without blocking the test's runtime.
+    let result = query_policy(
+      &handle,
+      json!({
+        "agent_id": "agent-1",
+        "action_type": "tool_call",
+        "tool_name": "run_python",
+        "tool_source": "langchain",
+        "args": { "code": "print(1)" },
+      }),
+    )
+    .await;
 
     server.abort();
     let _ = std::fs::remove_file(&socket_path);
@@ -343,11 +349,8 @@ mod tests {
       inner: Arc::new(AssemblyClient::new(ipc, Vec::new())),
     };
 
-    let result = tokio::task::spawn_blocking(move || {
-      query_policy(&handle, json!({ "agent_id": "agent-1", "tool_name": "run_python" }))
-    })
-    .await
-    .unwrap();
+    let result =
+      query_policy(&handle, json!({ "agent_id": "agent-1", "tool_name": "run_python" })).await;
 
     let decision = result.expect("fail-open must surface as Ok, never an error");
     assert_eq!(
