@@ -65,7 +65,8 @@
       "mermaid": "^11.15.0",
       "qs": "^6.15.2",
       "webpack-dev-server": "^5.2.4",
-      "@babel/core": "^7.29.6"
+      "@babel/core": "^7.29.6",
+      "uuid": ">=11.1.1"
     }
   }
 }
