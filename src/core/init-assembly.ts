@@ -4,7 +4,11 @@ import type {
   AssemblyCallbackHandler,
   WrapToolWithAssemblyOptions
 } from "../adapters/langchain/index.js";
-import { createNoopGatewayClient, type GatewayClient } from "../gateway/client.js";
+import {
+  createNativeGatewayClient,
+  createNoopGatewayClient,
+  type GatewayClient
+} from "../gateway/client.js";
 import { createNativeClient, type NativeClient } from "../native/client.js";
 import type { AssemblyConfig } from "../types/assembly-config.js";
 import type { AssemblyContext } from "../types/assembly-context.js";
@@ -54,6 +58,21 @@ export function createClient(config: AssemblyConfig): GatewayClient {
   // HTTP routes use controlPlaneUrl when set, otherwise fall back to the
   // resolved gatewayUrl so pre-feature callers keep their existing base URL.
   const httpBaseUrl = config.controlPlaneUrl ?? config.gatewayUrl;
+
+  // AAASM-3050: in napi-inprocess mode, route `check()` through the native
+  // runtime so a reachable aa-runtime's DENY actually blocks a tool. The
+  // native primitive fails open when the runtime is absent or slow, and the
+  // gateway client swallows local faults, so this never blocks without a
+  // runtime — preserving the pre-feature fail-open behavior.
+  if (mode === "napi-inprocess") {
+    const nativeClient = createNativeClient({
+      gateway: config.gatewayUrl ?? "",
+      apiKey: config.apiKey ?? "",
+      mode: "napi-inprocess"
+    });
+    return createNativeGatewayClient(mode, nativeClient, config.agentId, httpBaseUrl);
+  }
+
   return createNoopGatewayClient(mode, httpBaseUrl);
 }
 
@@ -260,14 +279,18 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     nativeClient = createNativeClient({
       gateway: resolvedGatewayUrl,
       apiKey: resolvedApiKey,
-      mode: resolvedConfig.mode === "napi-inprocess" ? "napi-inprocess" : "grpc-sidecar",
+      mode: resolvedConfig.mode === "napi-inprocess" ? "napi-inprocess" : "grpc-sidecar"
     });
     nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
   }
 
   const langChainHandler = await registerLangChainHandler(resolvedConfig, client, frameworks);
   const wrappedLangChainTools = await wrapLangChainTools(resolvedConfig, client, frameworks);
-  const vercelAiSdkPatched = await patchDetectedVercelAiSdk(client, frameworks, resolvedConfig.agentId);
+  const vercelAiSdkPatched = await patchDetectedVercelAiSdk(
+    client,
+    frameworks,
+    resolvedConfig.agentId
+  );
   const openAIAgentsPatched = await patchDetectedOpenAIAgents(client, frameworks);
   const langGraphPatched = await patchDetectedLangGraph(frameworks, resolvedConfig.agentId);
   const mastraPatched = await patchDetectedMastra(frameworks, resolvedConfig.agentId);
@@ -284,11 +307,19 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
         ...(mastraPatched ? ["mastra"] : [])
       ])
     ],
-    ...(resolvedConfig.parentAgentId !== undefined && { parentAgentId: resolvedConfig.parentAgentId }),
+    ...(resolvedConfig.parentAgentId !== undefined && {
+      parentAgentId: resolvedConfig.parentAgentId
+    }),
     ...(resolvedConfig.teamId !== undefined && { teamId: resolvedConfig.teamId }),
-    ...(resolvedConfig.delegationReason !== undefined && { delegationReason: resolvedConfig.delegationReason }),
-    ...(resolvedConfig.spawnedByTool !== undefined && { spawnedByTool: resolvedConfig.spawnedByTool }),
-    ...(resolvedConfig.enforcementMode !== undefined && { enforcementMode: resolvedConfig.enforcementMode }),
+    ...(resolvedConfig.delegationReason !== undefined && {
+      delegationReason: resolvedConfig.delegationReason
+    }),
+    ...(resolvedConfig.spawnedByTool !== undefined && {
+      spawnedByTool: resolvedConfig.spawnedByTool
+    }),
+    ...(resolvedConfig.enforcementMode !== undefined && {
+      enforcementMode: resolvedConfig.enforcementMode
+    }),
     shutdown: async () => {
       for (const adapter of adapters) {
         await adapter.shutdown?.();
