@@ -60,7 +60,8 @@
       "dompurify": "^3.4.9",
       "joi": "^17.13.4",
       "js-yaml@^4.0.0": "^4.2.0",
-      "launch-editor": "^2.14.1"
+      "launch-editor": "^2.14.1",
+      "markdown-it": "^14.2.0"
     }
   }
 }
