@@ -40,21 +40,25 @@ export interface PolicyDecision {
 }
 
 /**
- * Synchronously query the runtime for a policy decision on an action.
+ * Query the runtime for a policy decision on an action.
  *
  * The JS query object is translated into a `CheckActionRequest` (agent id,
  * action type, and — for tool calls — tool name / source / args) and handed
- * to [`AssemblyClient::query_policy`], which blocks the calling thread for up
- * to 5s waiting on the runtime's `CheckActionResponse`.
+ * to [`AssemblyClient::query_policy`], which blocks its calling thread for up
+ * to 5s waiting on the runtime's `CheckActionResponse`. That blocking call is
+ * run on a `spawn_blocking` task — exactly like [`disconnect`] — so the napi
+ * async runtime stays free and the **Node event loop is never blocked** while
+ * a slow runtime is answering.
  *
- * **Fail-open:** the SDK is advisory, not a security boundary. If the runtime
- * is unreachable or too slow ([`SdkClientError::QueryFailed`]), this returns a
- * non-deny `"allow"` so a missing or degraded runtime never blocks the agent —
- * the proxy / eBPF layers remain authoritative. Any other client error
- * (poisoned lock, closed channel, session already shut down) is a genuine
- * local fault and surfaces as a typed error.
+ * **Fail-open:** the SDK is advisory, not a security boundary. When the
+ * runtime does not return a decision — it is too slow or the connection
+ * closed ([`SdkClientError::QueryFailed`]), or it was never reachable so the
+ * IPC channel is closed / the session is shut down — this returns a non-deny
+ * `"allow"` so a missing or degraded runtime never blocks the agent (the
+ * proxy / eBPF layers remain authoritative). Only a genuine local fault
+ * (a poisoned lock) surfaces as a typed error.
  */
-export declare function queryPolicy(handle: ClientHandle, query: any): PolicyDecision
+export declare function queryPolicy(handle: ClientHandle, query: any): Promise<PolicyDecision>
 
 /**
  * Ship a captured event to the runtime.
