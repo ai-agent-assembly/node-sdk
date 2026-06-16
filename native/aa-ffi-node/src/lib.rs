@@ -243,3 +243,117 @@ fn decision_to_str(value: i32) -> &'static str {
 fn typed_error(code: &str, message: &str) -> Error {
   Error::from_reason(format!("{code}:{message}"))
 }
+
+#[cfg(test)]
+mod tests {
+  use std::path::PathBuf;
+  use std::time::Duration;
+
+  use aa_proto::assembly::common::v1::Decision;
+  use aa_proto::assembly::policy::v1::CheckActionResponse;
+  use aa_sdk_client::codec;
+  use aa_sdk_client::ipc::spawn_ipc_thread;
+  use prost::Message;
+  use serde_json::json;
+  use tokio::io::{AsyncReadExt, AsyncWriteExt};
+  use tokio::net::UnixListener;
+
+  use super::*;
+
+  /// A `queryPolicy` against a runtime that answers `PolicyQuery` with a Deny
+  /// `CheckActionResponse` returns `"deny"` to the JS caller. Mirrors the
+  /// shared client's `query_policy_returns_runtime_decision` test, but drives
+  /// the napi shim's `query_policy` end-to-end (translation + decision mapping).
+  #[tokio::test]
+  async fn query_policy_maps_runtime_deny() {
+    let socket_path = format!("/tmp/aa-ffi-node-query-{}.sock", std::process::id());
+    let _ = std::fs::remove_file(&socket_path);
+    let listener = UnixListener::bind(&socket_path).unwrap();
+
+    // Mock runtime: read the heartbeat + the PolicyQuery, then reply with a
+    // Deny CheckActionResponse. Bodies here are < 128 bytes, so the
+    // length-delimiter varint is a single byte.
+    let server = tokio::spawn(async move {
+      let (mut stream, _) = listener.accept().await.unwrap();
+      assert_eq!(stream.read_u8().await.unwrap(), codec::TAG_HEARTBEAT);
+      assert_eq!(stream.read_u8().await.unwrap(), codec::TAG_POLICY_QUERY);
+      let len = stream.read_u8().await.unwrap() as usize;
+      if len > 0 {
+        let mut body = vec![0u8; len];
+        stream.read_exact(&mut body).await.unwrap();
+      }
+
+      let resp = CheckActionResponse {
+        decision: Decision::Deny as i32,
+        reason: "blocked by policy".to_string(),
+        ..Default::default()
+      };
+      let mut buf = Vec::new();
+      resp.encode(&mut buf).unwrap();
+      assert!(buf.len() < 128, "test assumes a single-byte length varint");
+      stream.write_u8(codec::TAG_POLICY_RESPONSE).await.unwrap();
+      stream.write_u8(buf.len() as u8).await.unwrap();
+      stream.write_all(&buf).await.unwrap();
+      stream.flush().await.unwrap();
+      // Keep the connection open so the client can read the reply.
+      tokio::time::sleep(Duration::from_millis(200)).await;
+    });
+
+    let ipc = spawn_ipc_thread(PathBuf::from(&socket_path)).unwrap();
+    let handle = ClientHandle {
+      inner: Arc::new(AssemblyClient::new(ipc, Vec::new())),
+    };
+
+    // query_policy blocks the calling thread, so run it off the async runtime.
+    let result = tokio::task::spawn_blocking(move || {
+      query_policy(
+        &handle,
+        json!({
+          "agent_id": "agent-1",
+          "action_type": "tool_call",
+          "tool_name": "run_python",
+          "tool_source": "langchain",
+          "args": { "code": "print(1)" },
+        }),
+      )
+    })
+    .await
+    .unwrap();
+
+    server.abort();
+    let _ = std::fs::remove_file(&socket_path);
+
+    let decision = result.expect("query_policy should return a verdict");
+    assert_eq!(decision.decision, "deny");
+    assert_eq!(decision.reason, "blocked by policy");
+  }
+
+  /// With no runtime listening, `query_policy` blocks until the 5s timeout,
+  /// gets `SdkClientError::QueryFailed`, and **fails open**: it returns a
+  /// non-deny `"allow"` so an unreachable runtime never blocks the agent.
+  #[tokio::test]
+  async fn query_policy_fails_open_when_no_runtime() {
+    // A path nothing is listening on — spawn_ipc_thread starts the background
+    // thread regardless; the query then times out with QueryFailed.
+    let socket_path = format!("/tmp/aa-ffi-node-noserver-{}.sock", std::process::id());
+    let _ = std::fs::remove_file(&socket_path);
+
+    let ipc = spawn_ipc_thread(PathBuf::from(&socket_path)).unwrap();
+    let handle = ClientHandle {
+      inner: Arc::new(AssemblyClient::new(ipc, Vec::new())),
+    };
+
+    let result = tokio::task::spawn_blocking(move || {
+      query_policy(&handle, json!({ "agent_id": "agent-1", "tool_name": "run_python" }))
+    })
+    .await
+    .unwrap();
+
+    let decision = result.expect("fail-open must surface as Ok, never an error");
+    assert_eq!(
+      decision.decision, "allow",
+      "an unreachable runtime must fail open to allow"
+    );
+    assert_eq!(decision.reason, FAIL_OPEN_REASON);
+  }
+}
