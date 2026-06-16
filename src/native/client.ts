@@ -22,7 +22,7 @@ interface NativePolicyDecision {
 interface NativeBinding {
   connect: (socketPath: string) => Promise<object>;
   sendEvent: (handle: object, event: unknown) => void;
-  queryPolicy: (handle: object, query: unknown) => NativePolicyDecision;
+  queryPolicy: (handle: object, query: unknown) => Promise<NativePolicyDecision>;
   disconnect: (handle: object) => Promise<void>;
 }
 
@@ -221,11 +221,12 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
 
       // Connect (surfacing any connect error as a genuine local fault), then
       // ask the runtime for an authoritative verdict via the native primitive.
-      // The native `queryPolicy` already fails open — it returns `"allow"` when
-      // the runtime is unreachable or too slow — so a missing or degraded
-      // runtime never blocks the agent.
+      // The native `queryPolicy` is async — it offloads its blocking wait to a
+      // worker thread, so awaiting it never blocks the Node event loop — and it
+      // already fails open (returns `"allow"`) when the runtime is unreachable
+      // or too slow, so a missing or degraded runtime never blocks the agent.
       const handle = await getHandle();
-      const verdict = binding.queryPolicy(handle, action);
+      const verdict = await binding.queryPolicy(handle, action);
       return mapDecisionToPolicyResult(verdict);
     }
   };
