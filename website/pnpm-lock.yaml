@@ -17,6 +17,7 @@ overrides:
   markdown-it: ^14.2.0
   mermaid: ^11.15.0
   qs: ^6.15.2
+  webpack-dev-server: ^5.2.4
 
 importers:
 
@@ -5831,8 +5832,8 @@ packages:
       webpack:
         optional: true
 
-  webpack-dev-server@5.2.3:
-    resolution: {integrity: sha512-9Gyu2F7+bg4Vv+pjbovuYDhHX+mqdqITykfzdM9UyKqKHlsE5aAjRhR+oOEfXW5vBeu8tarzlJFIZva4ZjAdrQ==}
+  webpack-dev-server@5.2.5:
+    resolution: {integrity: sha512-4wZtCquSuv9CKX8oybo+mqxtxZqWz47uM1Ch94lxowBztOhWCbhqvRbfC/mODOwxgV2brY+JGZpHq58/SuVFYg==}
     engines: {node: '>= 18.12.0'}
     hasBin: true
     peerDependencies:
@@ -7357,7 +7358,7 @@ snapshots:
       update-notifier: 6.0.2
       webpack: 5.106.2(@swc/core@1.15.33)
       webpack-bundle-analyzer: 4.10.2
-      webpack-dev-server: 5.2.3(tslib@2.8.1)(webpack@5.106.2(@swc/core@1.15.33))
+      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack@5.106.2(@swc/core@1.15.33))
       webpack-merge: 6.0.1
     optionalDependencies:
       '@docusaurus/faster': 3.10.1(@docusaurus/types@3.10.1(@swc/core@1.15.33)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
@@ -13282,7 +13283,7 @@ snapshots:
     transitivePeerDependencies:
       - tslib
 
-  webpack-dev-server@5.2.3(tslib@2.8.1)(webpack@5.106.2(@swc/core@1.15.33)):
+  webpack-dev-server@5.2.5(tslib@2.8.1)(webpack@5.106.2(@swc/core@1.15.33)):
     dependencies:
       '@types/bonjour': 3.5.13
       '@types/connect-history-api-fallback': 1.5.4
