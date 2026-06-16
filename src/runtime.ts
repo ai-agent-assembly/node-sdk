@@ -130,17 +130,17 @@ export function startRuntime(
  *  2. Resolve the binary via {@link findAasmBinary}.
  *  3. Spawn the sidecar via {@link startRuntime}.
  *
- * `agentId` is accepted to keep the ticket-specified signature stable;
- * actual register-and-connect is performed by the existing gateway-aware
- * `@agent-assembly/sdk` `initAssembly` once the sidecar is reachable.
+ * `_agentId` is accepted to keep the ticket-specified signature stable but is
+ * intentionally not consumed at this lifecycle layer; actual register-and-connect
+ * is performed by the existing gateway-aware `@agent-assembly/sdk` `initAssembly`
+ * once the sidecar is reachable.
  *
  * Throws `Error` with {@link INSTALL_HINT} when no binary is found.
  */
 export async function initAssembly(
-  agentId?: string,
+  _agentId?: string,
   port: number = DEFAULT_PORT,
 ): Promise<void> {
-  void agentId; // not consumed at the lifecycle layer; see jsdoc
   if (await isRunning(port)) return;
   const binary = findAasmBinary();
   if (binary === null) {
