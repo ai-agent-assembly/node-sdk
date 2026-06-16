@@ -10,6 +10,8 @@ import {
   DEFAULT_GATEWAY_URL,
   ENV_API_KEY,
   ENV_GATEWAY_URL,
+  LEGACY_ENV_API_KEY,
+  LEGACY_ENV_GATEWAY_URL,
   loadConfigFile,
   probeHealthz,
   resolveApiKey,
@@ -176,11 +178,21 @@ describe("autoStartGateway", () => {
 describe("resolveGatewayUrl", () => {
   const originalSeams = { ...__testing._seams };
   const originalEnv = process.env[ENV_GATEWAY_URL];
+  const originalLegacyEnv = process.env[LEGACY_ENV_GATEWAY_URL];
+
+  beforeEach(() => {
+    delete process.env[ENV_GATEWAY_URL];
+    delete process.env[LEGACY_ENV_GATEWAY_URL];
+    __testing.resetLegacyEnvWarnings();
+  });
 
   afterEach(() => {
     Object.assign(__testing._seams, originalSeams);
     if (originalEnv === undefined) delete process.env[ENV_GATEWAY_URL];
     else process.env[ENV_GATEWAY_URL] = originalEnv;
+    if (originalLegacyEnv === undefined) delete process.env[LEGACY_ENV_GATEWAY_URL];
+    else process.env[LEGACY_ENV_GATEWAY_URL] = originalLegacyEnv;
+    __testing.resetLegacyEnvWarnings();
     vi.restoreAllMocks();
   });
 
@@ -189,7 +201,7 @@ describe("resolveGatewayUrl", () => {
     await expect(resolveGatewayUrl("http://explicit:7391")).resolves.toBe("http://explicit:7391");
   });
 
-  it("uses AAASM_GATEWAY_URL over config + default", async () => {
+  it("uses AA_GATEWAY_URL over config + default", async () => {
     process.env[ENV_GATEWAY_URL] = "http://from-env:7391";
     __testing._seams.loadConfigFile = async () => ({
       agent: { gateway_url: "http://from-config:7391" }
@@ -197,8 +209,31 @@ describe("resolveGatewayUrl", () => {
     await expect(resolveGatewayUrl()).resolves.toBe("http://from-env:7391");
   });
 
-  it("falls back to config file when env is unset", async () => {
-    delete process.env[ENV_GATEWAY_URL];
+  it("falls back to the deprecated AAASM_GATEWAY_URL and warns once", async () => {
+    process.env[LEGACY_ENV_GATEWAY_URL] = "http://from-legacy:7391";
+    __testing._seams.loadConfigFile = async () => ({
+      agent: { gateway_url: "http://from-config:7391" }
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(resolveGatewayUrl()).resolves.toBe("http://from-legacy:7391");
+    await expect(resolveGatewayUrl()).resolves.toBe("http://from-legacy:7391");
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]![0]).toContain(LEGACY_ENV_GATEWAY_URL);
+    expect(warnSpy.mock.calls[0]![0]).toContain(ENV_GATEWAY_URL);
+  });
+
+  it("prefers AA_GATEWAY_URL over the legacy alias and does not warn", async () => {
+    process.env[ENV_GATEWAY_URL] = "http://from-canonical:7391";
+    process.env[LEGACY_ENV_GATEWAY_URL] = "http://from-legacy:7391";
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(resolveGatewayUrl()).resolves.toBe("http://from-canonical:7391");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls back to config file when neither env name is set", async () => {
     __testing._seams.loadConfigFile = async () => ({
       agent: { gateway_url: "http://from-config:7391" }
     });
@@ -231,11 +266,21 @@ describe("resolveGatewayUrl", () => {
 describe("resolveApiKey", () => {
   const originalSeams = { ...__testing._seams };
   const originalEnv = process.env[ENV_API_KEY];
+  const originalLegacyEnv = process.env[LEGACY_ENV_API_KEY];
+
+  beforeEach(() => {
+    delete process.env[ENV_API_KEY];
+    delete process.env[LEGACY_ENV_API_KEY];
+    __testing.resetLegacyEnvWarnings();
+  });
 
   afterEach(() => {
     Object.assign(__testing._seams, originalSeams);
     if (originalEnv === undefined) delete process.env[ENV_API_KEY];
     else process.env[ENV_API_KEY] = originalEnv;
+    if (originalLegacyEnv === undefined) delete process.env[LEGACY_ENV_API_KEY];
+    else process.env[LEGACY_ENV_API_KEY] = originalLegacyEnv;
+    __testing.resetLegacyEnvWarnings();
     vi.restoreAllMocks();
   });
 
@@ -244,7 +289,7 @@ describe("resolveApiKey", () => {
     await expect(resolveApiKey("k-explicit")).resolves.toBe("k-explicit");
   });
 
-  it("uses AAASM_API_KEY over config-file value", async () => {
+  it("uses AA_API_KEY over config-file value", async () => {
     process.env[ENV_API_KEY] = "k-env";
     __testing._seams.loadConfigFile = async () => ({
       agent: { api_key: "k-config" }
@@ -252,8 +297,31 @@ describe("resolveApiKey", () => {
     await expect(resolveApiKey()).resolves.toBe("k-env");
   });
 
-  it("falls back to config file when env is unset", async () => {
-    delete process.env[ENV_API_KEY];
+  it("falls back to the deprecated AAASM_API_KEY and warns once", async () => {
+    process.env[LEGACY_ENV_API_KEY] = "k-legacy";
+    __testing._seams.loadConfigFile = async () => ({
+      agent: { api_key: "k-config" }
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(resolveApiKey()).resolves.toBe("k-legacy");
+    await expect(resolveApiKey()).resolves.toBe("k-legacy");
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]![0]).toContain(LEGACY_ENV_API_KEY);
+    expect(warnSpy.mock.calls[0]![0]).toContain(ENV_API_KEY);
+  });
+
+  it("prefers AA_API_KEY over the legacy alias and does not warn", async () => {
+    process.env[ENV_API_KEY] = "k-canonical";
+    process.env[LEGACY_ENV_API_KEY] = "k-legacy";
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(resolveApiKey()).resolves.toBe("k-canonical");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls back to config file when neither env name is set", async () => {
     __testing._seams.loadConfigFile = async () => ({
       agent: { api_key: "k-config" }
     });
@@ -261,7 +329,6 @@ describe("resolveApiKey", () => {
   });
 
   it("returns empty string as the documented local-mode default", async () => {
-    delete process.env[ENV_API_KEY];
     __testing._seams.loadConfigFile = async () => ({});
     await expect(resolveApiKey()).resolves.toBe("");
   });
