@@ -8,10 +8,16 @@
  */
 
 import { EventEmitter } from "node:events";
+import { credentials as grpcCredentials } from "@grpc/grpc-js";
 import { describe, expect, it } from "vitest";
 
 import { OpTerminatedError } from "../src/errors/op-terminated-error.js";
-import { OpControlSubscriber, type OpControlClient } from "../src/op-control.js";
+import {
+  OpControlSubscriber,
+  gatewayHostOf,
+  resolveOpControlCredentials,
+  type OpControlClient,
+} from "../src/op-control.js";
 import { type OpControlMessage, OpControlSignal } from "../src/proto/generated/policy.js";
 
 /**
@@ -197,5 +203,45 @@ describe("OpControlSubscriber", () => {
     expect(elapsed).toBeLessThan(500);
 
     sub.close();
+  });
+});
+
+describe("gatewayHostOf", () => {
+  it.each([
+    ["localhost:7391", "localhost"],
+    ["127.0.0.1:7391", "127.0.0.1"],
+    ["gateway.prod.example:443", "gateway.prod.example"],
+    ["https://gateway.prod.example:443/path", "gateway.prod.example"],
+    ["[::1]:7391", "[::1]"],
+    ["GATEWAY.PROD.EXAMPLE", "gateway.prod.example"],
+  ])("extracts the host from %s", (target, host) => {
+    expect(gatewayHostOf(target)).toBe(host);
+  });
+});
+
+describe("resolveOpControlCredentials (secure by default)", () => {
+  // grpc-js ChannelCredentials exposes _isSecure(); insecure → false, TLS → true.
+  const isSecure = (c: ReturnType<typeof grpcCredentials.createInsecure>): boolean =>
+    (c as unknown as { _isSecure(): boolean })._isSecure();
+
+  it("uses plaintext for a loopback target without any opt-in", () => {
+    expect(isSecure(resolveOpControlCredentials("localhost:7391", {}))).toBe(false);
+    expect(isSecure(resolveOpControlCredentials("127.0.0.1:7391", {}))).toBe(false);
+    expect(isSecure(resolveOpControlCredentials("[::1]:7391", {}))).toBe(false);
+  });
+
+  it("defaults a remote target to TLS", () => {
+    expect(isSecure(resolveOpControlCredentials("gateway.prod.example:443", {}))).toBe(true);
+  });
+
+  it("only allows plaintext to a remote target when allowInsecure is set", () => {
+    expect(
+      isSecure(resolveOpControlCredentials("gateway.prod.example:443", { allowInsecure: true })),
+    ).toBe(false);
+  });
+
+  it("honours an explicit credentials override verbatim", () => {
+    const explicit = grpcCredentials.createSsl();
+    expect(resolveOpControlCredentials("localhost:7391", { credentials: explicit })).toBe(explicit);
   });
 });
