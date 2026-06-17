@@ -10,8 +10,10 @@ import {
   type GatewayClient
 } from "../gateway/client.js";
 import { createNativeClient, type NativeClient } from "../native/client.js";
+import { ConfigurationError } from "../errors/index.js";
 import type { AssemblyConfig } from "../types/assembly-config.js";
 import type { AssemblyContext } from "../types/assembly-context.js";
+import type { AssemblyMode } from "../types/assembly-mode.js";
 import { ENFORCEMENT_MODES } from "../types/enforcement-mode.js";
 import type {
   LangChainCallbackHandlerLike,
@@ -49,10 +51,34 @@ function buildRegistrationEvent(config: AssemblyConfig): Record<string, string> 
   return event;
 }
 
+/**
+ * The only built-in {@link AssemblyMode} for which {@link createClient}
+ * constructs a gateway client whose `check()` consults a real authoritative
+ * verdict (the native `queryPolicy` against a reachable `aa-runtime`). Every
+ * other mode falls back to the allow-all no-op client.
+ */
+const CHECK_CAPABLE_MODE: AssemblyMode = "napi-inprocess";
+
 export function createClient(config: AssemblyConfig): GatewayClient {
   const mode = config.mode ?? "auto";
   if (config.gatewayClient) {
     return config.gatewayClient;
+  }
+
+  // AAASM-3105 (fail closed): the no-op gateway client's `check()` is allow-all,
+  // so registering under live `"enforce"` while routing through it would let a
+  // policy-denied action proceed unchecked — a silent fail-open. When the caller
+  // explicitly asks for `"enforce"` but supplies no check-capable mode (and no
+  // own `gatewayClient`), refuse loudly instead of pretending to enforce. An
+  // omitted `enforcementMode` keeps the pre-feature behavior (server-side
+  // default), and `"observe"` / `"disabled"` intentionally let actions through.
+  if (config.enforcementMode === "enforce" && mode !== CHECK_CAPABLE_MODE) {
+    throw new ConfigurationError(
+      `enforcementMode "enforce" requires a check-capable client, but mode "${mode}" ` +
+        `routes through the allow-all no-op gateway client, which cannot block a ` +
+        `denied action. Use mode "${CHECK_CAPABLE_MODE}", supply your own ` +
+        `gatewayClient, or set enforcementMode to "observe"/"disabled".`
+    );
   }
 
   // HTTP routes use controlPlaneUrl when set, otherwise fall back to the
