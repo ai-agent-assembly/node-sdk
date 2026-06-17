@@ -58,14 +58,77 @@ export interface OpControlSubscriberOptions {
   orgId: string;
   teamId: string;
   agentId: string;
-  /** Optional credentials override; defaults to insecure (matches PR-D's
-   * dev-mode gateway). Use `grpc.credentials.createSsl(...)` in prod.
+  /** Explicit credentials override. When supplied it is used verbatim and the
+   * loopback / `allowInsecure` defaulting below is bypassed — the caller has
+   * taken full responsibility for the transport (e.g. `createSsl(...)` with a
+   * custom CA, or `createInsecure()` for an in-cluster sidecar).
    */
   credentials?: ChannelCredentials;
+  /**
+   * Permit a plaintext (`createInsecure`) channel to a **non-loopback**
+   * gateway. Off by default: control-plane signals (pause / terminate) and the
+   * agent identity triple travel this stream, so an unencrypted channel to a
+   * remote host is opt-in only. Loopback targets stay plaintext without this
+   * flag (local dev-mode gateway). Ignored when `credentials` is set.
+   */
+  allowInsecure?: boolean;
   /** Test seam — when supplied, skips opening a real gRPC channel and uses
    * this client directly. Used by the vitest tests.
    */
   clientFactory?: () => OpControlClient;
+}
+
+/**
+ * Hosts treated as loopback for the secure-by-default transport decision.
+ * A loopback gateway is the local dev-mode CP, where plaintext gRPC is the
+ * documented default; anything else is presumed remote and must be encrypted.
+ */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Extract the bare host from a gRPC target (`host:port`, a bare host, or a
+ * URL-style `scheme://host:port`). Returns the lowercased host with any
+ * surrounding IPv6 brackets preserved so it can be matched against
+ * {@link LOOPBACK_HOSTS}.
+ */
+export function gatewayHostOf(gatewayUrl: string): string {
+  let target = gatewayUrl.trim();
+  const schemeIdx = target.indexOf("://");
+  if (schemeIdx !== -1) target = target.slice(schemeIdx + 3);
+  // Drop a path/query suffix if a URL form was passed.
+  const slashIdx = target.indexOf("/");
+  if (slashIdx !== -1) target = target.slice(0, slashIdx);
+  if (target.startsWith("[")) {
+    // Bracketed IPv6: keep the bracketed form, strip only the trailing :port.
+    const close = target.indexOf("]");
+    return close === -1 ? target.toLowerCase() : target.slice(0, close + 1).toLowerCase();
+  }
+  const colonIdx = target.indexOf(":");
+  if (colonIdx !== -1) target = target.slice(0, colonIdx);
+  return target.toLowerCase();
+}
+
+function isLoopbackTarget(gatewayUrl: string): boolean {
+  return LOOPBACK_HOSTS.has(gatewayHostOf(gatewayUrl));
+}
+
+/**
+ * Pick channel credentials for the op-control stream, secure by default.
+ *
+ * Precedence: an explicit `credentials` override wins; otherwise a loopback
+ * target gets plaintext (local dev gateway), a remote target gets TLS, and a
+ * remote target is only allowed plaintext when the caller sets `allowInsecure`.
+ *
+ * @throws never — returns the chosen {@link ChannelCredentials}.
+ */
+export function resolveOpControlCredentials(
+  gatewayUrl: string,
+  opts: Pick<OpControlSubscriberOptions, "credentials" | "allowInsecure">,
+): ChannelCredentials {
+  if (opts.credentials) return opts.credentials;
+  if (isLoopbackTarget(gatewayUrl)) return grpcCredentials.createInsecure();
+  if (opts.allowInsecure) return grpcCredentials.createInsecure();
+  return grpcCredentials.createSsl();
 }
 
 export class OpControlSubscriber {
@@ -94,7 +157,7 @@ export class OpControlSubscriber {
       ? opts.clientFactory()
       : (new PolicyServiceClient(
           gatewayUrl,
-          opts.credentials ?? grpcCredentials.createInsecure(),
+          resolveOpControlCredentials(gatewayUrl, opts),
         ) as unknown as OpControlClient & PolicyServiceClientType);
     const subscriber = new OpControlSubscriber(client, agent);
     subscriber.start();

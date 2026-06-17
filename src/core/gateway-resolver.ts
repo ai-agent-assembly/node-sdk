@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve as resolvePath } from "node:path";
+import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import { ConfigurationError, GatewayError } from "../errors/index.js";
 
@@ -21,7 +21,9 @@ import { ConfigurationError, GatewayError } from "../errors/index.js";
  *      as deprecated aliases (a one-time warning is logged when a legacy name
  *      supplies the value)
  *   3. Config file (~/.aasm/config.yaml, optional js-yaml soft dep)
- *   4. Local default: probe http://localhost:7391, auto-start if absent
+ *   4. Local default: probe http://localhost:7391; when absent, auto-start the
+ *      local `aasm` gateway ONLY if `AA_AUTO_START` is opted in and the binary
+ *      resolves to an allow-listed install dir — otherwise raise an error.
  */
 
 export const DEFAULT_GATEWAY_URL = "http://localhost:7391";
@@ -32,6 +34,64 @@ export const DEFAULT_CONFIG_FILE_PATH = "~/.aasm/config.yaml";
 
 export const ENV_GATEWAY_URL = "AA_GATEWAY_URL";
 export const ENV_API_KEY = "AA_API_KEY";
+
+/**
+ * Opt-in gate for auto-starting a local gateway. Auto-start spawns the `aasm`
+ * binary resolved from `$PATH`, so it is gated behind an explicit opt-in rather
+ * than running silently: a `$PATH` entry an attacker can write to would
+ * otherwise be executed by any process that calls `initAssembly()`. Set to
+ * `1`/`true`/`yes` to permit auto-start.
+ */
+export const ENV_AUTO_START = "AA_AUTO_START";
+
+/** Truthy values that enable {@link ENV_AUTO_START}. */
+function autoStartEnabled(): boolean {
+  const raw = process.env[ENV_AUTO_START]?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+/**
+ * Directories an auto-started `aasm` binary is permitted to live in. The
+ * resolved path must be absolute and sit inside one of these install roots,
+ * which blocks a `$PATH`-injected `./aasm` (cwd) or a binary planted in an
+ * arbitrary writable directory from being spawned. Mirrors the documented
+ * install locations (Homebrew, system, user-local, cargo).
+ */
+function allowedInstallDirs(): string[] {
+  const home = homedir();
+  return [
+    "/usr/local/bin",
+    "/usr/bin",
+    "/opt/homebrew/bin",
+    join(home, ".local", "bin"),
+    join(home, ".cargo", "bin"),
+    "/usr/local/cargo/bin",
+  ];
+}
+
+/**
+ * Throw {@link ConfigurationError} unless `aasmPath` is an absolute path inside
+ * an allow-listed install directory (see {@link allowedInstallDirs}). This is
+ * the integrity gate for the auto-start subprocess — without it the SDK would
+ * execute whatever `aasm` happened to be first on `$PATH`.
+ */
+export function assertAllowedAasmPath(aasmPath: string): void {
+  if (!isAbsolute(aasmPath)) {
+    throw new ConfigurationError(
+      `Refusing to auto-start a non-absolute 'aasm' path: ${aasmPath}. ` +
+        `Set ${ENV_GATEWAY_URL} to an already-running gateway instead.`
+    );
+  }
+  const resolved = resolvePath(aasmPath);
+  const ok = allowedInstallDirs().some((dir) => resolved.startsWith(dir + "/"));
+  if (!ok) {
+    throw new ConfigurationError(
+      `Refusing to auto-start 'aasm' from an untrusted location: ${resolved}. ` +
+        `Install it under one of: ${allowedInstallDirs().join(", ")}, ` +
+        `or set ${ENV_GATEWAY_URL} to an already-running gateway.`
+    );
+  }
+}
 
 /**
  * Deprecated environment-variable names, kept as backwards-compatible aliases.
@@ -235,6 +295,12 @@ export async function autoStartGateway(
     );
   }
 
+  // Integrity gate: only spawn an absolute path from an allow-listed install
+  // dir, and surface the resolved path so the operator can see exactly which
+  // binary the SDK is about to execute.
+  assertAllowedAasmPath(aasmPath);
+  console.info(`[agent-assembly] auto-starting gateway from ${aasmPath}`);
+
   _seams.spawnAasm(aasmPath);
 
   if (!(await waitForHealthz(baseUrl, timeoutMs))) {
@@ -268,6 +334,17 @@ export async function resolveGatewayUrl(explicit?: string): Promise<string> {
 
   if (await _seams.probeHealthz(DEFAULT_GATEWAY_URL)) {
     return DEFAULT_GATEWAY_URL;
+  }
+
+  // Auto-start is opt-in: spawning the local `aasm` binary is a privileged
+  // side effect, so a missing gateway is a hard error unless the operator has
+  // explicitly enabled AA_AUTO_START.
+  if (!autoStartEnabled()) {
+    throw new ConfigurationError(
+      `No gateway found at ${DEFAULT_GATEWAY_URL}. Start one with 'aasm start ` +
+        `--mode local', set ${ENV_GATEWAY_URL} to a running gateway, or set ` +
+        `${ENV_AUTO_START}=1 to allow the SDK to auto-start a local gateway.`
+    );
   }
 
   await _seams.autoStartGateway(DEFAULT_GATEWAY_URL);

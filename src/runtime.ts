@@ -13,12 +13,20 @@ import { existsSync, openSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createConnection } from "node:net";
 import { arch, homedir, platform } from "node:os";
-import { delimiter as PATH_DELIM, dirname, join } from "node:path";
+import { delimiter as PATH_DELIM, dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
 import { cwd, env } from "node:process";
 
 export const BINARY_NAME = "aasm";
 export const DEFAULT_PORT = 7878;
 export const DEFAULT_RUNTIME_HOST = "127.0.0.1";
+
+/**
+ * Opt-in gate for spawning the `aasm` sidecar. Auto-start runs a binary
+ * discovered from `$PATH` / the filesystem, so it is a privileged side effect
+ * that must be explicitly enabled rather than triggered silently by every
+ * `initAssembly()` call. Set to `1`/`true`/`yes` to permit auto-start.
+ */
+export const ENV_AUTO_START = "AA_AUTO_START";
 
 export const USER_LOCAL_BIN: string = join(homedir(), ".local", "bin");
 export const DOCKER_BASE_BIN = "/usr/local/bin";
@@ -99,6 +107,55 @@ export function isRunning(
   });
 }
 
+/** Truthy values that enable {@link ENV_AUTO_START}. */
+function autoStartEnabled(): boolean {
+  const raw = env[ENV_AUTO_START]?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+/**
+ * Install roots an auto-started `aasm` binary is permitted to live in, in
+ * addition to the npm-bundled `node_modules/@agent-assembly/runtime-*` path
+ * (which is trusted because it ships with the SDK install). This blocks a
+ * `$PATH`-injected `./aasm` or a binary planted in an arbitrary writable
+ * directory from being spawned.
+ */
+function allowedInstallDirs(): string[] {
+  const home = homedir();
+  return [
+    "/usr/local/bin",
+    "/usr/bin",
+    "/opt/homebrew/bin",
+    USER_LOCAL_BIN,
+    join(home, ".cargo", "bin"),
+    "/usr/local/cargo/bin",
+    DOCKER_BASE_BIN,
+  ];
+}
+
+/**
+ * Throw `Error` unless `binaryPath` is safe to spawn: it must be absolute and
+ * either resolve inside an allow-listed install dir (see
+ * {@link allowedInstallDirs}) or be the npm-bundled runtime binary. This is the
+ * integrity gate for the auto-start subprocess — without it the SDK would
+ * execute whatever `aasm` happened to be first on `$PATH`.
+ */
+export function assertSafeBinaryPath(binaryPath: string): void {
+  if (!isAbsolute(binaryPath)) {
+    throw new Error(`Refusing to auto-start a non-absolute 'aasm' path: ${binaryPath}`);
+  }
+  const resolved = resolvePath(binaryPath);
+  const bundled = bundledRuntimeBinaryPath();
+  if (bundled !== null && resolvePath(bundled) === resolved) return;
+  const ok = allowedInstallDirs().some((dir) => resolved.startsWith(resolvePath(dir) + "/"));
+  if (!ok) {
+    throw new Error(
+      `Refusing to auto-start 'aasm' from an untrusted location: ${resolved}. ` +
+        `Install it under one of: ${allowedInstallDirs().join(", ")}.`
+    );
+  }
+}
+
 /**
  * Spawn `aasm serve --port <port>` as a detached background subprocess.
  *
@@ -135,16 +192,31 @@ export function startRuntime(
  * is performed by the existing gateway-aware `@agent-assembly/sdk` `initAssembly`
  * once the sidecar is reachable.
  *
- * Throws `Error` with {@link INSTALL_HINT} when no binary is found.
+ * Auto-start is **opt-in**: when the sidecar is not already running, this
+ * throws unless `AA_AUTO_START` is enabled. When it does spawn, the resolved
+ * binary path is logged and integrity-checked via {@link assertSafeBinaryPath}.
+ *
+ * Throws `Error` with {@link INSTALL_HINT} when no binary is found, and a
+ * descriptive `Error` when auto-start is not opted in or the resolved binary
+ * fails the integrity check.
  */
 export async function initAssembly(
   _agentId?: string,
   port: number = DEFAULT_PORT,
 ): Promise<void> {
   if (await isRunning(port)) return;
+  if (!autoStartEnabled()) {
+    throw new Error(
+      `No aasm sidecar running on port ${port} and auto-start is disabled. ` +
+        `Start it with 'aasm serve --port ${port}', or set ${ENV_AUTO_START}=1 ` +
+        "to allow the SDK to auto-start it."
+    );
+  }
   const binary = findAasmBinary();
   if (binary === null) {
     throw new Error(INSTALL_HINT);
   }
+  assertSafeBinaryPath(binary);
+  console.info(`[agent-assembly] auto-starting aasm sidecar from ${binary}`);
   startRuntime(binary, port);
 }
