@@ -1,16 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { __testing, DEFAULT_GATEWAY_URL, ENV_API_KEY, ENV_GATEWAY_URL } from "../src/core/gateway-resolver.js";
+import {
+  __testing,
+  DEFAULT_GATEWAY_URL,
+  ENV_API_KEY,
+  ENV_AUTO_START,
+  ENV_GATEWAY_URL,
+} from "../src/core/gateway-resolver.js";
 import { initAssembly } from "../src/index.js";
 
 describe("initAssembly zero-config", () => {
   const originalSeams = { ...__testing._seams };
   const originalGatewayEnv = process.env[ENV_GATEWAY_URL];
   const originalApiKeyEnv = process.env[ENV_API_KEY];
+  const originalAutoStartEnv = process.env[ENV_AUTO_START];
 
   beforeEach(() => {
     delete process.env[ENV_GATEWAY_URL];
     delete process.env[ENV_API_KEY];
+    delete process.env[ENV_AUTO_START];
   });
 
   afterEach(async () => {
@@ -19,6 +27,8 @@ describe("initAssembly zero-config", () => {
     else process.env[ENV_GATEWAY_URL] = originalGatewayEnv;
     if (originalApiKeyEnv === undefined) delete process.env[ENV_API_KEY];
     else process.env[ENV_API_KEY] = originalApiKeyEnv;
+    if (originalAutoStartEnv === undefined) delete process.env[ENV_AUTO_START];
+    else process.env[ENV_AUTO_START] = originalAutoStartEnv;
     vi.restoreAllMocks();
   });
 
@@ -38,7 +48,8 @@ describe("initAssembly zero-config", () => {
     expect(__testing._seams.autoStartGateway).not.toHaveBeenCalled();
   });
 
-  it("triggers auto-start when no gateway is listening", async () => {
+  it("triggers auto-start when no gateway is listening and AA_AUTO_START is opted in", async () => {
+    process.env[ENV_AUTO_START] = "1";
     __testing._seams.loadConfigFile = async () => ({});
     __testing._seams.probeHealthz = async () => false;
     const autoStartSpy = vi.fn().mockResolvedValue(undefined);
@@ -50,6 +61,16 @@ describe("initAssembly zero-config", () => {
     } finally {
       await ctx.shutdown();
     }
+  });
+
+  it("does NOT auto-start when no gateway is listening and AA_AUTO_START is unset", async () => {
+    __testing._seams.loadConfigFile = async () => ({});
+    __testing._seams.probeHealthz = async () => false;
+    const autoStartSpy = vi.fn().mockResolvedValue(undefined);
+    __testing._seams.autoStartGateway = autoStartSpy;
+
+    await expect(initAssembly()).rejects.toThrow(/auto-start a local gateway/);
+    expect(autoStartSpy).not.toHaveBeenCalled();
   });
 
   it("explicit gatewayUrl + apiKey bypass the resolver entirely", async () => {
