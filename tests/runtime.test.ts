@@ -12,7 +12,14 @@ import { arch, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { BINARY_NAME, INSTALL_HINT, findAasmBinary, initAssembly } from "../src/runtime.js";
+import {
+  BINARY_NAME,
+  ENV_AUTO_START,
+  INSTALL_HINT,
+  assertSafeBinaryPath,
+  findAasmBinary,
+  initAssembly,
+} from "../src/runtime.js";
 
 function makeFakeAasm(dir: string): string {
   const path = join(dir, BINARY_NAME);
@@ -69,17 +76,19 @@ describe("runtime — F115 lifecycle", () => {
     }
   });
 
-  it("initAssembly throws Error with INSTALL_HINT when binary not found", async () => {
+  it("initAssembly throws Error with INSTALL_HINT when binary not found and auto-start opted in", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "aasm-missing-"));
     const originalCwd = process.cwd();
     const originalPath = process.env.PATH;
     const originalHome = process.env.HOME;
+    const originalAutoStart = process.env[ENV_AUTO_START];
     try {
       // Empty cwd (no node_modules), empty PATH/HOME → every search path misses.
       writeFileSync(join(tmp, "package.json"), JSON.stringify({ name: "test-missing" }));
       process.chdir(tmp);
       process.env.PATH = join(tmp, "no-such-path");
       process.env.HOME = join(tmp, "no-such-home");
+      process.env[ENV_AUTO_START] = "1";
 
       await expect(initAssembly()).rejects.toThrowError(INSTALL_HINT);
       await expect(initAssembly()).rejects.toThrowError(/agent-assembly runtime not found/);
@@ -87,8 +96,29 @@ describe("runtime — F115 lifecycle", () => {
       process.chdir(originalCwd);
       process.env.PATH = originalPath;
       process.env.HOME = originalHome;
+      if (originalAutoStart === undefined) delete process.env[ENV_AUTO_START];
+      else process.env[ENV_AUTO_START] = originalAutoStart;
       rmSync(tmp, { recursive: true, force: true });
     }
+  });
+
+  it("initAssembly refuses to auto-start when AA_AUTO_START is unset", async () => {
+    const originalAutoStart = process.env[ENV_AUTO_START];
+    try {
+      delete process.env[ENV_AUTO_START];
+      // No sidecar listens on this ephemeral-but-unbound port; the gate must
+      // fire before any binary lookup or spawn.
+      await expect(initAssembly(undefined, 7879)).rejects.toThrow(/auto-start is disabled/);
+    } finally {
+      if (originalAutoStart === undefined) delete process.env[ENV_AUTO_START];
+      else process.env[ENV_AUTO_START] = originalAutoStart;
+    }
+  });
+
+  it("assertSafeBinaryPath rejects relative and untrusted-location binaries", () => {
+    expect(() => assertSafeBinaryPath("aasm")).toThrow(/non-absolute/);
+    expect(() => assertSafeBinaryPath("/tmp/evil/aasm")).toThrow(/untrusted location/);
+    expect(() => assertSafeBinaryPath("/usr/local/bin/aasm")).not.toThrow();
   });
 
   it("initAssembly is idempotent when a sidecar is already running on the target port", async () => {
