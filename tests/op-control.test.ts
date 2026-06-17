@@ -77,6 +77,11 @@ describe("OpControlSubscriber", () => {
     const stream = new FakeStream();
     const { sub } = buildSubscriber(stream);
     await sub.waitForOp("never-seen", { timeoutMs: 50 });
+    // No PAUSE/TERMINATE arrived, so the op was never blocked and waitForOp
+    // returned on the immediate path — the subscriber must report it neither
+    // paused nor terminated.
+    expect(sub.isPaused("never-seen")).toBe(false);
+    expect(sub.isTerminated("never-seen")).toBe(false);
     sub.close();
   });
 
