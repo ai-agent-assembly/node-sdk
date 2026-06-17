@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   __testing,
+  assertAllowedAasmPath,
   autoStartGateway,
   DEFAULT_GATEWAY_URL,
   ENV_API_KEY,
+  ENV_AUTO_START,
   ENV_GATEWAY_URL,
   LEGACY_ENV_API_KEY,
   LEGACY_ENV_GATEWAY_URL,
@@ -179,10 +181,12 @@ describe("resolveGatewayUrl", () => {
   const originalSeams = { ...__testing._seams };
   const originalEnv = process.env[ENV_GATEWAY_URL];
   const originalLegacyEnv = process.env[LEGACY_ENV_GATEWAY_URL];
+  const originalAutoStartEnv = process.env[ENV_AUTO_START];
 
   beforeEach(() => {
     delete process.env[ENV_GATEWAY_URL];
     delete process.env[LEGACY_ENV_GATEWAY_URL];
+    delete process.env[ENV_AUTO_START];
     __testing.resetLegacyEnvWarnings();
   });
 
@@ -192,6 +196,8 @@ describe("resolveGatewayUrl", () => {
     else process.env[ENV_GATEWAY_URL] = originalEnv;
     if (originalLegacyEnv === undefined) delete process.env[LEGACY_ENV_GATEWAY_URL];
     else process.env[LEGACY_ENV_GATEWAY_URL] = originalLegacyEnv;
+    if (originalAutoStartEnv === undefined) delete process.env[ENV_AUTO_START];
+    else process.env[ENV_AUTO_START] = originalAutoStartEnv;
     __testing.resetLegacyEnvWarnings();
     vi.restoreAllMocks();
   });
@@ -251,7 +257,8 @@ describe("resolveGatewayUrl", () => {
     expect(autoStartSpy).not.toHaveBeenCalled();
   });
 
-  it("invokes autoStartGateway when probe fails", async () => {
+  it("invokes autoStartGateway when probe fails and AA_AUTO_START is opted in", async () => {
+    process.env[ENV_AUTO_START] = "1";
     delete process.env[ENV_GATEWAY_URL];
     __testing._seams.loadConfigFile = async () => ({});
     __testing._seams.probeHealthz = async () => false;
@@ -260,6 +267,35 @@ describe("resolveGatewayUrl", () => {
 
     await expect(resolveGatewayUrl()).resolves.toBe(DEFAULT_GATEWAY_URL);
     expect(autoStartSpy).toHaveBeenCalledWith(DEFAULT_GATEWAY_URL);
+  });
+
+  it("throws ConfigurationError instead of auto-starting when AA_AUTO_START is unset", async () => {
+    delete process.env[ENV_GATEWAY_URL];
+    delete process.env[ENV_AUTO_START];
+    __testing._seams.loadConfigFile = async () => ({});
+    __testing._seams.probeHealthz = async () => false;
+    const autoStartSpy = vi.fn().mockResolvedValue(undefined);
+    __testing._seams.autoStartGateway = autoStartSpy;
+
+    await expect(resolveGatewayUrl()).rejects.toBeInstanceOf(ConfigurationError);
+    await expect(resolveGatewayUrl()).rejects.toThrow(new RegExp(ENV_AUTO_START));
+    expect(autoStartSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("assertAllowedAasmPath", () => {
+  it("accepts an absolute path inside an allow-listed install dir", () => {
+    expect(() => assertAllowedAasmPath("/usr/local/bin/aasm")).not.toThrow();
+  });
+
+  it("rejects a relative / PATH-injected path", () => {
+    expect(() => assertAllowedAasmPath("aasm")).toThrow(ConfigurationError);
+    expect(() => assertAllowedAasmPath("./aasm")).toThrow(/non-absolute/);
+  });
+
+  it("rejects an absolute path outside the install allow-list", () => {
+    expect(() => assertAllowedAasmPath("/tmp/evil/aasm")).toThrow(ConfigurationError);
+    expect(() => assertAllowedAasmPath("/tmp/evil/aasm")).toThrow(/untrusted location/);
   });
 });
 
