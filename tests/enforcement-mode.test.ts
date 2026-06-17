@@ -7,7 +7,9 @@ import { describe, expect, it, vi } from "vitest";
 import { initAssembly, type EnforcementMode } from "../src/index.js";
 
 describe("initAssembly enforcementMode parameter", () => {
-  it.each(["enforce", "observe", "disabled"] as const)(
+  // `enforce` is exercised separately: in a non-check-capable mode it now fails
+  // closed (AAASM-3105), so it cannot be asserted on the allow-all `auto` path.
+  it.each(["observe", "disabled"] as const)(
     "accepts %s and echoes it on the returned context",
     async (mode) => {
       const ctx = await initAssembly({
