@@ -1,0 +1,39 @@
+name: Native pin consistency
+
+# Guards the ADR 0003 lockstep invariant: every `agent-assembly` git dependency
+# in the native binding must be pinned to ONE git rev, so cargo resolves a single
+# checkout and aa-proto / aa-sdk-client can never skew.
+on:
+  pull_request:
+    paths:
+      - "native/aa-ffi-node/Cargo.toml"
+  push:
+    branches: [master]
+    paths:
+      - "native/aa-ffi-node/Cargo.toml"
+
+permissions:
+  contents: read
+
+jobs:
+  aa-pin-single-rev:
+    name: aa-* crates share one git rev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Assert all agent-assembly git deps share one rev
+        run: |
+          manifest="native/aa-ffi-node/Cargo.toml"
+          revs=$(grep -E 'git *= *"https://github\.com/ai-agent-assembly/agent-assembly' "$manifest" \
+                 | grep -oE 'rev *= *"[0-9a-f]{7,40}"' | grep -oE '[0-9a-f]{7,40}' | sort -u)
+          n=$(printf '%s\n' "$revs" | grep -c . || true)
+          if [ "$n" -eq 0 ]; then
+            echo "No agent-assembly git-rev dependencies found in $manifest — nothing to check."
+            exit 0
+          fi
+          if [ "$n" -ne 1 ]; then
+            echo "::error file=$manifest::agent-assembly git deps pin $n distinct revs (must be exactly 1 — ADR 0003 lockstep invariant). Offending lines:"
+            grep -nE 'git *= *"https://github\.com/ai-agent-assembly/agent-assembly' "$manifest" || true
+            exit 1
+          fi
+          echo "OK: all agent-assembly git deps in $manifest pinned to ${revs}"
