@@ -114,6 +114,20 @@ describe("OpControlSubscriber", () => {
     sub.close();
   });
 
+  it("drops an UNSPECIFIED signal without altering op state", async () => {
+    const stream = new FakeStream();
+    const { sub } = buildSubscriber(stream);
+
+    // The default switch arm must ignore unrecognized signals: the op stays
+    // neither paused nor terminated.
+    stream.push(message("op-noop", OpControlSignal.OP_CONTROL_SIGNAL_UNSPECIFIED));
+
+    expect(sub.isPaused("op-noop")).toBe(false);
+    expect(sub.isTerminated("op-noop")).toBe(false);
+
+    sub.close();
+  });
+
   it("rejects with OpTerminatedError when the gateway terminates the op", async () => {
     const stream = new FakeStream();
     const { sub } = buildSubscriber(stream);
