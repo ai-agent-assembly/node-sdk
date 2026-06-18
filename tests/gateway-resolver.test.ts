@@ -53,6 +53,16 @@ describe("probeHealthz", () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ status } as Response) as unknown as typeof fetch;
     await expect(probeHealthz(DEFAULT_GATEWAY_URL)).resolves.toBe(false);
   });
+
+  it("strips trailing slashes from the base URL before appending /healthz", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200 } as Response);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(probeHealthz("http://localhost:7391///")).resolves.toBe(true);
+
+    const [calledUrl] = fetchMock.mock.calls[0]!;
+    expect(calledUrl).toBe("http://localhost:7391/healthz");
+  });
 });
 
 describe("waitForHealthz", () => {
@@ -367,5 +377,59 @@ describe("resolveApiKey", () => {
   it("returns empty string as the documented local-mode default", async () => {
     __testing._seams.loadConfigFile = async () => ({});
     await expect(resolveApiKey()).resolves.toBe("");
+  });
+});
+
+describe("default PATH lookup and spawn seams", () => {
+  // Capture the production default implementations before any other suite can
+  // reassign the mutable _seams entries.
+  const defaultFindAasmOnPath = __testing._seams.findAasmOnPath;
+  const defaultSpawnAasm = __testing._seams.spawnAasm;
+
+  let originalPath: string | undefined;
+
+  beforeEach(() => {
+    originalPath = process.env.PATH;
+  });
+
+  afterEach(() => {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    vi.restoreAllMocks();
+  });
+
+  it("findAasmOnPath returns the first matching binary across PATH entries", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "aaasm-3177-find-"));
+    try {
+      writeFileSync(join(tmp, "aasm"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+      // Prepend a guaranteed-miss dir to exercise the skip-and-continue branch.
+      process.env.PATH = [join(tmp, "no-such-dir"), tmp].join(":");
+      expect(defaultFindAasmOnPath()).toBe(join(tmp, "aasm"));
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("findAasmOnPath returns null when no PATH entry holds the binary", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "aaasm-3177-nofind-"));
+    try {
+      process.env.PATH = tmp;
+      expect(defaultFindAasmOnPath()).toBeNull();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("spawnAasm detaches a background subprocess from the resolved binary", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "aaasm-3177-spawn-"));
+    try {
+      const bin = join(tmp, "aasm");
+      // A trivially-exiting script: spawn must launch and unref it without
+      // throwing or keeping the event loop alive.
+      writeFileSync(bin, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+      expect(() => defaultSpawnAasm(bin)).not.toThrow();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

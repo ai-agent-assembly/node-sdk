@@ -87,6 +87,30 @@ describe("native gateway enforcement (AAASM-3050)", () => {
     expect(executeFn).toHaveBeenCalledOnce();
   });
 
+  it("defaults denied/pending to false and omits reason when the verdict is bare", async () => {
+    // A verdict object with no denied/pending/reason exercises the `?? false`
+    // fallbacks and the reason-omission branch.
+    const gateway = createNativeGatewayClient(
+      "napi-inprocess",
+      fakeNativeClient(async () => ({}) as Awaited<ReturnType<NativeClient["queryPolicy"]>>),
+      "agent-bare"
+    );
+
+    const decision = await gateway.check({ action: "tool_call", toolName: "noop", runId: "run-bare" });
+
+    expect(decision).toEqual({ denied: false, pending: false });
+    expect(decision).not.toHaveProperty("reason");
+  });
+
+  it("close() delegates to the native client's close", async () => {
+    const native = fakeNativeClient(async () => ({ denied: false, pending: false }));
+    const gateway = createNativeGatewayClient("napi-inprocess", native, "agent-close");
+
+    await gateway.close();
+
+    expect(native.close).toHaveBeenCalledOnce();
+  });
+
   it("PENDING: a runtime pending verdict routes to the approval path", async () => {
     const gateway = createNativeGatewayClient(
       "napi-inprocess",

@@ -242,6 +242,89 @@ describe("vercel ai sdk adapter", () => {
     expect(fakeModule.tool).toBe(originalTool);
   });
 
+  it("fails open and executes the original tool when approval-wait throws on PENDING", async () => {
+    const gateway = createGatewayClientMock();
+    gateway.check = vi.fn(async () => ({ pending: true, denied: false }));
+    gateway.waitForApproval = vi.fn(async () => {
+      throw new Error("approval channel unavailable");
+    });
+    const originalExecute = vi.fn(async () => ({ ok: "approval-fail-open" }));
+
+    const hooks = await import("../src/hooks/ai-sdk.js");
+    const wrappedExecute = hooks.createWrappedExecute(
+      originalExecute,
+      "pending tool",
+      gateway,
+      { approvalTimeoutMs: 2_000, fallbackRunId: "fallback" }
+    );
+
+    const result = await wrappedExecute({ x: 1 }, { toolCallId: "call-pending-throw" });
+
+    expect(result).toEqual({ ok: "approval-fail-open" });
+    expect(originalExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns true without re-patching when patchVercelAiSdk is already patched", async () => {
+    const gateway = createGatewayClientMock();
+    const originalTool = vi.fn((def: VercelAiToolDefinition) => def) as unknown as VercelAiToolFactory;
+    const fakeModule: VercelAiSdkModule = { tool: originalTool };
+
+    const hooks = await import("../src/hooks/ai-sdk.js");
+    expect(await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => fakeModule })).toBe(true);
+
+    const secondModule: VercelAiSdkModule = { tool: originalTool };
+    // Second call short-circuits: returns true and does not touch the new module.
+    expect(await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => secondModule })).toBe(true);
+    expect(secondModule.tool).toBe(originalTool);
+  });
+
+  it("returns false when the module loader yields nothing", async () => {
+    const gateway = createGatewayClientMock();
+    const hooks = await import("../src/hooks/ai-sdk.js");
+    expect(
+      await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => undefined })
+    ).toBe(false);
+    expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+  });
+
+  it("defaults the gateway toolName to 'unknown_tool' when a tool has no description", async () => {
+    const gateway = createGatewayClientMock();
+    gateway.check = vi.fn(async () => ({ denied: false, pending: false }));
+    const originalExecute = vi.fn(async () => ({ ok: true }));
+    // A tool with execute but no description exercises the `?? "unknown_tool"` fallback.
+    const originalTool = vi.fn((def: VercelAiToolDefinition) => ({
+      ...def,
+      execute: originalExecute,
+    })) as unknown as VercelAiToolFactory;
+    const fakeModule: VercelAiSdkModule = { tool: originalTool };
+
+    const hooks = await import("../src/hooks/ai-sdk.js");
+    await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => fakeModule });
+
+    const wrapped = fakeModule.tool({ parameters: {} } as VercelAiToolDefinition);
+    await wrapped.execute!({}, { toolCallId: "call-nodesc" });
+
+    expect(gateway.check).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: "unknown_tool" })
+    );
+  });
+
+  it("returns false when the loaded module has no usable tool factory", async () => {
+    const gateway = createGatewayClientMock();
+    // module.tool is not a function → captureOriginalToolFactory returns undefined.
+    const fakeModule = { tool: undefined } as unknown as VercelAiSdkModule;
+
+    const hooks = await import("../src/hooks/ai-sdk.js");
+    expect(await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => fakeModule })).toBe(false);
+    expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+  });
+
+  it("unpatch returns false when nothing is patched", async () => {
+    const hooks = await import("../src/hooks/ai-sdk.js");
+    expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+    expect(hooks.unpatchVercelAiSdk()).toBe(false);
+  });
+
   it("passes through tools without execute unchanged", async () => {
     const gateway = createGatewayClientMock();
     const toolWithoutExecute: VercelAiToolDefinition = { description: "a schema-only tool", parameters: {} };

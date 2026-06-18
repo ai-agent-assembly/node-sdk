@@ -153,6 +153,46 @@ describe("mastra hook", () => {
     warnSpy.mockRestore();
   });
 
+  it("returns false when the module loader throws", async () => {
+    const hooks = await import("../src/hooks/mastra.js");
+    const patched = await hooks.patchMastra({
+      agentId: "agent-loader-throws",
+      loadModule: async () => {
+        throw new Error("module resolution exploded");
+      }
+    });
+    expect(patched).toBe(false);
+    expect(hooks.mastraPatchState.isPatched).toBe(false);
+  });
+
+  it("falls back to original execute and logs warning when runWithAgentId throws on a Workflow", async () => {
+    const hooks = await import("../src/hooks/mastra.js");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const originalExecute = vi.fn(async () => ({ status: "fallback" }));
+    const fakeAgentClass: MastraAgentClass = { prototype: { generate: vi.fn(async () => ({})) } };
+    const fakeWorkflowClass: MastraWorkflowClass = { prototype: { execute: originalExecute } };
+    const fakeModule: MastraModule = { Agent: fakeAgentClass, Workflow: fakeWorkflowClass };
+
+    const lineage = await import("../src/lineage/agent-context-store.js");
+    vi.spyOn(lineage.agentContextStore, "run").mockImplementationOnce(() => {
+      throw new Error("context-store-error");
+    });
+
+    await hooks.patchMastra({ agentId: "agent-wf-fallback", loadModule: async () => fakeModule });
+
+    const instance = Object.create(fakeWorkflowClass.prototype);
+    const result = await fakeWorkflowClass.prototype.execute!.call(instance, {});
+
+    expect(result).toEqual({ status: "fallback" });
+    expect(originalExecute).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[assembly] Mastra lineage patch error on execute"),
+      expect.anything()
+    );
+    warnSpy.mockRestore();
+  });
+
   it("activates mastra in activeAdapters during initAssembly when module detected", async () => {
     const fakeAgentClass: MastraAgentClass = {
       prototype: { generate: vi.fn(async () => ({})) }
