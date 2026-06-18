@@ -300,6 +300,67 @@ describe("openai agents adapter", () => {
     expect(originalRunTool).toHaveBeenCalledTimes(1);
   });
 
+  it("fails open and executes original tool when approval handling throws on PENDING", async () => {
+    const gateway = createGatewayClientMock();
+    gateway.check = vi.fn(async () => ({ pending: true, denied: false }));
+    gateway.waitForApproval = vi.fn(async () => {
+      throw new Error("approval channel unavailable");
+    });
+    const originalRunTool = vi.fn(async () => ({ ok: "approval-fail-open" }));
+
+    const hooks = await import("../src/hooks/openai-agents.js");
+    const patchedRunTool = hooks.createPatchedRunTool(originalRunTool, gateway, {
+      fallbackRunId: "fallback-run",
+      approvalTimeoutMs: 2_000
+    });
+
+    const result = await patchedRunTool(
+      { function: { name: "pending_tool", arguments: "{}" } },
+      { runId: "run-pending-throw" }
+    );
+
+    expect(result).toEqual({ ok: "approval-fail-open" });
+    expect(originalRunTool).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns true without re-patching when already patched", async () => {
+    const gateway = createGatewayClientMock();
+    const fakeAgentClass: FakeAgentClass = {
+      prototype: { _runTool: vi.fn(async () => ({ ok: true })) }
+    };
+
+    const hooks = await import("../src/hooks/openai-agents.js");
+    expect(
+      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => fakeAgentClass })
+    ).toBe(true);
+    const patchedRunTool = fakeAgentClass.prototype._runTool;
+
+    expect(
+      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => fakeAgentClass })
+    ).toBe(true);
+    expect(fakeAgentClass.prototype._runTool).toBe(patchedRunTool);
+  });
+
+  it("returns false when the agent-class loader yields nothing", async () => {
+    const gateway = createGatewayClientMock();
+    const hooks = await import("../src/hooks/openai-agents.js");
+    expect(
+      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => undefined })
+    ).toBe(false);
+    expect(hooks.openAIAgentsPatchState.isPatched).toBe(false);
+  });
+
+  it("returns false when the agent class exposes no _runTool method", async () => {
+    const gateway = createGatewayClientMock();
+    // captureOriginalRunTool returns undefined → patch aborts before mutating.
+    const fakeAgentClass = { prototype: {} } as unknown as FakeAgentClass;
+    const hooks = await import("../src/hooks/openai-agents.js");
+    expect(
+      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => fakeAgentClass })
+    ).toBe(false);
+    expect(hooks.openAIAgentsPatchState.isPatched).toBe(false);
+  });
+
   it("restores original _runTool when unpatch is called", async () => {
     const gateway = createGatewayClientMock();
     const originalRunTool = vi.fn(async () => ({ ok: true }));

@@ -82,6 +82,20 @@ describe("langgraph hook", () => {
     expect(hooks.langGraphPatchState.isPatched).toBe(false);
   });
 
+  it("returns false when the module loader throws", async () => {
+    const hooks = await import("../src/hooks/langgraph.js");
+
+    const patched = await hooks.patchLangGraph({
+      agentId: "agent-loader-throws",
+      loadModule: async () => {
+        throw new Error("module resolution exploded");
+      }
+    });
+
+    expect(patched).toBe(false);
+    expect(hooks.langGraphPatchState.isPatched).toBe(false);
+  });
+
   it("returns false when StateGraph.prototype.compile is absent", async () => {
     const hooks = await import("../src/hooks/langgraph.js");
 
