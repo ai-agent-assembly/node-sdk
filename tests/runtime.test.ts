@@ -6,7 +6,7 @@
 //   - binary-not-found
 //   - already-running (initAssembly skips spawn when sidecar reachable)
 
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { arch, platform, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,9 +16,11 @@ import {
   BINARY_NAME,
   ENV_AUTO_START,
   INSTALL_HINT,
+  RUNTIME_LOG_FILENAME,
   assertSafeBinaryPath,
   findAasmBinary,
   initAssembly,
+  startRuntime,
 } from "../src/runtime.js";
 
 function makeFakeAasm(dir: string): string {
@@ -119,6 +121,29 @@ describe("runtime — F115 lifecycle", () => {
     expect(() => assertSafeBinaryPath("aasm")).toThrow(/non-absolute/);
     expect(() => assertSafeBinaryPath("/tmp/evil/aasm")).toThrow(/untrusted location/);
     expect(() => assertSafeBinaryPath("/usr/local/bin/aasm")).not.toThrow();
+  });
+
+  it("startRuntime spawns a detached subprocess and appends to the runtime log", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "aasm-spawn-"));
+    try {
+      const bin = makeFakeAasm(tmp);
+      const child = startRuntime(bin, 7980, tmp);
+
+      expect(typeof child.pid).toBe("number");
+      // The log file is opened (O_APPEND) before the spawn, so it exists
+      // synchronously regardless of how fast the detached child exits.
+      expect(existsSync(join(tmp, RUNTIME_LOG_FILENAME))).toBe(true);
+
+      // Best-effort terminate in case the (trivially-exiting) child is still
+      // alive; the spawn is detached + unref'd so it cannot keep the loop open.
+      try {
+        if (child.pid !== undefined) process.kill(child.pid);
+      } catch {
+        // Already exited — nothing to reap.
+      }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 
   it("initAssembly is idempotent when a sidecar is already running on the target port", async () => {
