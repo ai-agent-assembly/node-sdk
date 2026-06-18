@@ -193,6 +193,27 @@ describe("mastra hook", () => {
     warnSpy.mockRestore();
   });
 
+  it("propagates a rejecting generate to the caller without re-invoking the original", async () => {
+    const hooks = await import("../src/hooks/mastra.js");
+
+    const originalGenerate = vi.fn(async () => {
+      throw new Error("generate-failed");
+    });
+    const fakeAgentClass: MastraAgentClass = { prototype: { generate: originalGenerate } };
+    const fakeModule: MastraModule = { Agent: fakeAgentClass };
+
+    await hooks.patchMastra({ agentId: "agent-reject", loadModule: async () => fakeModule });
+
+    const instance = Object.create(fakeAgentClass.prototype);
+    await expect(fakeAgentClass.prototype.generate!.call(instance, "prompt")).rejects.toThrow(
+      "generate-failed"
+    );
+    // The rejection surfaces to the caller; the fallback path must NOT run, so
+    // the original is invoked exactly once (proves the promise is not awaited
+    // inside the patch's try/catch).
+    expect(originalGenerate).toHaveBeenCalledTimes(1);
+  });
+
   it("activates mastra in activeAdapters during initAssembly when module detected", async () => {
     const fakeAgentClass: MastraAgentClass = {
       prototype: { generate: vi.fn(async () => ({})) }

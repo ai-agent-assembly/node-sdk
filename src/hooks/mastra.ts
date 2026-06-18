@@ -75,14 +75,17 @@ export async function patchMastra(options: PatchMastraOptions): Promise<boolean>
   module.Agent.prototype.generate = function patchedGenerate(
     ...args: unknown[]
   ): Promise<unknown> {
-    let result: Promise<unknown>;
+    // The try guards only the *synchronous* setup (entering the async-context
+    // store and invoking the original); the returned promise is handed to the
+    // caller, which awaits it, so its rejection is the caller's to handle.
+    // Returning it directly (rather than via a local inside the try) avoids an
+    // unhandled-rejection footgun without changing timing or call count.
     try {
-      result = runWithAgentId(agentId, () => originalGenerate.apply(this, args));
+      return runWithAgentId(agentId, () => originalGenerate.apply(this, args));
     } catch (e) {
       console.warn("[assembly] Mastra lineage patch error on generate; falling back:", e);
       return originalGenerate.apply(this, args);
     }
-    return result;
   };
 
   // Wrap Workflow.prototype.execute if present
@@ -94,14 +97,15 @@ export async function patchMastra(options: PatchMastraOptions): Promise<boolean>
     module.Workflow.prototype.execute = function patchedExecute(
       ...args: unknown[]
     ): Promise<unknown> {
-      let result: Promise<unknown>;
+      // See patchedGenerate above: the try guards only the synchronous setup;
+      // the returned promise is awaited by the caller, so returning it directly
+      // (not via a local) handles its rejection without altering behaviour.
       try {
-        result = runWithAgentId(agentId, () => originalExecute.apply(this, args));
+        return runWithAgentId(agentId, () => originalExecute.apply(this, args));
       } catch (e) {
         console.warn("[assembly] Mastra lineage patch error on execute; falling back:", e);
         return originalExecute.apply(this, args);
       }
-      return result;
     };
   }
 
