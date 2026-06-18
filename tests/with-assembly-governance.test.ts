@@ -127,6 +127,44 @@ describe("withAssembly governance", () => {
     expect(invokeFn).not.toHaveBeenCalled();
   });
 
+  it("invoke PENDING→approve: waits for approval then invokes the original", async () => {
+    const gateway = createMockGateway({
+      check: vi.fn(async () => ({ denied: false, pending: true })),
+      waitForApproval: vi.fn(async () => ({ denied: false }))
+    });
+    const invokeFn: (input: string) => Promise<string> = vi.fn(async () => "invoke-approved");
+    const tools = {
+      lcTool: { name: "lcTool", invoke: invokeFn }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway });
+
+    const result = await tools.lcTool.invoke("input");
+
+    expect(gateway.waitForApproval).toHaveBeenCalledOnce();
+    expect(invokeFn).toHaveBeenCalledWith("input");
+    expect(result).toBe("invoke-approved");
+  });
+
+  it("invoke PENDING→deny: throws PolicyViolationError when approval is rejected", async () => {
+    const gateway = createMockGateway({
+      check: vi.fn(async () => ({ denied: false, pending: true })),
+      waitForApproval: vi.fn(async () => ({ denied: true, reason: "Manager rejected" }))
+    });
+    const invokeFn: (input: string) => Promise<string> = vi.fn(async () => "should not run");
+    const tools = {
+      lcTool: { name: "lcTool", invoke: invokeFn }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway });
+
+    await expect(tools.lcTool.invoke("input")).rejects.toThrow(PolicyViolationError);
+    await expect(tools.lcTool.invoke("input")).rejects.toThrow(
+      "Approval rejected for 'lcTool': Manager rejected"
+    );
+    expect(invokeFn).not.toHaveBeenCalled();
+  });
+
   it("passthrough: tools without execute or invoke are left unchanged", () => {
     const gateway = createMockGateway();
     const tools = {
