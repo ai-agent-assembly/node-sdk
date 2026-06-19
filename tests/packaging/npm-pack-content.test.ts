@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -15,9 +15,21 @@ describe("packaging npm pack contents", () => {
 
       const packDir = fs.mkdtempSync(path.resolve(process.cwd(), ".pack-"));
 
+      // Pass the temp-dir path as a discrete argument (no shell interpolation):
+      // packDir is derived from an absolute cwd path that may contain spaces or
+      // shell metacharacters, which would corrupt a shell-built command string.
       const packEntries = JSON.parse(
-        execSync(
-          `npm pack --json --ignore-scripts --cache ./.npm-cache --pack-destination ${packDir}`,
+        execFileSync(
+          "npm",
+          [
+            "pack",
+            "--json",
+            "--ignore-scripts",
+            "--cache",
+            "./.npm-cache",
+            "--pack-destination",
+            packDir
+          ],
           {
             encoding: "utf8",
             stdio: "pipe"
@@ -29,7 +41,9 @@ describe("packaging npm pack contents", () => {
       expect(tarballName).toBeTruthy();
 
       const tarballPath = path.resolve(packDir, tarballName!);
-      const packedFiles = execSync(`tar -tf ${tarballPath}`, {
+      // Same rationale: tarballPath is an absolute path; pass it as an argument
+      // rather than interpolating it into a shell command string.
+      const packedFiles = execFileSync("tar", ["-tf", tarballPath], {
         encoding: "utf8",
         stdio: "pipe"
       })
