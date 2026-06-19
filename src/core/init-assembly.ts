@@ -61,7 +61,9 @@ function buildRegistrationEvent(config: AssemblyConfig): Record<string, string> 
  * falls back to `agentId`; `framework` is the first detected framework (or
  * `"none"` when running without an adapter); `gatewayEndpoint` is set only when
  * a gateway URL was resolved so the native default endpoint resolution is
- * preserved when it was not.
+ * preserved when it was not. `teamId` / `parentAgentId` carry the agent's
+ * team-budget scoping and topology lineage to the gateway (AAASM-3415); each is
+ * set only when present so an unset field stays absent.
  */
 function buildRegisterOptions(
   config: AssemblyConfig,
@@ -72,7 +74,9 @@ function buildRegisterOptions(
     agentId,
     name: config.name ?? agentId,
     framework: frameworks[0] ?? "none",
-    ...(config.gatewayUrl ? { gatewayEndpoint: config.gatewayUrl } : {})
+    ...(config.gatewayUrl ? { gatewayEndpoint: config.gatewayUrl } : {}),
+    ...(config.teamId ? { teamId: config.teamId } : {}),
+    ...(config.parentAgentId ? { parentAgentId: config.parentAgentId } : {})
   };
 }
 
