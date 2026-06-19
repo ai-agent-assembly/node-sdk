@@ -33,7 +33,7 @@ export interface GatewayClient {
 export function createNoopGatewayClient(mode: AssemblyMode, httpBaseUrl?: string): GatewayClient {
   return {
     mode,
-    ...(httpBaseUrl !== undefined ? { httpBaseUrl } : {}),
+    ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
     start: async () => undefined,
     close: async () => undefined,
     check: async () => ({ denied: false, pending: false }),
@@ -89,7 +89,7 @@ export function createNativeGatewayClient(
 ): GatewayClient {
   return {
     mode,
-    ...(httpBaseUrl !== undefined ? { httpBaseUrl } : {}),
+    ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
     start: async () => undefined,
     close: async () => {
       await nativeClient.close();
@@ -100,7 +100,7 @@ export function createNativeGatewayClient(
         return {
           denied: verdict.denied ?? false,
           pending: verdict.pending ?? false,
-          ...(verdict.reason !== undefined ? { reason: verdict.reason } : {})
+          ...(verdict.reason === undefined ? {} : { reason: verdict.reason })
         };
       } catch {
         // Fail open: a local fault talking to the runtime must never block.

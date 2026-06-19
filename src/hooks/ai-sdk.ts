@@ -190,7 +190,7 @@ export async function patchVercelAiSdk(
     {
       approvalTimeoutMs: options.approvalTimeoutMs ?? 30_000,
       fallbackRunId: options.fallbackRunId ?? "vercel-ai-sdk",
-      ...(options.agentId !== undefined ? { agentId: options.agentId } : {})
+      ...(options.agentId === undefined ? {} : { agentId: options.agentId })
     }
   );
   vercelAiSdkPatchState.isPatched = true;
