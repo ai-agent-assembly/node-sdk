@@ -61,6 +61,40 @@ export interface PolicyDecision {
 export declare function queryPolicy(handle: ClientHandle, query: any): Promise<PolicyDecision>
 
 /**
+ * Register this agent with the governance gateway and store the issued
+ * credential token on the session.
+ *
+ * This is the **only** direct SDK→gateway gRPC call (per ADR 0004);
+ * `CheckAction` still flows through `aa-runtime`. The token the gateway issues
+ * is stored inside the shared [`AssemblyClient`] and then attached to every
+ * subsequent [`query_policy`] request so the gateway's
+ * `validate_credential_token` does not deny a registered agent.
+ *
+ * Delegates to [`AssemblyClient::register`], an async tonic call, so this napi
+ * function is itself `async` and awaits it without blocking the Node event
+ * loop. Returns the assigned policy id reported by the gateway. A failed
+ * registration — gateway unreachable, identity rejected — surfaces as a typed
+ * error so the caller can decide whether to proceed unregistered.
+ */
+export declare function register(handle: ClientHandle, options: RegisterOptions): Promise<string>
+
+/**
+ * Parameters for [`register`].
+ *
+ * `agentId` is the agent identity the gateway registers (derived into a
+ * `did:key` + Ed25519 public key by the shared client). `name` and `framework`
+ * are descriptive metadata the gateway records. `gatewayEndpoint` overrides the
+ * gateway gRPC endpoint (default resolved from `AA_GATEWAY_ENDPOINT` or
+ * `http://127.0.0.1:50051`).
+ */
+export interface RegisterOptions {
+  agentId: string
+  name: string
+  framework: string
+  gatewayEndpoint?: string
+}
+
+/**
  * Ship a captured event to the runtime.
  *
  * The JS event object is translated to the shared client's

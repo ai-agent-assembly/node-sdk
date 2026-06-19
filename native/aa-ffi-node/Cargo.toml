@@ -19,8 +19,14 @@ crate-type = ["cdylib"]
 # `aa-proto` is pinned at the SAME SHA so cargo resolves a single checkout of
 # the agent-assembly workspace; `query_policy` builds a `CheckActionRequest`
 # and reads its `CheckActionResponse` directly from these generated types.
-aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "4f9eea19c2c7e9d6730319e427861a291010fc75", package = "aa-sdk-client" }
-aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "4f9eea19c2c7e9d6730319e427861a291010fc75", package = "aa-proto" }
+#
+# Pinned at agent-assembly master 9cde1d83 (AAASM-3396), which adds
+# `AssemblyClient::register()` (the one direct SDK→gateway gRPC call, per ADR
+# 0004) and makes `query_policy()` attach the registration `credential_token`
+# so the gateway does not deny a registered agent. That commit also adds the
+# `gateway_endpoint` field to `AssemblyConfig`, consumed by `register`.
+aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "9cde1d83e4114114bd49c9546d4fa5d86d6cbd32", package = "aa-sdk-client" }
+aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "9cde1d83e4114114bd49c9546d4fa5d86d6cbd32", package = "aa-proto" }
 napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "3"
 prost = "0.14"

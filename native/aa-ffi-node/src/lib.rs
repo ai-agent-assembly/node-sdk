@@ -23,6 +23,7 @@ use napi_derive::napi;
 use serde_json::Value;
 
 const ERR_CONNECT: &str = "AA_ERR_CONNECT";
+const ERR_REGISTER: &str = "AA_ERR_REGISTER";
 const ERR_SEND_EVENT: &str = "AA_ERR_SEND_EVENT";
 const ERR_DISCONNECT: &str = "AA_ERR_DISCONNECT";
 const ERR_QUERY_POLICY: &str = "AA_ERR_QUERY_POLICY";
@@ -57,6 +58,7 @@ pub async fn connect(socket_path: String) -> Result<ClientHandle> {
   let config = AssemblyConfig {
     agent_id: String::new(),
     socket_path: Some(socket_path),
+    gateway_endpoint: None,
   };
   let resolved = config.resolve_socket_path();
 
@@ -67,6 +69,50 @@ pub async fn connect(socket_path: String) -> Result<ClientHandle> {
   Ok(ClientHandle {
     inner: Arc::new(client),
   })
+}
+
+/// Parameters for [`register`].
+///
+/// `agentId` is the agent identity the gateway registers (derived into a
+/// `did:key` + Ed25519 public key by the shared client). `name` and `framework`
+/// are descriptive metadata the gateway records. `gatewayEndpoint` overrides the
+/// gateway gRPC endpoint (default resolved from `AA_GATEWAY_ENDPOINT` or
+/// `http://127.0.0.1:50051`).
+#[napi(object)]
+pub struct RegisterOptions {
+  pub agent_id: String,
+  pub name: String,
+  pub framework: String,
+  pub gateway_endpoint: Option<String>,
+}
+
+/// Register this agent with the governance gateway and store the issued
+/// credential token on the session.
+///
+/// This is the **only** direct SDK→gateway gRPC call (per ADR 0004);
+/// `CheckAction` still flows through `aa-runtime`. The token the gateway issues
+/// is stored inside the shared [`AssemblyClient`] and then attached to every
+/// subsequent [`query_policy`] request so the gateway's
+/// `validate_credential_token` does not deny a registered agent.
+///
+/// Delegates to [`AssemblyClient::register`], an async tonic call, so this napi
+/// function is itself `async` and awaits it without blocking the Node event
+/// loop. Returns the assigned policy id reported by the gateway. A failed
+/// registration — gateway unreachable, identity rejected — surfaces as a typed
+/// error so the caller can decide whether to proceed unregistered.
+#[napi]
+pub async fn register(handle: &ClientHandle, options: RegisterOptions) -> Result<String> {
+  let config = AssemblyConfig {
+    agent_id: options.agent_id,
+    socket_path: None,
+    gateway_endpoint: options.gateway_endpoint,
+  };
+
+  handle
+    .inner
+    .register(&config, options.name, options.framework)
+    .await
+    .map_err(|err| typed_error(ERR_REGISTER, &err.to_string()))
 }
 
 /// Ship a captured event to the runtime.
