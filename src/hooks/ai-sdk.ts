@@ -31,9 +31,7 @@ export function captureOriginalToolFactory(
     return undefined;
   }
 
-  if (!vercelAiSdkPatchState.originalToolFactory) {
-    vercelAiSdkPatchState.originalToolFactory = candidate;
-  }
+  vercelAiSdkPatchState.originalToolFactory ??= candidate;
 
   return vercelAiSdkPatchState.originalToolFactory;
 }
