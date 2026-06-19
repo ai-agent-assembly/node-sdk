@@ -161,6 +161,44 @@ describe("initAssembly registers the agent (AAASM-3403)", () => {
     });
   });
 
+  it("forwards teamId and parentAgentId to native register (AAASM-3415)", async () => {
+    const binding = makeBinding();
+    const { initAssembly } = await loadWithBinding(binding);
+
+    const ctx = await initAssembly({
+      gatewayUrl: "/tmp/aa.sock",
+      apiKey: "test-key",
+      agentId: "child-1",
+      teamId: "team-payments",
+      parentAgentId: "parent-42",
+      mode: "napi-inprocess"
+    });
+    await ctx.shutdown();
+
+    expect(binding.register.mock.calls[0]?.[1]).toMatchObject({
+      agentId: "child-1",
+      teamId: "team-payments",
+      parentAgentId: "parent-42"
+    });
+  });
+
+  it("omits teamId and parentAgentId when not configured (AAASM-3415)", async () => {
+    const binding = makeBinding();
+    const { initAssembly } = await loadWithBinding(binding);
+
+    const ctx = await initAssembly({
+      gatewayUrl: "/tmp/aa.sock",
+      apiKey: "test-key",
+      agentId: "root-1",
+      mode: "napi-inprocess"
+    });
+    await ctx.shutdown();
+
+    const options = binding.register.mock.calls[0]?.[1];
+    expect(options).not.toHaveProperty("teamId");
+    expect(options).not.toHaveProperty("parentAgentId");
+  });
+
   it("proceeds unregistered when registration fails (fail-open)", async () => {
     const binding = makeBinding({
       register: vi.fn(async () => {
