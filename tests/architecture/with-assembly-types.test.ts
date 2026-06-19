@@ -1,10 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { createNoopGatewayClient } from "../../src/gateway/client.js";
 import { withAssembly } from "../../src/wrappers/with-assembly.js";
-
-type Equal<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
-type Expect<T extends true> = T;
 
 describe("withAssembly", () => {
   it("preserves the exact tool map type", () => {
@@ -24,10 +20,8 @@ describe("withAssembly", () => {
       agentId: "agent-1"
     });
 
-    type _ExactTypePreserved = Expect<Equal<typeof wrapped, typeof tools>>;
-    const _typeAssertion: _ExactTypePreserved = true;
-
-    expect(_typeAssertion).toBe(true);
+    // Compile-time guarantee that withAssembly preserves the exact tool-map type.
+    expectTypeOf(wrapped).toEqualTypeOf<typeof tools>();
     expect(wrapped).toBe(tools);
   });
 });
