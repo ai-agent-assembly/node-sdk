@@ -77,7 +77,7 @@ export function createWrappedExecute<TArgs, TResult>(
       decision = await gatewayClient.check({
         action: "tool_call",
         toolName: description,
-        args: args as Record<string, unknown>,
+        args,
         runId
       });
     } catch {
