@@ -31,9 +31,7 @@ export function captureOriginalToolFactory(
     return undefined;
   }
 
-  if (!vercelAiSdkPatchState.originalToolFactory) {
-    vercelAiSdkPatchState.originalToolFactory = candidate;
-  }
+  vercelAiSdkPatchState.originalToolFactory ??= candidate;
 
   return vercelAiSdkPatchState.originalToolFactory;
 }
@@ -79,7 +77,7 @@ export function createWrappedExecute<TArgs, TResult>(
       decision = await gatewayClient.check({
         action: "tool_call",
         toolName: description,
-        args: args as Record<string, unknown>,
+        args,
         runId
       });
     } catch {
@@ -190,7 +188,7 @@ export async function patchVercelAiSdk(
     {
       approvalTimeoutMs: options.approvalTimeoutMs ?? 30_000,
       fallbackRunId: options.fallbackRunId ?? "vercel-ai-sdk",
-      ...(options.agentId !== undefined ? { agentId: options.agentId } : {})
+      ...(options.agentId === undefined ? {} : { agentId: options.agentId })
     }
   );
   vercelAiSdkPatchState.isPatched = true;

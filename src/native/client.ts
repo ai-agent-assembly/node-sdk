@@ -158,19 +158,17 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
   let pendingSendError: Error | undefined;
 
   const getHandle = async (): Promise<object> => {
-    if (!handlePromise) {
-      handlePromise = binding
-        .connect(socketPath)
-        .then((handle) => {
-          activeHandle = handle;
-          return handle;
-        })
-        .catch((error: unknown) => {
-          handlePromise = undefined;
-          activeHandle = undefined;
-          throw mapNativeError(error);
-        });
-    }
+    handlePromise ??= binding
+      .connect(socketPath)
+      .then((handle) => {
+        activeHandle = handle;
+        return handle;
+      })
+      .catch((error: unknown) => {
+        handlePromise = undefined;
+        activeHandle = undefined;
+        throw mapNativeError(error);
+      });
     return handlePromise;
   };
 

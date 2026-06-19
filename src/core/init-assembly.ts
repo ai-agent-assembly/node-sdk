@@ -226,7 +226,7 @@ async function patchDetectedVercelAiSdk(
 
   return patchVercelAiSdk({
     gatewayClient: client,
-    ...(agentId !== undefined ? { agentId } : {})
+    ...(agentId === undefined ? {} : { agentId })
   });
 }
 
@@ -354,7 +354,7 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     ...config,
     gatewayUrl: resolvedGatewayUrl,
     apiKey: resolvedApiKey,
-    ...(controlPlaneUrlInput !== undefined ? { controlPlaneUrl: controlPlaneUrlInput } : {}),
+    ...(controlPlaneUrlInput === undefined ? {} : { controlPlaneUrl: controlPlaneUrlInput }),
     ...(resolvedParentAgentId ? { parentAgentId: resolvedParentAgentId } : {})
   };
 

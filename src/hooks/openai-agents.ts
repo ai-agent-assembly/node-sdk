@@ -33,9 +33,7 @@ export function captureOriginalRunTool(
     return undefined;
   }
 
-  if (!openAIAgentsPatchState.originalRunTool) {
-    openAIAgentsPatchState.originalRunTool = candidate;
-  }
+  openAIAgentsPatchState.originalRunTool ??= candidate;
 
   return openAIAgentsPatchState.originalRunTool;
 }

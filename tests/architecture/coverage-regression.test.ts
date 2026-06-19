@@ -49,14 +49,18 @@ describe("coverage regression guards", () => {
   });
 
   it("loads type and adapter contract modules", async () => {
-    await import("../../src/types/assembly-mode.js");
-    await import("../../src/types/assembly-config.js");
-    await import("../../src/types/assembly-context.js");
-    await import("../../src/types/tool-map.js");
-    await import("../../src/adapters/adapter.js");
-    await import("../../src/adapters/adapter-registry.js");
-    await import("../../src/gateway/client.js");
+    const modules = await Promise.all([
+      import("../../src/types/assembly-mode.js"),
+      import("../../src/types/assembly-config.js"),
+      import("../../src/types/assembly-context.js"),
+      import("../../src/types/tool-map.js"),
+      import("../../src/adapters/adapter.js"),
+      import("../../src/adapters/adapter-registry.js"),
+      import("../../src/gateway/client.js")
+    ]);
 
-    expect(true).toBe(true);
+    for (const module of modules) {
+      expect(module).toBeDefined();
+    }
   });
 });
