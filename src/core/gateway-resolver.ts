@@ -191,7 +191,11 @@ export async function waitForHealthz(
 }
 
 function expandHome(p: string): string {
-  return p.startsWith("~") ? resolvePath(homedir(), p.slice(p.startsWith("~/") ? 2 : 1)) : p;
+  if (!p.startsWith("~")) {
+    return p;
+  }
+  const prefixLength = p.startsWith("~/") ? 2 : 1;
+  return resolvePath(homedir(), p.slice(prefixLength));
 }
 
 /**
