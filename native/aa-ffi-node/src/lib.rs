@@ -57,6 +57,7 @@ pub async fn connect(socket_path: String) -> Result<ClientHandle> {
   let config = AssemblyConfig {
     agent_id: String::new(),
     socket_path: Some(socket_path),
+    gateway_endpoint: None,
   };
   let resolved = config.resolve_socket_path();
 
