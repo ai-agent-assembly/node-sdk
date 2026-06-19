@@ -19,7 +19,8 @@ function fakeNativeClient(queryPolicy: NativeClient["queryPolicy"]): NativeClien
     mode: "napi-inprocess",
     close: vi.fn(async () => undefined),
     sendEvent: vi.fn(() => undefined),
-    queryPolicy
+    queryPolicy,
+    register: vi.fn(async () => "")
   };
 }
 

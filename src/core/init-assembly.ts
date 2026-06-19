@@ -9,7 +9,11 @@ import {
   createNoopGatewayClient,
   type GatewayClient
 } from "../gateway/client.js";
-import { createNativeClient, type NativeClient } from "../native/client.js";
+import {
+  createNativeClient,
+  type NativeClient,
+  type RegisterOptions
+} from "../native/client.js";
 import { ConfigurationError } from "../errors/index.js";
 import type { AssemblyConfig } from "../types/assembly-config.js";
 import type { AssemblyContext } from "../types/assembly-context.js";
@@ -52,6 +56,27 @@ function buildRegistrationEvent(config: AssemblyConfig): Record<string, string> 
 }
 
 /**
+ * Build the {@link RegisterOptions} for the native `register` gRPC call
+ * (AAASM-3400) from the resolved config and the detected frameworks. `name`
+ * falls back to `agentId`; `framework` is the first detected framework (or
+ * `"none"` when running without an adapter); `gatewayEndpoint` is set only when
+ * a gateway URL was resolved so the native default endpoint resolution is
+ * preserved when it was not.
+ */
+function buildRegisterOptions(
+  config: AssemblyConfig,
+  frameworks: readonly string[]
+): RegisterOptions {
+  const agentId = config.agentId ?? "";
+  return {
+    agentId,
+    name: config.name ?? agentId,
+    framework: frameworks[0] ?? "none",
+    ...(config.gatewayUrl ? { gatewayEndpoint: config.gatewayUrl } : {})
+  };
+}
+
+/**
  * The only built-in {@link AssemblyMode} for which {@link createClient}
  * constructs a gateway client whose `check()` consults a real authoritative
  * verdict (the native `queryPolicy` against a reachable `aa-runtime`). Every
@@ -59,7 +84,10 @@ function buildRegistrationEvent(config: AssemblyConfig): Record<string, string> 
  */
 const CHECK_CAPABLE_MODE: AssemblyMode = "napi-inprocess";
 
-export function createClient(config: AssemblyConfig): GatewayClient {
+export function createClient(
+  config: AssemblyConfig,
+  nativeClientOverride?: NativeClient
+): GatewayClient {
   const mode = config.mode ?? "auto";
   if (config.gatewayClient) {
     return config.gatewayClient;
@@ -91,11 +119,17 @@ export function createClient(config: AssemblyConfig): GatewayClient {
   // gateway client swallows local faults, so this never blocks without a
   // runtime — preserving the pre-feature fail-open behavior.
   if (mode === "napi-inprocess") {
-    const nativeClient = createNativeClient({
-      gateway: config.gatewayUrl ?? "",
-      apiKey: config.apiKey ?? "",
-      mode: "napi-inprocess"
-    });
+    // Reuse the caller-supplied native client when present so the registered
+    // session (the one `register()` stored the gateway token on) is the same
+    // session `queryPolicy` runs against. Standalone callers (and the routing
+    // tests) get a freshly-built client instead.
+    const nativeClient =
+      nativeClientOverride ??
+      createNativeClient({
+        gateway: config.gatewayUrl ?? "",
+        apiKey: config.apiKey ?? "",
+        mode: "napi-inprocess"
+      });
     return createNativeGatewayClient(mode, nativeClient, config.agentId, httpBaseUrl);
   }
 
@@ -358,14 +392,12 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     ...(resolvedParentAgentId ? { parentAgentId: resolvedParentAgentId } : {})
   };
 
-  const client = createClient(resolvedConfig);
   const frameworks = detectFrameworks();
-  const adapters = await registerAdapters(frameworks);
 
-  await startNetworkLayerIfNeeded(client, resolvedConfig);
-
-  // Send topology registration event through the native transport on every boot
-  // except sdk-only mode (which has no sidecar to register with).
+  // Build the native transport up front (every mode except sdk-only, which has
+  // no sidecar) so the same session backs both the gateway client's `check()`
+  // and the agent registration — the gateway token `register()` stores on the
+  // session is then attached to every subsequent `queryPolicy` request.
   let nativeClient: NativeClient | undefined;
   if (resolvedConfig.mode !== "sdk-only") {
     nativeClient = createNativeClient({
@@ -373,6 +405,28 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
       apiKey: resolvedApiKey,
       mode: resolvedConfig.mode === "napi-inprocess" ? "napi-inprocess" : "grpc-sidecar"
     });
+  }
+
+  const client = createClient(resolvedConfig, nativeClient);
+  const adapters = await registerAdapters(frameworks);
+
+  await startNetworkLayerIfNeeded(client, resolvedConfig);
+
+  if (nativeClient !== undefined) {
+    // AAASM-3403: register the agent over the native SDK→gateway gRPC call so
+    // the gateway issues a credential token (stored on this session) that
+    // unblocks subsequent policy queries. Advisory: a failed registration must
+    // not abort init — the agent proceeds unregistered and the proxy / eBPF
+    // layers remain authoritative.
+    try {
+      await nativeClient.register(buildRegisterOptions(resolvedConfig, frameworks));
+    } catch (error) {
+      console.warn(
+        `[agent-assembly] agent registration failed; proceeding unregistered: ${String(error)}`
+      );
+    }
+    // Topology lineage metadata still flows as an audit event (parent / team /
+    // delegation), which `register` does not carry.
     nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
   }
 

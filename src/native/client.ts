@@ -19,10 +19,23 @@ interface NativePolicyDecision {
   reason: string;
 }
 
+/**
+ * Options for the native `register` primitive (AAASM-3400). `agentId` is the
+ * identity the gateway registers; `name` / `framework` are descriptive
+ * metadata; `gatewayEndpoint` overrides the gateway gRPC endpoint.
+ */
+export interface RegisterOptions {
+  agentId: string;
+  name: string;
+  framework: string;
+  gatewayEndpoint?: string;
+}
+
 interface NativeBinding {
   connect: (socketPath: string) => Promise<object>;
   sendEvent: (handle: object, event: unknown) => void;
   queryPolicy: (handle: object, query: unknown) => Promise<NativePolicyDecision>;
+  register?: (handle: object, options: RegisterOptions) => Promise<string>;
   disconnect: (handle: object) => Promise<void>;
 }
 
@@ -35,6 +48,7 @@ interface GlobalWithNativeBinding {
 const ERROR_CONNECT = "AA_ERR_CONNECT";
 const ERROR_SEND_EVENT = "AA_ERR_SEND_EVENT";
 const ERROR_QUERY_POLICY = "AA_ERR_QUERY_POLICY";
+const ERROR_REGISTER = "AA_ERR_REGISTER";
 const ERROR_DISCONNECT = "AA_ERR_DISCONNECT";
 
 export class NativeConnectError extends Error {
@@ -49,6 +63,10 @@ export class NativeQueryPolicyError extends Error {
   readonly code = ERROR_QUERY_POLICY;
 }
 
+export class NativeRegisterError extends Error {
+  readonly code = ERROR_REGISTER;
+}
+
 export class NativeDisconnectError extends Error {
   readonly code = ERROR_DISCONNECT;
 }
@@ -58,6 +76,18 @@ export interface NativeClient {
   close: () => Promise<void>;
   sendEvent: (event: unknown) => void;
   queryPolicy: (action: unknown) => Promise<PolicyResult>;
+  /**
+   * Register this agent with the governance gateway over the native
+   * SDK→gateway gRPC call (AAASM-3400). The token the gateway issues is stored
+   * on the underlying session and attached to every subsequent
+   * {@link queryPolicy} request, so the gateway does not deny a registered
+   * agent. Returns the assigned policy id.
+   *
+   * **Advisory:** like the rest of the SDK this is not a security boundary. A
+   * failed registration surfaces as a typed error; callers may proceed
+   * unregistered (the proxy / eBPF layers remain authoritative).
+   */
+  register: (options: RegisterOptions) => Promise<string>;
 }
 
 /**
@@ -96,6 +126,9 @@ function mapNativeError(error: unknown): Error {
   }
   if (code === ERROR_QUERY_POLICY) {
     return new NativeQueryPolicyError(detail);
+  }
+  if (code === ERROR_REGISTER) {
+    return new NativeRegisterError(detail);
   }
   if (code === ERROR_DISCONNECT) {
     return new NativeDisconnectError(detail);
@@ -146,7 +179,11 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
       mode,
       close: async () => undefined,
       sendEvent: () => undefined,
-      queryPolicy: async () => ({ denied: false, pending: false })
+      queryPolicy: async () => ({ denied: false, pending: false }),
+      // No native session to register against off the in-process path; the
+      // gRPC sidecar registers the agent in its own process. Resolve neutrally
+      // so init never blocks on a transport that does not own a handle.
+      register: async () => ""
     };
   }
 
@@ -226,6 +263,21 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
       const handle = await getHandle();
       const verdict = await binding.queryPolicy(handle, action);
       return mapDecisionToPolicyResult(verdict);
+    },
+    register: async (options: RegisterOptions) => {
+      // Register on the same session the queryPolicy path uses, so the token
+      // the gateway issues is stored on this handle and attached to every
+      // subsequent query. This is the only direct SDK→gateway gRPC call
+      // (ADR 0004); CheckAction still flows through aa-runtime.
+      if (binding.register === undefined) {
+        // A binding without `register` predates AAASM-3400; the agent simply
+        // runs unregistered rather than failing init.
+        return "";
+      }
+      const handle = await getHandle();
+      return binding.register(handle, options).catch((error: unknown) => {
+        throw mapNativeError(error);
+      });
     }
   };
 }

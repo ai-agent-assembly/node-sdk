@@ -9,7 +9,8 @@ function createClient(mode: NativeClient["mode"]): NativeClient {
     mode,
     close: async () => undefined,
     sendEvent: () => undefined,
-    queryPolicy: async () => ({ denied: false, pending: false })
+    queryPolicy: async () => ({ denied: false, pending: false }),
+    register: async () => ""
   };
 }
 

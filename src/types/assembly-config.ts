@@ -26,6 +26,12 @@ export interface AssemblyConfig {
    */
   apiKey?: string;
   agentId?: string;
+  /**
+   * Human-readable agent name recorded by the gateway at registration
+   * (AAASM-3400). Descriptive metadata only; when omitted it falls back to
+   * ``agentId``.
+   */
+  name?: string;
   mode?: AssemblyMode;
   gatewayClient?: GatewayClient;
   langchain?: LangChainAdapterConfig;
