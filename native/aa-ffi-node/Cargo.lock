@@ -19,7 +19,7 @@ dependencies = [
 [[package]]
 name = "aa-proto"
 version = "0.0.1-beta.2"
-source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=9cde1d83e4114114bd49c9546d4fa5d86d6cbd32#9cde1d83e4114114bd49c9546d4fa5d86d6cbd32"
+source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=fdff8e402e83f01bda3fbbf1f3f7f831b391b62b#fdff8e402e83f01bda3fbbf1f3f7f831b391b62b"
 dependencies = [
  "prost",
  "tonic",
@@ -30,7 +30,7 @@ dependencies = [
 [[package]]
 name = "aa-sdk-client"
 version = "0.0.1-beta.2"
-source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=9cde1d83e4114114bd49c9546d4fa5d86d6cbd32#9cde1d83e4114114bd49c9546d4fa5d86d6cbd32"
+source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=fdff8e402e83f01bda3fbbf1f3f7f831b391b62b#fdff8e402e83f01bda3fbbf1f3f7f831b391b62b"
 dependencies = [
  "aa-proto",
  "aa-security",
@@ -47,7 +47,7 @@ dependencies = [
 [[package]]
 name = "aa-security"
 version = "0.0.1-beta.2"
-source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=9cde1d83e4114114bd49c9546d4fa5d86d6cbd32#9cde1d83e4114114bd49c9546d4fa5d86d6cbd32"
+source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=fdff8e402e83f01bda3fbbf1f3f7f831b391b62b#fdff8e402e83f01bda3fbbf1f3f7f831b391b62b"
 dependencies = [
  "aho-corasick",
 ]

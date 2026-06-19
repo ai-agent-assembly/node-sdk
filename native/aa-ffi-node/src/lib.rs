@@ -59,6 +59,8 @@ pub async fn connect(socket_path: String) -> Result<ClientHandle> {
     agent_id: String::new(),
     socket_path: Some(socket_path),
     gateway_endpoint: None,
+    team_id: None,
+    parent_agent_id: None,
   };
   let resolved = config.resolve_socket_path();
 
@@ -78,12 +80,19 @@ pub async fn connect(socket_path: String) -> Result<ClientHandle> {
 /// are descriptive metadata the gateway records. `gatewayEndpoint` overrides the
 /// gateway gRPC endpoint (default resolved from `AA_GATEWAY_ENDPOINT` or
 /// `http://127.0.0.1:50051`).
+///
+/// `teamId` and `parentAgentId` carry the agent's lineage/team scoping to the
+/// gateway on register (AAASM-3415): `teamId` drives team-budget attribution
+/// and `parentAgentId` the topology graph. Both are optional — omit for a
+/// team-unscoped / root agent.
 #[napi(object)]
 pub struct RegisterOptions {
   pub agent_id: String,
   pub name: String,
   pub framework: String,
   pub gateway_endpoint: Option<String>,
+  pub team_id: Option<String>,
+  pub parent_agent_id: Option<String>,
 }
 
 /// Register this agent with the governance gateway and store the issued
@@ -106,6 +115,8 @@ pub async fn register(handle: &ClientHandle, options: RegisterOptions) -> Result
     agent_id: options.agent_id,
     socket_path: None,
     gateway_endpoint: options.gateway_endpoint,
+    team_id: options.team_id,
+    parent_agent_id: options.parent_agent_id,
   };
 
   handle

@@ -23,12 +23,19 @@ interface NativePolicyDecision {
  * Options for the native `register` primitive (AAASM-3400). `agentId` is the
  * identity the gateway registers; `name` / `framework` are descriptive
  * metadata; `gatewayEndpoint` overrides the gateway gRPC endpoint.
+ *
+ * `teamId` and `parentAgentId` carry the agent's lineage/team scoping to the
+ * gateway on register (AAASM-3415): `teamId` drives team-budget attribution and
+ * `parentAgentId` the topology graph. Both optional — omit for a team-unscoped
+ * / root agent.
  */
 export interface RegisterOptions {
   agentId: string;
   name: string;
   framework: string;
   gatewayEndpoint?: string;
+  teamId?: string;
+  parentAgentId?: string;
 }
 
 interface NativeBinding {
