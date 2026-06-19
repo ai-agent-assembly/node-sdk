@@ -86,12 +86,19 @@ export declare function register(handle: ClientHandle, options: RegisterOptions)
  * are descriptive metadata the gateway records. `gatewayEndpoint` overrides the
  * gateway gRPC endpoint (default resolved from `AA_GATEWAY_ENDPOINT` or
  * `http://127.0.0.1:50051`).
+ *
+ * `teamId` and `parentAgentId` carry the agent's lineage/team scoping to the
+ * gateway on register (AAASM-3415): `teamId` drives team-budget attribution
+ * and `parentAgentId` the topology graph. Both are optional — omit for a
+ * team-unscoped / root agent.
  */
 export interface RegisterOptions {
   agentId: string
   name: string
   framework: string
   gatewayEndpoint?: string
+  teamId?: string
+  parentAgentId?: string
 }
 
 /**
