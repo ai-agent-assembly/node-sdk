@@ -20,13 +20,15 @@ crate-type = ["cdylib"]
 # the agent-assembly workspace; `query_policy` builds a `CheckActionRequest`
 # and reads its `CheckActionResponse` directly from these generated types.
 #
-# Pinned at agent-assembly master 9cde1d83 (AAASM-3396), which adds
+# Pinned at the agent-assembly AAASM-3415 branch tip, which adds the
+# `team_id` / `parent_agent_id` fields to `AssemblyConfig` that `register`
+# now forwards onto the native gRPC Register (team-budget attribution +
+# topology lineage). The base 9cde1d83 (AAASM-3396) added
 # `AssemblyClient::register()` (the one direct SDK→gateway gRPC call, per ADR
-# 0004) and makes `query_policy()` attach the registration `credential_token`
-# so the gateway does not deny a registered agent. That commit also adds the
-# `gateway_endpoint` field to `AssemblyConfig`, consumed by `register`.
-aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "9cde1d83e4114114bd49c9546d4fa5d86d6cbd32", package = "aa-sdk-client" }
-aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "9cde1d83e4114114bd49c9546d4fa5d86d6cbd32", package = "aa-proto" }
+# 0004) plus the `gateway_endpoint` field. Move this to the squash-merge
+# commit once agent-assembly PR #1160 lands.
+aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "209572bcac450adbdceef451d36e4712b8b3a66f", package = "aa-sdk-client" }
+aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "209572bcac450adbdceef451d36e4712b8b3a66f", package = "aa-proto" }
 napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "3"
 prost = "0.14"
