@@ -6,7 +6,7 @@ version = 4
 name = "aa-ffi-node"
 version = "0.0.0"
 dependencies = [
- "aa-proto 0.0.1-beta.3 (git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=fdff8e402e83f01bda3fbbf1f3f7f831b391b62b)",
+ "aa-proto",
  "aa-sdk-client",
  "napi",
  "napi-build",
@@ -28,22 +28,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "aa-proto"
-version = "0.0.1-beta.3"
-source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=fdff8e402e83f01bda3fbbf1f3f7f831b391b62b#ebc4d7dc9da81cdf4f265d681c138500ca6e98e7"
-dependencies = [
- "prost",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
-]
-
-[[package]]
 name = "aa-sdk-client"
 version = "0.0.1-beta.3"
 source = "git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=ebc4d7dc9da81cdf4f265d681c138500ca6e98e7#ebc4d7dc9da81cdf4f265d681c138500ca6e98e7"
 dependencies = [
- "aa-proto 0.0.1-beta.3 (git+https://github.com/ai-agent-assembly/agent-assembly.git?rev=ebc4d7dc9da81cdf4f265d681c138500ca6e98e7)",
+ "aa-proto",
  "aa-security",
  "bs58",
  "ed25519-dalek",
