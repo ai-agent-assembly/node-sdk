@@ -1,6 +1,16 @@
 export { initAssembly } from "./core/init-assembly.js";
 export { withAssembly } from "./wrappers/index.js";
-export type { WithAssemblyOptions } from "./wrappers/index.js";
+export type { OpControl, WithAssemblyOptions } from "./wrappers/index.js";
+// Live op-control consumer (AAASM-3491). Subscribes to the gateway's
+// OpControlStream and exposes per-op cooperative-pause / fast-fail-terminate;
+// pass the subscriber as `withAssembly(..., { opControl })` so an operator
+// terminate/pause reaches a running tool through the SDK tool path.
+export { OpControlSubscriber } from "./op-control.js";
+export type {
+  OpControlClient,
+  OpControlSubscriberOptions
+} from "./op-control.js";
+export { OpTerminatedError } from "./errors/op-terminated-error.js";
 export type {
   AssemblyConfig,
   AssemblyContext,
