@@ -16,13 +16,15 @@ name: release-node
 #            produces the aasm-{rust-target}.tar.gz assets consumed here)
 
 on:
-  # Listen for agent-assembly's release.yml `notify-downstream` job firing a
-  # repository_dispatch after the Release object is published. This replaces
-  # the prior `push: tags` trigger which raced agent-assembly's release
-  # pipeline and required the AAASM-2328 retry workaround.
-  # AAASM-2336.
-  repository_dispatch:
-    types: [agent-assembly-release-published]
+  # Operator-dispatch only. The Node SDK versions independently of the
+  # agent-assembly core, so the npm version must NOT be derived from a core
+  # release tag. Auto-publishing on the core `agent-assembly-release-published`
+  # repository_dispatch set npm_version from the core tag and forced a real
+  # publish, which npm rejected as a duplicate every core release (AAASM-3503).
+  # Per the AAASM-3007 SOP, an SDK release must wait for the FFI-pin PR merge
+  # and be operator-driven via workflow_dispatch. The core's separate
+  # update-node-sdk-ffi-pin PR job handles the FFI-pin handoff, so dropping
+  # this trigger loses nothing.
   workflow_dispatch:
     inputs:
       npm_version:
@@ -86,7 +88,6 @@ jobs:
           DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
           DISPATCH_PUBLISH_MODE: ${{ inputs.publish_mode }}
           DISPATCH_DRY_RUN: ${{ inputs.dry-run }}
-          DISPATCH_PAYLOAD_TAG: ${{ github.event.client_payload.release_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -106,21 +107,12 @@ jobs:
             # legacy dispatch behavior is preserved when the operator does
             # not tick the checkbox.
             dry_run="$DISPATCH_DRY_RUN"
-          elif [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
-            # Coordinated release path. Both come from the same dispatched tag.
-            # publish_mode is hard-coded to 'all' — coordinated releases always
-            # publish the full 5-package set.
-            binary_source_tag="$DISPATCH_PAYLOAD_TAG"
-            npm_version="${DISPATCH_PAYLOAD_TAG#v}"
-            publish_mode="all"
-            # Coordinated releases from agent-assembly's notify-downstream job
-            # must ALWAYS publish for real. Hard-coding dry_run='false' here
-            # makes this regression-safe: even if a future workflow change
-            # adds a new dry-run code path, repository_dispatch will continue
-            # to publish.
-            dry_run="false"
           else
-            echo "::error::unexpected event_name '$EVENT_NAME' — release-node should only fire on repository_dispatch or workflow_dispatch"
+            # AAASM-3503: this workflow is workflow_dispatch-only. The
+            # auto-publish repository_dispatch path was removed because it
+            # derived npm_version from the core tag and forced a publish npm
+            # rejected as a duplicate every core release.
+            echo "::error::unexpected event_name '$EVENT_NAME' — release-node is workflow_dispatch-only"
             exit 1
           fi
           if [[ ! "$binary_source_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
@@ -236,10 +228,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p bin-staging
-          # AAASM-2336: this workflow fires on repository_dispatch from
-          # agent-assembly's `notify-downstream` job AFTER its Release object
-          # is published. So `gh release download` is guaranteed to find the
-          # assets on the first try — no retry needed.
+          # The operator points binary_source_tag at a published agent-assembly
+          # release, so `gh release download` finds the aasm-* assets that were
+          # uploaded when that release was cut.
           gh release download "$RELEASE_TAG" \
             --repo ai-agent-assembly/agent-assembly \
             --pattern "aasm-*.tar.gz" \
@@ -316,8 +307,7 @@ jobs:
       - name: Publish 4 runtime sub-packages
         # AAASM-2862: combine the existing publish_mode gate with a dry_run
         # gate. workflow_dispatch with dry-run=true must skip every step
-        # that mutates the npm registry; coordinated repository_dispatch
-        # hard-codes dry_run='false' upstream so this stays a no-op there.
+        # that mutates the npm registry.
         if: steps.tag.outputs.publish_mode == 'all' && steps.tag.outputs.dry_run != 'true'
         env:
           NPM_CONFIG_PROVENANCE: "true"
@@ -344,8 +334,7 @@ jobs:
         # AAASM-2862: this step previously had no `if:` (it runs in BOTH
         # publish_mode='all' and 'main-only'). Gate ONLY on dry_run so
         # both modes still skip cleanly when the operator dispatches with
-        # dry-run=true. repository_dispatch hard-codes dry_run='false' so
-        # coordinated releases continue to publish.
+        # dry-run=true.
         if: steps.tag.outputs.dry_run != 'true'
         env:
           NPM_CONFIG_PROVENANCE: "true"
@@ -406,8 +395,7 @@ jobs:
     needs: publish
     # AAASM-2862: don't cut an immutable docs snapshot for a version that
     # was never published. Skip the entire docs-version job when the
-    # publish job ran in dry-run mode. repository_dispatch hard-codes
-    # dry_run='false' upstream so coordinated releases still cut snapshots.
+    # publish job ran in dry-run mode.
     if: needs.publish.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
