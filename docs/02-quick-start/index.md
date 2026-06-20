@@ -19,11 +19,11 @@ npm install @agent-assembly/sdk
 The package ships dual ESM/CJS entries and selects a prebuilt native binding for your
 platform during `postinstall`, so there is no extra build step for typical consumers.
 
-:::note Pre-1.0 / alpha
-The current release line is `0.0.1-alpha.x`, published under the npm `alpha`
+:::note Pre-1.0 / beta
+The current release line is `0.0.1-beta.x`, published under the npm `beta`
 dist-tag. The public surface (`initAssembly`, `withAssembly`) is stabilizing but may
-change between alpha releases. Pin an exact version for reproducible installs:
-`npm install @agent-assembly/sdk@0.0.1-alpha.3`.
+change between pre-releases. Pin an exact version for reproducible installs:
+`npm install @agent-assembly/sdk@0.0.1-beta.4`.
 :::
 
 ## 2. Make sure a gateway is reachable
