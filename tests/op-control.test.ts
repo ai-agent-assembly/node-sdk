@@ -16,7 +16,7 @@ import {
   OpControlSubscriber,
   gatewayHostOf,
   resolveOpControlCredentials,
-  type OpControlClient,
+  type OpControlClient
 } from "../src/op-control.js";
 import { type OpControlMessage, OpControlSignal } from "../src/proto/generated/policy.js";
 
@@ -48,7 +48,7 @@ class FakeStream extends EventEmitter {
 
 function makeClient(stream: FakeStream): OpControlClient & { lastRequest?: { agentId?: unknown } } {
   const wrapper: { stream: FakeStream; lastRequest?: { agentId?: unknown } } = {
-    stream,
+    stream
   };
   return {
     stream: wrapper.stream as unknown as never, // unused field for inspection
@@ -59,7 +59,7 @@ function makeClient(stream: FakeStream): OpControlClient & { lastRequest?: { age
       wrapper.lastRequest = request;
       // Cast: vitest doesn't care that FakeStream isn't the exact grpc-js type.
       return stream as never;
-    },
+    }
   } as unknown as OpControlClient & { lastRequest?: { agentId?: unknown } };
 }
 
@@ -67,13 +67,16 @@ function message(opId: string, signal: OpControlSignal, sequence = 0): OpControl
   return { opId, signal, sequence };
 }
 
-function buildSubscriber(stream: FakeStream): { sub: OpControlSubscriber; client: ReturnType<typeof makeClient> } {
+function buildSubscriber(stream: FakeStream): {
+  sub: OpControlSubscriber;
+  client: ReturnType<typeof makeClient>;
+} {
   const client = makeClient(stream);
   const sub = OpControlSubscriber.connect("ignored", {
     orgId: "org",
     teamId: "team",
     agentId: "agent-7",
-    clientFactory: () => client,
+    clientFactory: () => client
   });
   return { sub, client };
 }
@@ -137,7 +140,7 @@ describe("OpControlSubscriber", () => {
 
     await expect(sub.waitForOp("op-2")).rejects.toMatchObject({
       name: "OpTerminatedError",
-      opId: "op-2",
+      opId: "op-2"
     });
 
     sub.close();
@@ -186,7 +189,7 @@ describe("OpControlSubscriber", () => {
     expect(client.lastRequest?.agentId).toEqual({
       orgId: "org",
       teamId: "team",
-      agentId: "agent-7",
+      agentId: "agent-7"
     });
   });
 
@@ -227,7 +230,7 @@ describe("gatewayHostOf", () => {
     ["gateway.prod.example:443", "gateway.prod.example"],
     ["https://gateway.prod.example:443/path", "gateway.prod.example"],
     ["[::1]:7391", "[::1]"],
-    ["GATEWAY.PROD.EXAMPLE", "gateway.prod.example"],
+    ["GATEWAY.PROD.EXAMPLE", "gateway.prod.example"]
   ])("extracts the host from %s", (target, host) => {
     expect(gatewayHostOf(target)).toBe(host);
   });
@@ -239,23 +242,37 @@ describe("resolveOpControlCredentials (secure by default)", () => {
     (c as unknown as { _isSecure(): boolean })._isSecure();
 
   it("uses plaintext for a loopback target without any opt-in", () => {
-    expect(isSecure(resolveOpControlCredentials("localhost:7391", {}))).toBe(false);
-    expect(isSecure(resolveOpControlCredentials("127.0.0.1:7391", {}))).toBe(false);
-    expect(isSecure(resolveOpControlCredentials("[::1]:7391", {}))).toBe(false);
+    expect(isSecure(resolveOpControlCredentials("localhost:7391", {}, grpcCredentials))).toBe(
+      false
+    );
+    expect(isSecure(resolveOpControlCredentials("127.0.0.1:7391", {}, grpcCredentials))).toBe(
+      false
+    );
+    expect(isSecure(resolveOpControlCredentials("[::1]:7391", {}, grpcCredentials))).toBe(false);
   });
 
   it("defaults a remote target to TLS", () => {
-    expect(isSecure(resolveOpControlCredentials("gateway.prod.example:443", {}))).toBe(true);
+    expect(
+      isSecure(resolveOpControlCredentials("gateway.prod.example:443", {}, grpcCredentials))
+    ).toBe(true);
   });
 
   it("only allows plaintext to a remote target when allowInsecure is set", () => {
     expect(
-      isSecure(resolveOpControlCredentials("gateway.prod.example:443", { allowInsecure: true })),
+      isSecure(
+        resolveOpControlCredentials(
+          "gateway.prod.example:443",
+          { allowInsecure: true },
+          grpcCredentials
+        )
+      )
     ).toBe(false);
   });
 
   it("honours an explicit credentials override verbatim", () => {
     const explicit = grpcCredentials.createSsl();
-    expect(resolveOpControlCredentials("localhost:7391", { credentials: explicit })).toBe(explicit);
+    expect(
+      resolveOpControlCredentials("localhost:7391", { credentials: explicit }, grpcCredentials)
+    ).toBe(explicit);
   });
 });
