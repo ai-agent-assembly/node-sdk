@@ -122,6 +122,27 @@ system. The matrix is enforced by `.github/workflows/test-matrix.yml`:
 Older Node.js lines (≤ 16) are unsupported because the napi-rs ABI used by the native
 binding requires Node 18.18 or newer.
 
+## Framework compatibility
+
+`initAssembly()` auto-detects and governs the agent frameworks below. Each is an
+**optional** peer dependency — the SDK works without any of them installed, and only
+hooks into the ones it finds at runtime. The version floors are the major lines the
+governance hooks are built against and verified in the cross-repo live smokes; newer
+releases on the same major line are expected to work.
+
+| Framework     | Peer dependency        | Supported range |
+| ------------- | ---------------------- | --------------- |
+| LangChain.js  | `@langchain/core`      | `>=0.3.0`       |
+| LangGraph.js  | `@langchain/langgraph` | `>=1.0.0`       |
+| Vercel AI SDK | `ai`                   | `>=5.0.0`       |
+| Mastra        | `@mastra/core`         | `>=0.20.0`      |
+| OpenAI Agents | `@openai/agents`       | `>=0.1.0`       |
+
+These ranges are the Node SDK's view of the support matrix. The canonical, product-wide
+framework compatibility matrix lives in the core documentation:
+[Framework compatibility](https://ai-agent-assembly.github.io/agent-assembly/stable/reference/framework-compatibility.html)
+(the `/stable/` link goes live at GA).
+
 ## How it works
 
 The SDK is a thin TypeScript wrapper around the Agent Assembly Rust runtime. It reaches
@@ -136,16 +157,16 @@ call is checked against policy before it runs.
 
 ## What the package exports
 
-| Export | Purpose |
-| ------ | ------- |
-| `initAssembly(config)` | Set up governance and auto-wire detected frameworks. The main entrypoint. |
-| `withAssembly(tools, options)` | Lower-level wrapper to govern a tool map when you manage the gateway client yourself. |
-| `createNoopGatewayClient(mode)` | Build an allow-all `GatewayClient` for offline demos and tests, or as a base to wrap. |
-| `PolicyViolationError` | Thrown by a governed tool when the gateway client denies the call. |
-| `currentAgentId()`, `runWithAgentId()` | Read and set the active agent id in the async-context lineage store. |
-| `encodeAuditEvent()` / `decodeAuditEvent()` (and the call-stack codecs) | Encode and decode audit events to and from their wire shape. |
-| `findAasmBinary()`, `INSTALL_HINT` | Locate the bundled `aasm` runtime binary and the install hint shown when it is missing. |
-| `ENFORCEMENT_MODES` | The allowed `enforcementMode` values. |
+| Export                                                                  | Purpose                                                                                 |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `initAssembly(config)`                                                  | Set up governance and auto-wire detected frameworks. The main entrypoint.               |
+| `withAssembly(tools, options)`                                          | Lower-level wrapper to govern a tool map when you manage the gateway client yourself.   |
+| `createNoopGatewayClient(mode)`                                         | Build an allow-all `GatewayClient` for offline demos and tests, or as a base to wrap.   |
+| `PolicyViolationError`                                                  | Thrown by a governed tool when the gateway client denies the call.                      |
+| `currentAgentId()`, `runWithAgentId()`                                  | Read and set the active agent id in the async-context lineage store.                    |
+| `encodeAuditEvent()` / `decodeAuditEvent()` (and the call-stack codecs) | Encode and decode audit events to and from their wire shape.                            |
+| `findAasmBinary()`, `INSTALL_HINT`                                      | Locate the bundled `aasm` runtime binary and the install hint shown when it is missing. |
+| `ENFORCEMENT_MODES`                                                     | The allowed `enforcementMode` values.                                                   |
 
 Type-only exports (`AssemblyConfig`, `AssemblyContext`, `AssemblyMode`, `EnforcementMode`,
 `ToolMap`, `GatewayClient`, the `Gateway*` governance types, and friends) are documented in
@@ -157,11 +178,7 @@ the [API reference](https://ai-agent-assembly.github.io/node-sdk/api-reference).
 in-process policies you can build one yourself — no running gateway required:
 
 ```ts
-import {
-  createNoopGatewayClient,
-  withAssembly,
-  type GatewayClient
-} from "@agent-assembly/sdk";
+import { createNoopGatewayClient, withAssembly, type GatewayClient } from "@agent-assembly/sdk";
 
 // Allow-all client — handy for offline smoke tests:
 withAssembly(
@@ -285,15 +302,15 @@ and is re-published on every push to `master` via the `publish-docs.yml` workflo
 decisions it enforces are made by the core Rust runtime; the protocol it speaks is shared
 across all SDKs.
 
-| Project                                                                        | What it is                                                                                                    |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| [agent-assembly](https://github.com/ai-agent-assembly/agent-assembly)          | Core Rust runtime — gateway, policy engine, proxy, eBPF, CLI (`aasm`). The protocol specification lives here. |
-| [Documentation site](https://ai-agent-assembly.github.io/agent-assembly-docs/) | Canonical, cross-repo documentation for the whole platform.                                                   |
-| [python-sdk](https://github.com/ai-agent-assembly/python-sdk)                  | Sibling SDK for Python.                                                                                       |
-| [go-sdk](https://github.com/ai-agent-assembly/go-sdk)                          | Sibling SDK for Go.                                                                                           |
+| Project                                                                                 | What it is                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [agent-assembly](https://github.com/ai-agent-assembly/agent-assembly)                   | Core Rust runtime — gateway, policy engine, proxy, eBPF, CLI (`aasm`). The protocol specification lives here.                                                                     |
+| [Documentation site](https://ai-agent-assembly.github.io/agent-assembly-docs/)          | Canonical, cross-repo documentation for the whole platform.                                                                                                                       |
+| [python-sdk](https://github.com/ai-agent-assembly/python-sdk)                           | Sibling SDK for Python.                                                                                                                                                           |
+| [go-sdk](https://github.com/ai-agent-assembly/go-sdk)                                   | Sibling SDK for Go.                                                                                                                                                               |
 | [agent-assembly-examples](https://github.com/ai-agent-assembly/agent-assembly-examples) | Runnable examples — learn by running small, framework-specific Node.js/TypeScript (and Python/Go) samples for policy enforcement, approvals, audit, trace, and runtime workflows. |
-| [Release notes](https://github.com/ai-agent-assembly/node-sdk/releases)        | Per-version changelog for this package.                                                                       |
-| [Organization profile](https://github.com/ai-agent-assembly)                   | Index of every Agent Assembly repository and its status.                                                      |
+| [Release notes](https://github.com/ai-agent-assembly/node-sdk/releases)                 | Per-version changelog for this package.                                                                                                                                           |
+| [Organization profile](https://github.com/ai-agent-assembly)                            | Index of every Agent Assembly repository and its status.                                                                                                                          |
 
 ## Support & security
 
