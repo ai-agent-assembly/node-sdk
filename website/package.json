@@ -29,6 +29,7 @@
     "@docusaurus/module-type-aliases": "3.10.1",
     "@docusaurus/tsconfig": "3.10.1",
     "@docusaurus/types": "3.10.1",
+    "@easyops-cn/docusaurus-search-local": "^0.55.2",
     "@types/react": "^19.2.17",
     "docusaurus-plugin-typedoc": "^1.4.2",
     "typedoc": "^0.28.19",
