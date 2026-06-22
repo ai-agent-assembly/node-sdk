@@ -1,0 +1,63 @@
+/**
+ * "Was this page helpful?" feedback widget styles (AAASM-3555).
+ *
+ * The widget is appended to the bottom of each doc page's <article> by
+ * feedbackWidget.ts. Layout uses the same Infima design tokens as the rest of
+ * the site so it adapts to light/dark automatically.
+ */
+
+.feedbackWidget {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--ifm-toc-border-color);
+}
+
+.feedbackWidget__heading {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.feedbackWidget__buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.feedbackWidget__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ifm-font-color-base);
+  background-color: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-button-border-radius, 0.4rem);
+  cursor: pointer;
+  transition:
+    border-color var(--ifm-transition-fast, 200ms),
+    background-color var(--ifm-transition-fast, 200ms);
+}
+
+.feedbackWidget__button:hover {
+  border-color: var(--ifm-color-primary);
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+.feedbackWidget__button:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+.feedbackWidget__ack {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.feedbackWidget__improve {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
