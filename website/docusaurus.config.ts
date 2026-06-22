@@ -131,6 +131,13 @@ const config: Config = {
         theme: {
           customCss: "./src/css/custom.css",
         },
+        // Google Analytics 4 (AAASM-3552). Built-in gtag support shipped by
+        // preset-classic — no extra dependency. `anonymizeIP` truncates the
+        // visitor IP before it reaches Google. The Measurement ID is public.
+        gtag: {
+          trackingID: "G-6FHQKGLDE4",
+          anonymizeIP: true,
+        },
       } satisfies Preset.Options,
     ],
   ],
