@@ -93,6 +93,11 @@ const config: Config = {
   clientModules: [
     require.resolve("./src/analytics/gtagRouteTracker.ts"),
     require.resolve("./src/analytics/consentBanner.ts"),
+    // "Was this page helpful? 👍 / 👎" doc feedback widget (AAASM-3555). A
+    // client module rather than a DocItem/Footer swizzle: Docusaurus flags
+    // wrap-swizzling that internal component as unsafe (`--danger` required).
+    // The widget reuses the self-managed `window.gtag` from AAASM-3552/3554.
+    require.resolve("./src/analytics/feedbackWidget.ts"),
   ],
 
   markdown: {
