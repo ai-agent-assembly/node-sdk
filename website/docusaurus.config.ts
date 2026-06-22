@@ -32,7 +32,25 @@ const config: Config = {
       onBrokenMarkdownLinks: "throw",
     },
   },
-  themes: ["@docusaurus/theme-mermaid"],
+  themes: [
+    "@docusaurus/theme-mermaid",
+    // Offline/local search (AAASM-3550). Indexes the docs at build time and
+    // ships a client-side search box — zero external service. Docs are served
+    // at the site root (`routeBasePath: "/"`) and there is no blog, so point
+    // the indexer at `/` and disable blog indexing. `hashed` adds a content
+    // hash to the index URL for long-term browser caching.
+    [
+      require.resolve("@easyops-cn/docusaurus-search-local"),
+      {
+        hashed: true,
+        indexDocs: true,
+        indexBlog: false,
+        indexPages: false,
+        docsRouteBasePath: "/",
+        language: ["en"],
+      },
+    ],
+  ],
 
   plugins: [
     [
