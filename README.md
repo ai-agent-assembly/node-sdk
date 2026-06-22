@@ -124,23 +124,16 @@ binding requires Node 18.18 or newer.
 
 ## Framework compatibility
 
-`initAssembly()` auto-detects and governs the agent frameworks below. Each is an
-**optional** peer dependency — the SDK works without any of them installed, and only
-hooks into the ones it finds at runtime. The version floors are the major lines the
-governance hooks are built against and verified in the cross-repo live smokes; newer
-releases on the same major line are expected to work.
+`initAssembly()` auto-detects and governs five optional framework integrations
+(LangChain.js, LangGraph.js, Vercel AI SDK, Mastra, OpenAI Agents). The full table —
+each framework's optional peer dependency, supported version range, and current status
+(including the [known Vercel AI SDK caveat](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532)) —
+is the **authoritative** reference and lives on the docs site:
+[Framework compatibility](https://ai-agent-assembly.github.io/node-sdk/compatibility-versioning/compatibility).
 
-| Framework     | Peer dependency        | Supported range |
-| ------------- | ---------------------- | --------------- |
-| LangChain.js  | `@langchain/core`      | `>=0.3.0`       |
-| LangGraph.js  | `@langchain/langgraph` | `>=1.0.0`       |
-| Vercel AI SDK | `ai`                   | `>=5.0.0`       |
-| Mastra        | `@mastra/core`         | `>=0.20.0`      |
-| OpenAI Agents | `@openai/agents`       | `>=0.1.0`       |
-
-These ranges are the Node SDK's view of the support matrix. The canonical, product-wide
-framework compatibility matrix lives in the core documentation:
-[Framework compatibility](https://ai-agent-assembly.github.io/agent-assembly/stable/reference/framework-compatibility.html)
+For the product-wide, cross-SDK index/hub that links every language SDK's matrix, see the
+core documentation:
+[Framework compatibility index](https://ai-agent-assembly.github.io/agent-assembly/stable/reference/framework-compatibility.html)
 (the `/stable/` link goes live at GA).
 
 ## How it works
