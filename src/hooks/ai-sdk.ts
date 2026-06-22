@@ -14,13 +14,27 @@ export interface VercelAiSdkModule {
 export interface VercelAiSdkPatchState {
   isPatched: boolean;
   originalToolFactory: VercelAiToolFactory | undefined;
+  /**
+   * The module object whose `tool` factory is governed. When the loaded `ai`
+   * package is a real ES module its namespace is frozen (assignment to a named
+   * export throws), so this is a mutable **shim copy** (`{ ...module, tool:
+   * governed }`) rather than the frozen original — see `applyGovernedToolFactory`.
+   */
   patchedModule: VercelAiSdkModule | undefined;
+  /**
+   * True only when `tool` was assigned back onto the loaded module object (a
+   * writable plain object); false when a frozen ESM namespace forced a shim copy.
+   * Governs whether `unpatchVercelAiSdk` writes the original factory back —
+   * there is nothing to restore on the frozen original in the shim case.
+   */
+  mutatedOriginal: boolean;
 }
 
 export const vercelAiSdkPatchState: VercelAiSdkPatchState = {
   isPatched: false,
   originalToolFactory: undefined,
-  patchedModule: undefined
+  patchedModule: undefined,
+  mutatedOriginal: false
 };
 
 export function captureOriginalToolFactory(
@@ -154,6 +168,39 @@ export interface PatchVercelAiSdkOptions {
   loadModule?: () => Promise<VercelAiSdkModule | undefined>;
 }
 
+/**
+ * Install `governed` as the module's `tool` factory without ever assigning to a
+ * frozen ESM namespace.
+ *
+ * A real `ai` package loaded via `import()` is an ES module: its namespace is an
+ * exotic object whose named exports are non-writable, so `module.tool = …` throws
+ * `Cannot assign to read only property 'tool'` (AAASM-3532). We therefore attempt
+ * the in-place assignment only as a fast path for writable plain objects (the
+ * shape used by the unit suite's `loadModule` fakes) and fall back to a mutable
+ * **shim copy** for the frozen-namespace case — the same `{ tool: aiModule.tool }`
+ * shim the AAASM-3525 integration driver proved works. The returned module is what
+ * downstream consumers read the governed factory from (`patchedModule.tool`).
+ */
+function applyGovernedToolFactory(
+  module: VercelAiSdkModule,
+  governed: VercelAiToolFactory
+): { patchedModule: VercelAiSdkModule; mutatedOriginal: boolean } {
+  if (Object.isExtensible(module)) {
+    try {
+      module.tool = governed;
+      return { patchedModule: module, mutatedOriginal: true };
+    } catch {
+      // Some non-extensible-but-reported-extensible exotic objects still reject
+      // the write; fall through to the shim copy below.
+    }
+  }
+
+  return {
+    patchedModule: { ...module, tool: governed },
+    mutatedOriginal: false
+  };
+}
+
 async function loadVercelAiSdkModule(): Promise<VercelAiSdkModule | undefined> {
   try {
     const moduleName = "ai";
@@ -182,7 +229,7 @@ export async function patchVercelAiSdk(
     return false;
   }
 
-  module.tool = createPatchedToolFactory(
+  const governed = createPatchedToolFactory(
     originalToolFactory,
     options.gatewayClient,
     {
@@ -191,8 +238,15 @@ export async function patchVercelAiSdk(
       ...(options.agentId === undefined ? {} : { agentId: options.agentId })
     }
   );
+
+  const { patchedModule, mutatedOriginal } = applyGovernedToolFactory(
+    module,
+    governed
+  );
+
   vercelAiSdkPatchState.isPatched = true;
-  vercelAiSdkPatchState.patchedModule = module;
+  vercelAiSdkPatchState.patchedModule = patchedModule;
+  vercelAiSdkPatchState.mutatedOriginal = mutatedOriginal;
   return true;
 }
 
@@ -207,9 +261,15 @@ export function unpatchVercelAiSdk(): boolean {
     return false;
   }
 
-  vercelAiSdkPatchState.patchedModule.tool =
-    vercelAiSdkPatchState.originalToolFactory;
+  // Only restore when we mutated a writable module in place. For the frozen-ESM
+  // shim path the original `ai` namespace was never touched, so there is nothing
+  // to write back — and attempting it would re-throw the AAASM-3532 crash.
+  if (vercelAiSdkPatchState.mutatedOriginal) {
+    vercelAiSdkPatchState.patchedModule.tool =
+      vercelAiSdkPatchState.originalToolFactory;
+  }
   vercelAiSdkPatchState.isPatched = false;
   vercelAiSdkPatchState.patchedModule = undefined;
+  vercelAiSdkPatchState.mutatedOriginal = false;
   return true;
 }
