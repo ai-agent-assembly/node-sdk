@@ -8,6 +8,16 @@ import type * as Preset from "@docusaurus/preset-classic";
 // is cut, so they live in data, not inline. See ../docs/releasing.md.
 import versionChannels from "./versionChannels.json";
 
+// Google Analytics + GDPR consent gating (AAASM-3554, fast-follow to
+// AAASM-3552). We self-manage the gtag init instead of using preset-classic's
+// `gtag` option so the Consent-Mode default-denied state is guaranteed to be
+// in place BEFORE the first GA hit. See ./src/analytics/consentInit.ts.
+import {
+  GA_MEASUREMENT_ID,
+  consentDefaultScript,
+  gtagConfigScript,
+} from "./src/analytics/consentInit";
+
 const config: Config = {
   title: "@agent-assembly/sdk",
   tagline: "TypeScript and Node.js SDK for Agent Assembly",
@@ -25,6 +35,65 @@ const config: Config = {
 
   onBrokenLinks: "throw",
   onBrokenAnchors: "throw",
+
+  // Self-managed Google Analytics with Consent Mode v2 (AAASM-3554).
+  //
+  // These two <head> scripts replace preset-classic's `gtag` option. They are
+  // injected in array order at the position of `<%~ it.headTags %>` in the SSG
+  // template — i.e. before the deferred app bundle and before any GA hit:
+  //
+  //   1. consentDefaultScript — defines `dataLayer`/`gtag`, sets Consent-Mode
+  //      default to DENIED for analytics + ads storage, then restores a stored
+  //      opt-in. This MUST run first so GA writes no cookie until opt-in.
+  //   2. the gtag.js loader (async) + gtagConfigScript — loads gtag and fires
+  //      `gtag('config', ...)` (the first hit), which now respects the
+  //      already-denied default above.
+  //
+  // Owning the whole init (rather than relying on `config.headTags`, which
+  // Docusaurus appends AFTER plugin head tags) is what guarantees the
+  // deny-before-hit ordering. The opt-in banner lives in clientModules below.
+  headTags: [
+    {
+      tagName: "script",
+      attributes: {},
+      innerHTML: consentDefaultScript,
+    },
+    {
+      tagName: "link",
+      attributes: {
+        rel: "preconnect",
+        href: "https://www.google-analytics.com",
+      },
+    },
+    {
+      tagName: "link",
+      attributes: {
+        rel: "preconnect",
+        href: "https://www.googletagmanager.com",
+      },
+    },
+    {
+      tagName: "script",
+      attributes: {
+        // headTags config validation requires string attribute values.
+        async: "true",
+        src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`,
+      },
+    },
+    {
+      tagName: "script",
+      attributes: {},
+      innerHTML: gtagConfigScript,
+    },
+  ],
+
+  // Vanilla-JS opt-in cookie-consent banner + SPA page-view tracker
+  // (AAASM-3554). The tracker replaces the route tracking we lose by not using
+  // the preset `gtag` plugin.
+  clientModules: [
+    require.resolve("./src/analytics/gtagRouteTracker.ts"),
+    require.resolve("./src/analytics/consentBanner.ts"),
+  ],
 
   markdown: {
     mermaid: true,
@@ -131,13 +200,9 @@ const config: Config = {
         theme: {
           customCss: "./src/css/custom.css",
         },
-        // Google Analytics 4 (AAASM-3552). Built-in gtag support shipped by
-        // preset-classic — no extra dependency. `anonymizeIP` truncates the
-        // visitor IP before it reaches Google. The Measurement ID is public.
-        gtag: {
-          trackingID: "G-6FHQKGLDE4",
-          anonymizeIP: true,
-        },
+        // Google Analytics 4 is initialised via `headTags` above (AAASM-3554)
+        // instead of preset-classic's `gtag` option, so the Consent-Mode
+        // default-denied init is guaranteed to run before the first GA hit.
       } satisfies Preset.Options,
     ],
   ],
