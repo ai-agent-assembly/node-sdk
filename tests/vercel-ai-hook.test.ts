@@ -402,4 +402,5 @@ async function resetPatchState(): Promise<void> {
   hooks.vercelAiSdkPatchState.originalToolFactory = undefined;
   hooks.vercelAiSdkPatchState.patchedModule = undefined;
   hooks.vercelAiSdkPatchState.isPatched = false;
+  hooks.vercelAiSdkPatchState.mutatedOriginal = false;
 }
