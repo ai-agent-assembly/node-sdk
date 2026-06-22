@@ -31,5 +31,16 @@ export default tseslint.config(
         process: "readonly"
       }
     }
+  },
+  {
+    // CommonJS pnpm install hook — runs in pnpm's Node context, not the SDK.
+    files: [".pnpmfile.cjs"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        module: "readonly",
+        require: "readonly"
+      }
+    }
   }
 );
