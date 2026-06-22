@@ -27,6 +27,36 @@ Prebuilt platform runtime packages (`@agent-assembly/runtime-*`) are published f
 Windows: Windows hosts are tested in CI but build the native addon from source, which
 requires a Rust toolchain. See [Troubleshooting](../08-troubleshooting/index.md).
 
+## Frameworks
+
+`initAssembly()` auto-detects and governs the agent frameworks below. Each is an
+**optional** peer dependency — the SDK works without any of them installed, and only
+hooks into the ones it finds at runtime. The version floors are the major lines the
+governance hooks are built against and verified in the cross-repo live smokes; newer
+releases on the same major line are expected to work. These ranges mirror the
+`peerDependencies` declared in `package.json`.
+
+| Framework     | Peer dependency        | Supported range |
+| ------------- | ---------------------- | --------------- |
+| LangChain.js  | `@langchain/core`      | `>=0.3.0`       |
+| LangGraph.js  | `@langchain/langgraph` | `>=1.0.0`       |
+| Vercel AI SDK | `ai`                   | `>=5.0.0`       |
+| Mastra        | `@mastra/core`         | `>=0.20.0`      |
+| OpenAI Agents | `@openai/agents`       | `>=0.1.0`       |
+
+:::caution Vercel AI SDK status
+The Vercel AI SDK adapter is **not yet usable** with real `ai` 5.x/6.x releases. It
+currently crashes trying to mutate the frozen ESM `tool` export
+([AAASM-3532](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532)). The range
+above reflects the intended support floor once that bug is fixed.
+:::
+
+This page is the **authoritative** reference for the Node SDK's framework support. The
+product-wide, cross-SDK **index/hub** that points at each language SDK's matrix lives in
+the core documentation:
+[Framework compatibility](https://ai-agent-assembly.github.io/agent-assembly/stable/reference/framework-compatibility.html)
+(the `/stable/` link goes live at GA).
+
 ## Package manager
 
 `pnpm ≥ 10` is the supported package manager (enforced via `engines` and a committed

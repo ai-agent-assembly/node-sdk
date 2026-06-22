@@ -46,10 +46,22 @@
   },
   "peerDependencies": {
     "@langchain/core": ">=0.3.0",
+    "@langchain/langgraph": ">=1.0.0",
+    "ai": ">=5.0.0",
+    "@mastra/core": ">=0.20.0",
     "@openai/agents": ">=0.1.0"
   },
   "peerDependenciesMeta": {
     "@langchain/core": {
+      "optional": true
+    },
+    "@langchain/langgraph": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "@mastra/core": {
       "optional": true
     },
     "@openai/agents": {
