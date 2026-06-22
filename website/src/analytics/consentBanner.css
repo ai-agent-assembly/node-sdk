@@ -1,0 +1,64 @@
+/**
+ * Cookie-consent opt-in banner (AAASM-3554).
+ *
+ * Styling is intentionally minimal and self-contained so the banner has no
+ * dependency on the docs theme bundle and can render the instant the client
+ * module runs. Colours reuse the Infima theme variables Docusaurus already
+ * defines, with hard fallbacks so the banner is legible even before the theme
+ * CSS has loaded.
+ */
+.aa-consent-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--ifm-background-surface-color, #ffffff);
+  color: var(--ifm-font-color-base, #1c1e21);
+  border-top: 1px solid var(--ifm-color-emphasis-300, #dadde1);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.aa-consent-banner__text {
+  flex: 1 1 280px;
+  max-width: 60ch;
+  margin: 0;
+}
+
+.aa-consent-banner__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.aa-consent-banner__button {
+  cursor: pointer;
+  border: 1px solid var(--ifm-color-emphasis-300, #dadde1);
+  border-radius: var(--ifm-button-border-radius, 6px);
+  padding: 0.4rem 1rem;
+  font: inherit;
+  font-weight: 600;
+}
+
+.aa-consent-banner__button:focus-visible {
+  outline: 2px solid var(--ifm-color-primary, #2e8555);
+  outline-offset: 2px;
+}
+
+.aa-consent-banner__button--accept {
+  background: var(--ifm-color-primary, #2e8555);
+  color: #ffffff;
+  border-color: var(--ifm-color-primary, #2e8555);
+}
+
+.aa-consent-banner__button--reject {
+  background: transparent;
+  color: var(--ifm-font-color-base, #1c1e21);
+}
