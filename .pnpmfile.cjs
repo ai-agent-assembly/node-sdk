@@ -8,15 +8,19 @@
 // gets a correct version range — that is a contract, not an install.
 //
 // pnpm 10 materializes *declared* peerDependencies (even optional ones) into the
-// importer and `node_modules`. If the real `ai` / `@langchain/langgraph` /
-// `@mastra/core` packages land in this repo's `node_modules`, the SDK's own unit
-// suite trips: `initAssembly` detects the framework present and the Vercel adapter
-// then assigns to the frozen ESM `tool` binding of the real `ai` module
-// (`Cannot assign to read only property 'tool'`). Those frameworks must therefore
-// stay declared-but-uninstalled here. `@langchain/core` / `@openai/agents` are left
-// alone — `@langchain/core` is already a transitive dep of the `langchain` devDep
-// and the existing suite relies on them being resolvable.
-const STRIP_FROM_INSTALL = ["@langchain/langgraph", "ai", "@mastra/core"];
+// importer and `node_modules`. We keep the heavyweight `@langchain/langgraph` and
+// `@mastra/core` declared-but-uninstalled here purely to avoid pulling their large
+// dependency trees into this repo's own install — their adapters mutate a class
+// *prototype*, not the module namespace, so they never crashed on a frozen ESM.
+//
+// `ai` is now installed as a `devDependency` (not stripped): AAASM-3532 fixed the
+// Vercel adapter so it no longer assigns to the frozen ESM `tool` binding of the
+// real `ai` module (it falls back to a shim copy), and the real-`ai` regression
+// test in `tests/vercel-ai-real-module.test.ts` needs the genuine frozen namespace
+// to prove the fix. `@langchain/core` / `@openai/agents` are likewise left alone —
+// `@langchain/core` is already a transitive dep of the `langchain` devDep and the
+// existing suite relies on them being resolvable.
+const STRIP_FROM_INSTALL = ["@langchain/langgraph", "@mastra/core"];
 
 function readPackage(pkg) {
   if (pkg.name === "@agent-assembly/sdk") {

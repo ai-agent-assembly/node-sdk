@@ -16,7 +16,7 @@ overrides:
   tar: ^7.5.16
   uuid: '>=11.1.1'
 
-pnpmfileChecksum: sha256-G0rPZ7h/JMrFXtzbD/VloEPh3PHNVVjaBe3B0LqF8r0=
+pnpmfileChecksum: sha256-Ba1Bu9ZW48eqIymOVoJKwAIn7SvtKEytaNxSbWYgaI0=
 
 importers:
 
@@ -30,7 +30,7 @@ importers:
         version: 1.14.4
       '@langchain/core':
         specifier: '>=0.3.0'
-        version: 1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+        version: 1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
       '@openai/agents':
         specifier: '>=0.1.0'
         version: 0.8.5(@cfworker/json-schema@4.1.1)(ws@8.21.0)(zod@4.4.3)
@@ -50,6 +50,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^3.2.6
         version: 3.2.6(vitest@3.2.6(@types/node@25.9.3)(lightningcss@1.32.0))
+      ai:
+        specifier: ^6.0.0
+        version: 6.0.208(zod@4.4.3)
       blocked-at:
         specifier: ^1.2.0
         version: 1.2.0
@@ -64,7 +67,7 @@ importers:
         version: 4.2.0
       langchain:
         specifier: ^1.4.0
-        version: 1.4.0(@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))
+        version: 1.4.0(@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))
       prettier:
         specifier: ^3.5.3
         version: 3.8.4
@@ -103,6 +106,22 @@ importers:
   packages/runtime-linux-x64: {}
 
 packages:
+
+  '@ai-sdk/gateway@3.0.133':
+    resolution: {integrity: sha512-Ebs+7iS9zUgJu5B0RlxM2JmDWzq79Cpd6YdiqcCzB5qFdpfQJPUDiXutqlQP89F2XGjOdDeidulBTXUdXWzOxw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider-utils@4.0.30':
+    resolution: {integrity: sha512-VO7I+vPffqI5sMnPoUq5DCSqKIgQIk/naJWRdQVpz2ma2zoprC/lqiJiUEl2s6DfvTD76TbhD3q39ROjlA6rGw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider@3.0.10':
+    resolution: {integrity: sha512-Q3BZ27qfpYqnCYGvE3vt+Qi6LGOF9R5Nmzn+9JoM1lCRsD9mYaIhfJLkSunN48nfGXJ6n+XNV0J/XVpqGQl7Dw==}
+    engines: {node: '>=18'}
 
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
@@ -1020,6 +1039,10 @@ packages:
     peerDependencies:
       zod: ^4.0.0
 
+  '@opentelemetry/api@1.9.1':
+    resolution: {integrity: sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q==}
+    engines: {node: '>=8.0.0'}
+
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
@@ -1281,6 +1304,10 @@ packages:
     resolution: {integrity: sha512-QVLZu3ZPQEE+HICQyAMZ2yLQhxf0meY/wx6Hx14YcTNj13JB3qHlX3lJ02L3fLGHgERRH71kvYDwiXIguT3AjQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
+  '@vercel/oidc@3.2.0':
+    resolution: {integrity: sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug==}
+    engines: {node: '>= 20'}
+
   '@vitest/coverage-v8@3.2.6':
     resolution: {integrity: sha512-LsAdmUapA0qSN306d8+zOyawM0hFm2m2Hg9IwVNIKBm+qJV8cijiq2c+gxKZcB1HCfIWAy+0qEZDCUQA58A1cw==}
     peerDependencies:
@@ -1340,6 +1367,12 @@ packages:
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
+
+  ai@6.0.208:
+    resolution: {integrity: sha512-STz+AaZqJ4ZjH7UkpXkbHx+bjgIDOsE8fIUoZjkZ2whoZcfVmG9K/TqEKouJZ03SuZuD7lagntlU3zBhAEkRpQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
@@ -1901,6 +1934,9 @@ packages:
 
   json-schema-typed@8.0.2:
     resolution: {integrity: sha512-fQhoXdcvc3V28x7C7BMs4P5+kNlgUURe2jmUT1T//oBRMDrqy1QPelJimwZGo7Hg9VPV3EQV5Bnq4hbFy2vetA==}
+
+  json-schema@0.4.0:
+    resolution: {integrity: sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA==}
 
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
@@ -2608,6 +2644,24 @@ packages:
 
 snapshots:
 
+  '@ai-sdk/gateway@3.0.133(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.10
+      '@ai-sdk/provider-utils': 4.0.30(zod@4.4.3)
+      '@vercel/oidc': 3.2.0
+      zod: 4.4.3
+
+  '@ai-sdk/provider-utils@4.0.30(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.10
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.8
+      zod: 4.4.3
+
+  '@ai-sdk/provider@3.0.10':
+    dependencies:
+      json-schema: 0.4.0
+
   '@ampproject/remapping@2.3.0':
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
@@ -2943,7 +2997,7 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
-  '@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)':
+  '@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@standard-schema/spec': 1.1.0
@@ -2951,7 +3005,7 @@ snapshots:
       camelcase: 6.3.0
       decamelize: 1.2.0
       js-tiktoken: 1.0.21
-      langsmith: 0.6.3(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      langsmith: 0.6.3(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
       mustache: 4.2.0
       p-queue: 6.6.2
       zod: 4.4.3
@@ -2962,14 +3016,14 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/langgraph-checkpoint@1.0.2(@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))':
+  '@langchain/langgraph-checkpoint@1.0.2(@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))':
     dependencies:
-      '@langchain/core': 1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      '@langchain/core': 1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
       uuid: 13.0.2
 
-  '@langchain/langgraph-sdk@1.9.1(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)':
+  '@langchain/langgraph-sdk@1.9.1(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)':
     dependencies:
-      '@langchain/core': 1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      '@langchain/core': 1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
       '@langchain/protocol': 0.0.15
       '@types/json-schema': 7.0.15
       p-queue: 9.2.0
@@ -2982,11 +3036,11 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/langgraph@1.3.0(@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
+  '@langchain/langgraph@1.3.0(@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
     dependencies:
-      '@langchain/core': 1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
-      '@langchain/langgraph-checkpoint': 1.0.2(@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))
-      '@langchain/langgraph-sdk': 1.9.1(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      '@langchain/core': 1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      '@langchain/langgraph-checkpoint': 1.0.2(@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))
+      '@langchain/langgraph-sdk': 1.9.1(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
       '@langchain/protocol': 0.0.15
       '@standard-schema/spec': 1.1.0
       uuid: 13.0.2
@@ -3424,6 +3478,8 @@ snapshots:
       - utf-8-validate
       - ws
 
+  '@opentelemetry/api@1.9.1': {}
+
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
@@ -3647,6 +3703,8 @@ snapshots:
       '@typescript-eslint/types': 8.61.0
       eslint-visitor-keys: 5.0.1
 
+  '@vercel/oidc@3.2.0': {}
+
   '@vitest/coverage-v8@3.2.6(vitest@3.2.6(@types/node@25.9.3)(lightningcss@1.32.0))':
     dependencies:
       '@ampproject/remapping': 2.3.0
@@ -3723,6 +3781,14 @@ snapshots:
   acorn@8.16.0: {}
 
   agent-base@7.1.4: {}
+
+  ai@6.0.208(zod@4.4.3):
+    dependencies:
+      '@ai-sdk/gateway': 3.0.133(zod@4.4.3)
+      '@ai-sdk/provider': 3.0.10
+      '@ai-sdk/provider-utils': 4.0.30(zod@4.4.3)
+      '@opentelemetry/api': 1.9.1
+      zod: 4.4.3
 
   ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:
@@ -4050,8 +4116,7 @@ snapshots:
 
   eventemitter3@5.0.4: {}
 
-  eventsource-parser@3.0.8:
-    optional: true
+  eventsource-parser@3.0.8: {}
 
   eventsource@3.0.7:
     dependencies:
@@ -4330,6 +4395,8 @@ snapshots:
   json-schema-typed@8.0.2:
     optional: true
 
+  json-schema@0.4.0: {}
+
   json-stable-stringify-without-jsonify@1.0.1: {}
 
   json-with-bigint@3.5.8: {}
@@ -4338,12 +4405,12 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  langchain@1.4.0(@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3)):
+  langchain@1.4.0(@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3)):
     dependencies:
-      '@langchain/core': 1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
-      '@langchain/langgraph': 1.3.0(@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
-      '@langchain/langgraph-checkpoint': 1.0.2(@langchain/core@1.1.45(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))
-      langsmith: 0.6.3(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      '@langchain/core': 1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
+      '@langchain/langgraph': 1.3.0(@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+      '@langchain/langgraph-checkpoint': 1.0.2(@langchain/core@1.1.45(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))
+      langsmith: 0.6.3(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
       zod: 4.4.3
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -4357,10 +4424,11 @@ snapshots:
       - ws
       - zod-to-json-schema
 
-  langsmith@0.6.3(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0):
+  langsmith@0.6.3(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0):
     dependencies:
       p-queue: 6.6.2
     optionalDependencies:
+      '@opentelemetry/api': 1.9.1
       openai: 6.35.0(ws@8.21.0)(zod@4.4.3)
       ws: 8.21.0
 
