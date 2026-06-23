@@ -314,5 +314,8 @@ across all SDKs.
   via the repository's
   [security advisories](https://github.com/ai-agent-assembly/node-sdk/security/advisories)
   page so a fix can be coordinated before disclosure.
+- **Canonical package names + verifying your install** — see [SECURITY.md](./SECURITY.md)
+  for the authoritative `@agent-assembly/*` package list (to spot typosquats) and how to
+  verify npm provenance (`npm audit signatures`) and the per-release CycloneDX SBOM.
 - **Contributing** — see [CONTRIBUTING.md](./CONTRIBUTING.md) for environment setup, the
   adapter-authoring guide, and the test/commit conventions.
