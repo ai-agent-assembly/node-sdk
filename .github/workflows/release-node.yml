@@ -298,6 +298,21 @@ jobs:
       - name: Build main SDK (ESM + CJS)
         run: pnpm build
 
+      # AAASM-3619: generate a CycloneDX SBOM for the workspace so every
+      # release ships a consumer-verifiable dependency manifest alongside npm
+      # provenance (NPM_CONFIG_PROVENANCE above). Runs on every dispatch
+      # (incl. dry-run) so a dry-run validates generation; the real-publish
+      # path attaches it to the GitHub Release below.
+      - name: Generate CycloneDX SBOM
+        run: pnpm dlx @cyclonedx/cyclonedx-npm --output-format JSON --output-file sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: error
+
       # Publish the 4 runtime sub-packages first. The main SDK's
       # optionalDependencies (declared under AAASM-1221) point at the
       # `@agent-assembly/runtime-*` versions we're publishing here;
@@ -367,23 +382,27 @@ jobs:
         run: |
           set -euo pipefail
           tag="v${NPM_VERSION}"
+          # Create the Release unless it already exists (idempotent re-run).
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::notice::GitHub Release $tag already exists — leaving it untouched (idempotent re-run)."
-            exit 0
+            echo "::notice::GitHub Release $tag already exists — leaving its metadata untouched (idempotent re-run)."
+          else
+            # Mark pre-release for any SemVer pre-release identifier (e.g.
+            # 0.0.1-beta.1); a bare X.Y.Z is a stable release.
+            prerelease_flag=""
+            if [[ "$NPM_VERSION" == *-* ]]; then
+              prerelease_flag="--prerelease"
+            fi
+            # shellcheck disable=SC2086
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$tag" \
+              $prerelease_flag \
+              --notes "node-sdk @agent-assembly/sdk@${NPM_VERSION} (bundled aasm binaries from agent-assembly ${BINARY_SOURCE_TAG})."
           fi
-          # Mark pre-release for any SemVer pre-release identifier (e.g.
-          # 0.0.1-beta.1); a bare X.Y.Z is a stable release.
-          prerelease_flag=""
-          if [[ "$NPM_VERSION" == *-* ]]; then
-            prerelease_flag="--prerelease"
-          fi
-          # shellcheck disable=SC2086
-          gh release create "$tag" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "$tag" \
-            $prerelease_flag \
-            --notes "node-sdk @agent-assembly/sdk@${NPM_VERSION} (bundled aasm binaries from agent-assembly ${BINARY_SOURCE_TAG})."
+          # AAASM-3619: attach the CycloneDX SBOM to the Release. --clobber
+          # keeps this idempotent across re-runs (overwrites a stale asset).
+          gh release upload "$tag" sbom.cdx.json --repo "$GITHUB_REPOSITORY" --clobber
 
   # AAASM-2751: cut the immutable Docusaurus docs snapshot for this release
   # and repoint the channel metadata. This runs ONLY after `publish` succeeds,
