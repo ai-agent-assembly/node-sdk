@@ -17,6 +17,7 @@ on:
       - module-system-smoke
       - pre-commit-checks
       - quality-report
+      - dependency-audit
     types:
       - completed
 
