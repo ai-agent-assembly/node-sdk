@@ -33,6 +33,7 @@ import { hasOpenAIAgentsSDK } from "../hooks/openai-agents-detection.js";
 import { patchOpenAIAgents } from "../hooks/openai-agents.js";
 import { currentAgentId } from "../lineage/index.js";
 import { resolveApiKey, resolveGatewayUrl } from "./gateway-resolver.js";
+import { redactErrorMessage } from "./redact.js";
 
 const requireFromCwd = createRequire(`${process.cwd()}/`);
 
@@ -425,8 +426,11 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     try {
       await nativeClient.register(buildRegisterOptions(resolvedConfig, frameworks));
     } catch (error) {
+      // Redact any Bearer/auth credential the error message might carry before
+      // it reaches the console — the apiKey/credentialToken must never be logged
+      // (AAASM-3645).
       console.warn(
-        `[agent-assembly] agent registration failed; proceeding unregistered: ${String(error)}`
+        `[agent-assembly] agent registration failed; proceeding unregistered: ${redactErrorMessage(error)}`
       );
     }
     // Topology lineage metadata still flows as an audit event (parent / team /
