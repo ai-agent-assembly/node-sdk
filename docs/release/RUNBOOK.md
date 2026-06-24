@@ -6,7 +6,7 @@
 > story) and AAASM-2858 (this runbook).
 
 This runbook assumes the operator has push rights to
-`AI-agent-assembly/node-sdk` and that the five `@agent-assembly/*` npm
+`ai-agent-assembly/node-sdk` and that the five `@agent-assembly/*` npm
 packages have `@agent-assembly/release-bot` configured as their npm
 Trusted Publisher with the node-sdk repo + `release-node.yml` workflow path.
 
