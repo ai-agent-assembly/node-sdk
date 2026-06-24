@@ -68,10 +68,18 @@ describe("packaging op-control grpc lazy-load", () => {
           console.error("FAIL: @grpc/grpc-js was eagerly loaded");
           process.exit(1);
         }
+        console.log("OK: grpc-js absent from require.cache");
         process.exit(0);
       `;
-      // Inherit a clean run; throws on non-zero exit, failing the test.
-      execFileSync(process.execPath, ["-e", probe], { stdio: "pipe" });
+      // Run the probe in a clean child process. `execFileSync` throws on a
+      // non-zero exit (the grpc-loaded failure path above), and we additionally
+      // assert on the explicit success marker so the lazy-load guarantee is
+      // checked positively rather than only via the absence of a throw.
+      const probeOutput = execFileSync(process.execPath, ["-e", probe], {
+        stdio: "pipe",
+        encoding: "utf8",
+      });
+      expect(probeOutput).toContain("OK: grpc-js absent from require.cache");
     });
   }, 120000);
 });
