@@ -20,14 +20,14 @@ crate-type = ["cdylib"]
 # the agent-assembly workspace; `query_policy` builds a `CheckActionRequest`
 # and reads its `CheckActionResponse` directly from these generated types.
 #
-# Pinned at the agent-assembly PR #1160 squash-merge commit, which adds the
-# `team_id` / `parent_agent_id` fields to `AssemblyConfig` that `register`
-# now forwards onto the native gRPC Register (team-budget attribution +
-# topology lineage). The base 9cde1d83 (AAASM-3396) added
-# `AssemblyClient::register()` (the one direct SDK→gateway gRPC call, per ADR
-# 0004) plus the `gateway_endpoint` field.
-aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "ebc4d7dc9da81cdf4f265d681c138500ca6e98e7", package = "aa-sdk-client" }
-aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "ebc4d7dc9da81cdf4f265d681c138500ca6e98e7", package = "aa-proto" }
+# Pinned at agent-assembly AAASM-3683, which adds the `sdk_version` field to
+# `AssemblyConfig` and threads it through `spawn_ipc_thread` into the signed IPC
+# handshake — the version this shim now forwards from the npm package version so
+# downgrade detection reflects the installed @agent-assembly/sdk release.
+# Re-pin to the squash-merge commit once PR #1226 lands on master. (Prior pin
+# ebc4d7dc / AAASM-3415 added `team_id` / `parent_agent_id`, still forwarded.)
+aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "b0576a72422bad7c6f380e666aa6ad70d1939822", package = "aa-sdk-client" }
+aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "b0576a72422bad7c6f380e666aa6ad70d1939822", package = "aa-proto" }
 napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "3"
 prost = "0.14"
@@ -43,3 +43,11 @@ napi-build = "2"
 # codec, so it needs the async net/io stack and prost to encode the response.
 prost = "0.14"
 tokio = { version = "1", features = ["rt", "macros", "net", "io-util", "time"] }
+# The mock server now performs the AAASM-3587 session handshake (the client
+# signs `nonce || sdk_version` before any heartbeat), so the test verifies the
+# Ed25519 proof. `rand` is value-returning for the nonce (no `[0u8; N]` literal
+# in the signing data-flow → CodeQL-clean).
+ed25519-dalek = "2"
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"

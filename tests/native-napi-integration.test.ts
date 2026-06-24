@@ -24,9 +24,31 @@ const TAG_POLICY_QUERY = 1;
 const TAG_EVENT_REPORT = 2;
 const TAG_HEARTBEAT = 4;
 const TAG_ACK = 3;
+// SDK → runtime signed handshake proof (AAASM-3587). The runtime issues the
+// challenge first; the SDK replies with this frame before any other traffic.
+const TAG_HANDSHAKE_PROOF = 5;
 // Inbound (runtime → SDK) policy-response tag.
 const TAG_POLICY_RESPONSE = 1;
+// Runtime → SDK handshake challenge (AAASM-3587), the first frame the runtime
+// sends on connect.
+const TAG_HANDSHAKE_CHALLENGE = 5;
 const ACK_FRAME = Buffer.from([TAG_ACK, 0x00]);
+
+// A `HandshakeChallenge { nonce: bytes }` (proto field 1, wire type 2) carrying
+// a fixed 32-byte nonce, framed as [tag, length-delimiter varint, body]. The
+// real runtime issues a random nonce; the mock only needs a decodable challenge
+// so the client completes the AAASM-3587 handshake and starts shipping events.
+// The mock does not verify the resulting proof — that is the authoritative
+// runtime's job; here the handshake just has to advance so the event flow opens.
+const HANDSHAKE_NONCE = Buffer.alloc(32, 0x5a);
+const HANDSHAKE_CHALLENGE_BODY = Buffer.concat([
+  Buffer.from([0x0a, HANDSHAKE_NONCE.length]),
+  HANDSHAKE_NONCE
+]);
+const HANDSHAKE_CHALLENGE_FRAME = Buffer.concat([
+  Buffer.from([TAG_HANDSHAKE_CHALLENGE, HANDSHAKE_CHALLENGE_BODY.length]),
+  HANDSHAKE_CHALLENGE_BODY
+]);
 // A `CheckActionResponse { decision: ALLOW }` — proto field 1 (varint) = 1.
 // Framed as [tag, length-delimiter varint, body]; the 2-byte body fits in a
 // single-byte length varint. The runtime answers a policy-query with this,
@@ -69,17 +91,21 @@ interface MockRuntime {
 
 /**
  * Minimal mock of the aa-runtime UDS endpoint. It speaks just enough of the
- * wire codec to keep the shared client's background IPC thread alive — ACKing
- * every heartbeat / event-report frame, answering a policy-query with an
- * allow `PolicyResponse` (as the real runtime does — an Ack would leave the
- * query blocked until its 5s timeout), and counting the event-report frames it
- * receives. It performs no scanning or redaction; that is the authoritative
- * runtime's job, not the SDK's.
+ * wire codec to keep the shared client's background IPC thread alive — issuing
+ * the AAASM-3587 handshake challenge on connect and consuming the SDK's signed
+ * proof, ACKing every heartbeat / event-report frame, answering a policy-query
+ * with an allow `PolicyResponse` (as the real runtime does — an Ack would leave
+ * the query blocked until its 5s timeout), and counting the event-report frames
+ * it receives. It performs no scanning, redaction, or proof verification; that
+ * is the authoritative runtime's job, not the SDK's.
  */
 function startMockRuntime(socketPath: string): Promise<MockRuntime> {
   let events = 0;
   const server = net.createServer((sock) => {
     let buf = Buffer.alloc(0);
+    // AAASM-3587: the runtime sends the handshake challenge first; the client's
+    // IPC thread completes the handshake (fail-closed) before any other traffic.
+    sock.write(HANDSHAKE_CHALLENGE_FRAME);
     sock.on("data", (chunk: Buffer) => {
       buf = Buffer.concat([buf, chunk]);
       let offset = 0;
@@ -89,6 +115,16 @@ function startMockRuntime(socketPath: string): Promise<MockRuntime> {
         if (tag === TAG_HEARTBEAT) {
           offset += 1;
           sock.write(ACK_FRAME);
+          continue;
+        }
+        if (tag === TAG_HANDSHAKE_PROOF) {
+          // Length-delimited proof frame; consume and discard it (the mock does
+          // not verify the proof). Wait for the whole frame before advancing.
+          const varint = readVarint(buf, offset + 1);
+          if (!varint) break;
+          const frameEnd = offset + 1 + varint.bytes + varint.value;
+          if (frameEnd > buf.length) break;
+          offset = frameEnd;
           continue;
         }
         if (tag === TAG_EVENT_REPORT || tag === TAG_POLICY_QUERY) {

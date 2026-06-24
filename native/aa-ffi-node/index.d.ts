@@ -15,8 +15,15 @@ export declare class ClientHandle {
  * Socket resolution, the background IPC thread, and the wire codec are all
  * delegated to `aa-sdk-client`; this shim only validates the argument and
  * wraps the resulting client.
+ *
+ * `agentId` is the agent identity the background thread signs the runtime
+ * session handshake with (AAASM-3587). `sdkVersion` is the user-facing npm
+ * package version (`@agent-assembly/sdk`) the JS layer forwards so it — not the
+ * shared `aa-sdk-client` crate version — is what gets signed into the handshake
+ * proof (AAASM-3683); `undefined` falls back to the crate version (no
+ * regression vs AAASM-3666).
  */
-export declare function connect(socketPath: string): Promise<ClientHandle>
+export declare function connect(socketPath: string, agentId?: string | undefined | null, sdkVersion?: string | undefined | null): Promise<ClientHandle>
 
 /**
  * Shut down the session and join the background IPC thread.
