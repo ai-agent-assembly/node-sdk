@@ -39,11 +39,31 @@ export interface RegisterOptions {
 }
 
 interface NativeBinding {
-  connect: (socketPath: string) => Promise<object>;
+  connect: (socketPath: string, agentId?: string, sdkVersion?: string) => Promise<object>;
   sendEvent: (handle: object, event: unknown) => void;
   queryPolicy: (handle: object, query: unknown) => Promise<NativePolicyDecision>;
   register?: (handle: object, options: RegisterOptions) => Promise<string>;
   disconnect: (handle: object) => Promise<void>;
+}
+
+/**
+ * Resolve the installed `@agent-assembly/sdk` package version, or `undefined`.
+ *
+ * Forwarded into the native `connect` so the user-facing npm package version —
+ * not the shared `aa-sdk-client` crate version — is what gets signed into the
+ * runtime handshake, giving accurate downgrade detection (AAASM-3683).
+ * `undefined` lets the native shim fall back to the crate version (no
+ * regression vs AAASM-3666). Uses `createRequire(<cwd>/package.json)`, the same
+ * ESM/CJS-safe pattern as the native-binding and runtime-binary resolvers.
+ */
+export function resolveSdkVersion(): string | undefined {
+  try {
+    const requireFromHere = createRequire(path.resolve(process.cwd(), "package.json"));
+    const pkg = requireFromHere("@agent-assembly/sdk/package.json") as { version?: string };
+    return typeof pkg.version === "string" && pkg.version.length > 0 ? pkg.version : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const NATIVE_BINDING_SINGLETON_KEY = Symbol.for("@agent-assembly/sdk/native-binding");
@@ -201,9 +221,13 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
   let activeHandle: object | undefined;
   let pendingSendError: Error | undefined;
 
+  const sdkVersion = resolveSdkVersion();
+
   const getHandle = async (): Promise<object> => {
     handlePromise ??= binding
-      .connect(socketPath)
+      // Forward the npm package version so it is signed into the handshake
+      // (AAASM-3683); agent id is wired at register time, not connect.
+      .connect(socketPath, undefined, sdkVersion)
       .then((handle) => {
         activeHandle = handle;
         return handle;
