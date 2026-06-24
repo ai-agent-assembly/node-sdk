@@ -49,7 +49,13 @@ describe("createNativeClient", () => {
       } satisfies MockBinding;
 
       const mod = await loadNativeClientWithRequire(() => {
-        return () => {
+        return (request: string) => {
+          // Count only the native-binding load (the thing under test for
+          // caching); the AAASM-3683 package.json version lookup uses its own
+          // require and must not inflate this count.
+          if (request === "@agent-assembly/sdk/package.json") {
+            return { version: "0.0.0-test" };
+          }
           requireCallCount += 1;
           return binding;
         };
@@ -128,7 +134,10 @@ describe("createNativeClient", () => {
     });
     expect(binding.queryPolicy).toHaveBeenCalledWith({ id: "handle-1" }, query);
 
-    expect(binding.connect).toHaveBeenCalledWith("/tmp/aa.sock");
+    // AAASM-3683: connect now also receives the agent id (wired at register
+    // time, so undefined here) and the resolved sdk_version. Under the mocked
+    // createRequire the package.json lookup yields no version, so it is undefined.
+    expect(binding.connect).toHaveBeenCalledWith("/tmp/aa.sock", undefined, undefined);
     await expect(client.close()).resolves.toBeUndefined();
     expect(binding.disconnect).toHaveBeenCalledTimes(1);
   });
@@ -409,5 +418,55 @@ describe("createNativeClient", () => {
         mode: "napi-inprocess"
       })
     ).toThrow(mod.NativeConnectError);
+  });
+
+  // AAASM-3683: the npm package version is read and forwarded into connect so it
+  // — not the aa-sdk-client crate version — is what gets signed into the
+  // handshake for accurate downgrade detection.
+  it("forwards the resolved sdk_version into the native connect", async () => {
+    const binding = {
+      connect: vi.fn(async () => ({ id: "handle-vers" })),
+      sendEvent: vi.fn(() => undefined),
+      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
+      disconnect: vi.fn(async () => undefined)
+    } satisfies MockBinding;
+
+    // A require that yields the package version for the package.json lookup and
+    // the binding for the native module path.
+    const mod = await loadNativeClientWithRequire(() => (request: string) => {
+      if (request === "@agent-assembly/sdk/package.json") {
+        return { version: "9.8.7" };
+      }
+      return binding;
+    });
+
+    const client = mod.createNativeClient({
+      gateway: "/tmp/aa.sock",
+      apiKey: "test-key",
+      mode: "napi-inprocess"
+    });
+    await client.queryPolicy({ action: "warmup" });
+
+    expect(binding.connect).toHaveBeenCalledWith("/tmp/aa.sock", undefined, "9.8.7");
+    await client.close();
+  });
+
+  it("resolveSdkVersion returns the package version when present", async () => {
+    const mod = await loadNativeClientWithRequire(() => (request: string) => {
+      if (request === "@agent-assembly/sdk/package.json") {
+        return { version: "1.2.3" };
+      }
+      throw new Error("unexpected require");
+    });
+
+    expect(mod.resolveSdkVersion()).toBe("1.2.3");
+  });
+
+  it("resolveSdkVersion returns undefined when the version cannot be resolved", async () => {
+    const mod = await loadNativeClientWithRequire(() => () => {
+      throw new Error("package.json not found");
+    });
+
+    expect(mod.resolveSdkVersion()).toBeUndefined();
   });
 });
