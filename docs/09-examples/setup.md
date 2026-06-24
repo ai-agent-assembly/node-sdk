@@ -16,7 +16,7 @@ can focus on what each example actually demonstrates.
 - **pnpm** — install via `npm install -g pnpm`.
 
 Every example pins `@agent-assembly/sdk` (the [`node-sdk`](https://github.com/ai-agent-assembly/node-sdk)
-package, version `0.0.1-alpha.9.1` at the time of writing) as its only required
+package, version `0.0.1-beta.4` at the time of writing) as its only required
 dependency. The framework-specific examples add one extra package each
 (`@mastra/core` for Mastra, `ai` for the Vercel AI SDK).
 

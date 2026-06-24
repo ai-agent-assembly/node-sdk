@@ -22,7 +22,7 @@ wrapping their `execute` through `withAssembly`.
 
 [Mastra](https://mastra.ai) — the real `@mastra/core` package (version `^1.0.0` in
 `package.json`), plus `zod` (`^3.25.76`) for the tool schemas and
-`@agent-assembly/sdk` (version `0.0.1-alpha.9.1`). It runs fully offline — no provider
+`@agent-assembly/sdk` (version `0.0.1-beta.4`). It runs fully offline — no provider
 key and no live LLM.
 
 ## How it works
