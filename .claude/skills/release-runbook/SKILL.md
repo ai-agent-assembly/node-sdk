@@ -126,10 +126,50 @@ on npm. That removes the structural coupling instead of papering over it with th
 coordinated release as "version == bundled-binary version", and route every
 SDK-only need through `/sdk-only-release`.
 
+## Sync docs version refs + example pins (before publish)
+
+`release-node.yml` rewrites every `package.json` `version` from `npm_version` at
+publish time — but it does **not** touch the docs site. The common assumption
+that "the docs just say `@beta` so they auto-track" is **wrong here**: the
+quick-start and example pages carry **explicit, pinned** version strings that go
+stale the moment a new version publishes. Sweep them on the same PR that prepares
+the release, *before* the tag is cut.
+
+1. **Bump the checked-in version file** to match the `npm_version` dispatch input
+   (the core tag with the leading `v` stripped): set the **root `package.json`**
+   `version`. Leave the four runtime sub-package `package.json` files at their
+   tree value — `release-node.yml` rewrites all five from `npm_version` at
+   publish. Touch `pnpm-lock.yaml` only if it pins the root package's version.
+2. **Sweep the docs site for PINNED versions** — these are NOT auto-updated:
+   - `docs/02-quick-start/index.md` — the `npm install @agent-assembly/sdk@<X>`
+     command is pinned to an explicit version.
+   - `docs/09-examples/*.md` — each states the example "depends only on
+     `@agent-assembly/sdk` (version `<X>`)".
+
+   Find every occurrence with `git grep -nE '0\.0\.1-beta\.[0-9]+' docs/` (adjust
+   the pattern to the live series) and bump each to the new version.
+3. **New-feature example pins are a forward-reference (the trap).** An example
+   that uses a feature added *after* the last published tag must pin the release
+   that actually ships that feature — not the previous version it was written
+   against. Verify which versions already exist upstream before pinning: a path
+   that errors under `git cat-file -e <last-published-tag>:<path>` was absent at
+   that tag, so its example must pin the **new** version, not the old one. This is
+   the same class of miss as the python-sdk agno/haystack/smolagents example pins.
+4. **Leave the Docusaurus channel config alone.** `website/versions.json`,
+   `website/versionChannels.json`, and the `website/versioned_docs/**` snapshots
+   are auto-managed by the `version-docs` snapshot job (see "What is auto-handled").
+   Do not hand-edit them on the release-prep PR.
+
+The canonical, full version-sweep procedure is the `agent-assembly` core
+`release-docs-sync` skill; this runbook is the node slice of it.
+
 ## Coordinated release — operating procedure
 
 Runs against `ai-agent-assembly/node-sdk`. Assumes the `agent-assembly` core tag
 is being / has been cut by that repo's `/release-tag-cut`.
+
+0. **Sync docs version refs + example pins** per the section above, on the
+   release-prep PR, before the core tag is cut.
 
 1. **Confirm the upstream Release exists.** The downstream dispatch only fires
    after `agent-assembly`'s Release object is published:
@@ -191,6 +231,8 @@ state machine:
 
 ## Detailed references
 
+- **Full docs-version sweep procedure** (the canonical checklist; this runbook is
+  the node slice) → `agent-assembly` `/release-docs-sync`.
 - **SDK-only republish** (the `workflow_dispatch` `main-only` escape hatch and
   the 2026-06-15 release-coordination SOP) → `/sdk-only-release`.
 - **Upstream core tag cut** → `agent-assembly` `/release-tag-cut`.
