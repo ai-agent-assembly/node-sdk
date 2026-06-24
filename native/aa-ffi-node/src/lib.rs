@@ -49,23 +49,35 @@ pub struct ClientHandle {
 /// Socket resolution, the background IPC thread, and the wire codec are all
 /// delegated to `aa-sdk-client`; this shim only validates the argument and
 /// wraps the resulting client.
+///
+/// `agentId` is the agent identity the background thread signs the runtime
+/// session handshake with (AAASM-3587). `sdkVersion` is the user-facing npm
+/// package version (`@agent-assembly/sdk`) the JS layer forwards so it — not the
+/// shared `aa-sdk-client` crate version — is what gets signed into the handshake
+/// proof (AAASM-3683); `undefined` falls back to the crate version (no
+/// regression vs AAASM-3666).
 #[napi]
-pub async fn connect(socket_path: String) -> Result<ClientHandle> {
+pub async fn connect(
+  socket_path: String,
+  agent_id: Option<String>,
+  sdk_version: Option<String>,
+) -> Result<ClientHandle> {
   if socket_path.trim().is_empty() {
     return Err(typed_error(ERR_CONNECT, "socketPath cannot be empty"));
   }
 
   let config = AssemblyConfig {
-    agent_id: String::new(),
+    agent_id: agent_id.unwrap_or_default(),
     socket_path: Some(socket_path),
     gateway_endpoint: None,
     team_id: None,
     parent_agent_id: None,
+    sdk_version,
   };
   let resolved = config.resolve_socket_path();
 
-  let ipc =
-    spawn_ipc_thread(resolved).map_err(|err| typed_error(ERR_CONNECT, &err.to_string()))?;
+  let ipc = spawn_ipc_thread(resolved, config.agent_id.clone(), config.resolved_sdk_version())
+    .map_err(|err| typed_error(ERR_CONNECT, &err.to_string()))?;
   let client = AssemblyClient::new(ipc, Vec::new());
 
   Ok(ClientHandle {
@@ -117,6 +129,9 @@ pub async fn register(handle: &ClientHandle, options: RegisterOptions) -> Result
     gateway_endpoint: options.gateway_endpoint,
     team_id: options.team_id,
     parent_agent_id: options.parent_agent_id,
+    // The version is signed at IPC-handshake time (`connect`), not on the
+    // gateway register, so it is not needed for this config.
+    sdk_version: None,
   };
 
   handle
@@ -325,6 +340,66 @@ mod tests {
 
   use super::*;
 
+  /// The agent id the mock-server tests handshake as.
+  const TEST_AGENT_ID: &str = "agent-1";
+
+  /// A distinctive language-package version forwarded into `spawn_ipc_thread`, so
+  /// the deny test asserts the FFI-passed version (not the crate version) reaches
+  /// the signed handshake proof (AAASM-3683).
+  const TEST_SDK_VERSION: &str = "npm-4.5.6";
+
+  /// Server side of the AAASM-3587 session handshake the client now performs
+  /// before any heartbeat: send a nonce challenge, read the signed proof, verify
+  /// it over `nonce || sdk_version` (AAASM-3666), and return the signed version
+  /// so callers can assert the FFI-forwarded version reached the handshake
+  /// (AAASM-3683).
+  async fn server_handshake<S>(stream: &mut S, agent_id: &str) -> String
+  where
+    S: AsyncReadExt + AsyncWriteExt + Unpin,
+  {
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use sha2::{Digest, Sha256};
+
+    // Value-returning CSPRNG so no constant literal flows into the signed nonce
+    // (CodeQL hard-coded-crypto).
+    let nonce = rand::random::<[u8; 32]>().to_vec();
+    let challenge = aa_proto::assembly::ipc::v1::HandshakeChallenge { nonce: nonce.clone() };
+    let payload = challenge.encode_to_vec();
+    stream.write_u8(codec::TAG_HANDSHAKE_CHALLENGE).await.unwrap();
+    assert!(payload.len() < 128);
+    stream.write_u8(payload.len() as u8).await.unwrap();
+    stream.write_all(&payload).await.unwrap();
+    stream.flush().await.unwrap();
+
+    assert_eq!(stream.read_u8().await.unwrap(), codec::TAG_HANDSHAKE_PROOF);
+    let mut len: u64 = 0;
+    let mut shift = 0u32;
+    loop {
+      let byte = stream.read_u8().await.unwrap();
+      len |= ((byte & 0x7F) as u64) << shift;
+      if byte & 0x80 == 0 {
+        break;
+      }
+      shift += 7;
+    }
+    let mut buf = vec![0u8; len as usize];
+    stream.read_exact(&mut buf).await.unwrap();
+    let proof = aa_proto::assembly::ipc::v1::HandshakeProof::decode(buf.as_ref()).unwrap();
+
+    let seed: [u8; 32] = Sha256::digest(agent_id.as_bytes()).into();
+    let vk = ed25519_dalek::SigningKey::from_bytes(&seed).verifying_key();
+    assert_eq!(proof.public_key, hex::encode(vk.to_bytes()));
+    let mut signed_payload = nonce.clone();
+    signed_payload.extend_from_slice(proof.sdk_version.as_bytes());
+    let sig: [u8; 64] = proof.signature.as_slice().try_into().unwrap();
+    let vk2 = VerifyingKey::from_bytes(&vk.to_bytes()).unwrap();
+    vk2
+      .verify(&signed_payload, &Signature::from_bytes(&sig))
+      .expect("client handshake proof must verify");
+
+    proof.sdk_version
+  }
+
   /// A `queryPolicy` against a runtime that answers `PolicyQuery` with a Deny
   /// `CheckActionResponse` returns `"deny"` to the JS caller. Mirrors the
   /// shared client's `query_policy_returns_runtime_decision` test, but drives
@@ -340,6 +415,10 @@ mod tests {
     // length-delimiter varint is a single byte.
     let server = tokio::spawn(async move {
       let (mut stream, _) = listener.accept().await.unwrap();
+      // AAASM-3587/3683: the client completes the signed handshake first; assert
+      // the FFI-forwarded version reaches the proof.
+      let signed_version = server_handshake(&mut stream, TEST_AGENT_ID).await;
+      assert_eq!(signed_version, TEST_SDK_VERSION);
       assert_eq!(stream.read_u8().await.unwrap(), codec::TAG_HEARTBEAT);
       assert_eq!(stream.read_u8().await.unwrap(), codec::TAG_POLICY_QUERY);
       let len = stream.read_u8().await.unwrap() as usize;
@@ -364,7 +443,12 @@ mod tests {
       tokio::time::sleep(Duration::from_millis(200)).await;
     });
 
-    let ipc = spawn_ipc_thread(PathBuf::from(&socket_path)).unwrap();
+    let ipc = spawn_ipc_thread(
+      PathBuf::from(&socket_path),
+      TEST_AGENT_ID.to_string(),
+      TEST_SDK_VERSION.to_string(),
+    )
+    .unwrap();
     let handle = ClientHandle {
       inner: Arc::new(AssemblyClient::new(ipc, Vec::new())),
     };
@@ -401,7 +485,12 @@ mod tests {
     let socket_path = format!("/tmp/aa-ffi-node-noserver-{}.sock", std::process::id());
     let _ = std::fs::remove_file(&socket_path);
 
-    let ipc = spawn_ipc_thread(PathBuf::from(&socket_path)).unwrap();
+    let ipc = spawn_ipc_thread(
+      PathBuf::from(&socket_path),
+      TEST_AGENT_ID.to_string(),
+      TEST_SDK_VERSION.to_string(),
+    )
+    .unwrap();
     let handle = ClientHandle {
       inner: Arc::new(AssemblyClient::new(ipc, Vec::new())),
     };
