@@ -303,8 +303,19 @@ jobs:
       # provenance (NPM_CONFIG_PROVENANCE above). Runs on every dispatch
       # (incl. dry-run) so a dry-run validates generation; the real-publish
       # path attaches it to the GitHub Release below.
+      #
+      # AAASM-3723: this repo installs with `pnpm install --frozen-lockfile`,
+      # so node_modules is pnpm's symlinked layout with no package-lock.json.
+      # cyclonedx-npm shells out to `npm ls` to walk the tree, which flags
+      # devDependencies of transitive deps (e.g. safe-publish-latest required
+      # by math-intrinsics) as "missing" and exits non-zero — aborting the
+      # release before publish. `--omit dev` builds a production-only tree
+      # (the right scope for a release SBOM anyway), and `--ignore-npm-errors`
+      # tolerates the residual npm-ls noise from the pnpm node_modules layout.
+      # This is purely the dependency-manifest step; it does not touch the
+      # OIDC trusted-publish / SLSA provenance path below.
       - name: Generate CycloneDX SBOM
-        run: pnpm dlx @cyclonedx/cyclonedx-npm --output-format JSON --output-file sbom.cdx.json
+        run: pnpm dlx @cyclonedx/cyclonedx-npm --omit dev --ignore-npm-errors --output-format JSON --output-file sbom.cdx.json
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
