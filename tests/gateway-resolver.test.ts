@@ -21,6 +21,17 @@ import {
   waitForHealthz,
 } from "../src/core/gateway-resolver.js";
 import { ConfigurationError, GatewayError } from "../src/errors/index.js";
+import { nativeRuntimeAvailable } from "./helpers/native-runtime.js";
+
+// The auto-start path resolves, allow-lists and spawns the native `aasm`
+// binary, which only ships on platforms with a published runtime package. Those
+// suites assume POSIX install dirs (`/usr/local/bin`, …) and a POSIX `$PATH`
+// shape, so they cannot pass on a platform whose native runtime is absent
+// (Windows today — `@agent-assembly/runtime-win32-x64` is not yet published,
+// AAASM-3544 / AAASM-3809). Guard those cases on actual binary availability,
+// not `process.platform`, so they re-enable automatically once it is published.
+// On Linux/macOS the runtime is present and every case runs unchanged.
+const NATIVE_RUNTIME_AVAILABLE = nativeRuntimeAvailable();
 
 describe("probeHealthz", () => {
   let originalFetch: typeof globalThis.fetch;
@@ -143,7 +154,7 @@ describe("loadConfigFile", () => {
   });
 });
 
-describe("autoStartGateway", () => {
+describe.skipIf(!NATIVE_RUNTIME_AVAILABLE)("autoStartGateway", () => {
   let originalFetch: typeof globalThis.fetch;
   let originalFind: (typeof __testing._seams)["findAasmOnPath"];
   let originalSpawn: (typeof __testing._seams)["spawnAasm"];
@@ -294,9 +305,16 @@ describe("resolveGatewayUrl", () => {
 });
 
 describe("assertAllowedAasmPath", () => {
-  it("accepts an absolute path inside an allow-listed install dir", () => {
-    expect(() => assertAllowedAasmPath("/usr/local/bin/aasm")).not.toThrow();
-  });
+  // The allow-list is built from POSIX install dirs, so a POSIX absolute path
+  // only resolves inside it on a POSIX platform. Guard on native-runtime
+  // availability (absent on Windows today) rather than asserting POSIX layout
+  // on every OS; the two rejection cases below stay platform-independent.
+  it.skipIf(!NATIVE_RUNTIME_AVAILABLE)(
+    "accepts an absolute path inside an allow-listed install dir",
+    () => {
+      expect(() => assertAllowedAasmPath("/usr/local/bin/aasm")).not.toThrow();
+    }
+  );
 
   it("rejects a relative / PATH-injected path", () => {
     expect(() => assertAllowedAasmPath("aasm")).toThrow(ConfigurationError);
@@ -380,7 +398,7 @@ describe("resolveApiKey", () => {
   });
 });
 
-describe("default PATH lookup and spawn seams", () => {
+describe.skipIf(!NATIVE_RUNTIME_AVAILABLE)("default PATH lookup and spawn seams", () => {
   // Capture the production default implementations before any other suite can
   // reassign the mutable _seams entries.
   const defaultFindAasmOnPath = __testing._seams.findAasmOnPath;
