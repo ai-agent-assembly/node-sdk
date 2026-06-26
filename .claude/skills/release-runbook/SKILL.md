@@ -228,6 +228,14 @@ state machine:
 - Downloading + staging the `aasm-*.tar.gz` binaries.
 - The post-publish `v<version>` git tag + GitHub Release.
 - The Docusaurus docs-version snapshot PR (`version-docs` job).
+- The SonarCloud `sonar.projectVersion`. `quality-report.yml` overrides the
+  `sonar-project.properties` value with `-Dsonar.projectVersion=<package.json
+  version>` at scan time, so the quality gate auto-advances once the five
+  `package.json` files are bumped — no manual `sonar.projectVersion` bump is
+  required on the release path (AAASM-2774). Keep the static fallback in
+  `sonar-project.properties` roughly in step with `package.json` so the gate
+  never falls back to `0.0.0` ("Not computed") if the scan ever runs without the
+  CI override.
 
 ## Detailed references
 

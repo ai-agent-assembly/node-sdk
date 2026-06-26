@@ -160,6 +160,12 @@ Three operator-side rules govern every dispatch:
   `repository_dispatch`); refresh docs separately if needed.
 - dist-tag promotion is a separate operator step from an authenticated
   terminal: `npm dist-tag add @agent-assembly/sdk@<X> alpha`.
+- The SonarCloud `sonar.projectVersion` needs **no** manual bump for an SDK-only
+  release. `quality-report.yml` derives it from `package.json` at scan time
+  (`-Dsonar.projectVersion=<version>`), so once `<npm_version>` is committed to
+  `package.json` the quality gate tracks it automatically (AAASM-2774). Keep the
+  static fallback in `sonar-project.properties` roughly in step so the gate never
+  reverts to `0.0.0` ("Not computed").
 
 ## Do NOT manually run
 
