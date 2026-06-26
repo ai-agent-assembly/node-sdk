@@ -60,8 +60,17 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
+      - name: Resolve package version for Sonar
+        id: sonar_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: SonarQube Scan
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+        with:
+          # Override sonar-project.properties' static fallback so the quality
+          # gate version always tracks package.json and auto-advances per release.
+          args: >
+            -Dsonar.projectVersion=${{ steps.sonar_version.outputs.version }}
