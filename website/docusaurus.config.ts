@@ -27,7 +27,13 @@ const config: Config = {
     v4: true,
   },
 
-  url: "https://ai-agent-assembly.github.io",
+  // Production docs origin. Docusaurus derives the emitted `<link
+  // rel="canonical">` and OpenGraph `og:url` from `url` + `baseUrl`, so this
+  // points at the custom docs domain the hub serves the module under
+  // (https://docs.agent-assembly.com/node-sdk/...). The GitHub Pages
+  // deployment (ai-agent-assembly.github.io/node-sdk/) keeps working as a
+  // mirror because in-site routing is driven by `baseUrl`, not `url`.
+  url: "https://docs.agent-assembly.com",
   baseUrl: "/node-sdk/",
 
   organizationName: "ai-agent-assembly",
