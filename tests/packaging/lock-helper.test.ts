@@ -23,6 +23,17 @@ describe("withPackagingLock", () => {
     const closeSpy = vi.spyOn(fs, "closeSync").mockImplementation(() => undefined);
     const rmSpy = vi.spyOn(fs, "rmSync").mockImplementation(() => undefined);
     vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+    // Keep the staleness probe hermetic: a transient contention error is not a
+    // stale lock, so model "no lock file on disk" regardless of any real
+    // .packaging-test.lock a concurrent packaging test may hold on CI. This
+    // exercises the not-stale path, where the retry simply succeeds once
+    // contention clears, instead of letting the test depend on shared FS state.
+    vi.spyOn(fs, "readFileSync").mockImplementation(() => {
+      throw createFsError("ENOENT");
+    });
+    vi.spyOn(fs, "statSync").mockImplementation(() => {
+      throw createFsError("ENOENT");
+    });
 
     const result = await withPackagingLock(async () => "ok");
 
