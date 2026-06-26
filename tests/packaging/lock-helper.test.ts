@@ -22,6 +22,7 @@ describe("withPackagingLock", () => {
       .mockImplementationOnce(() => 123);
     const closeSpy = vi.spyOn(fs, "closeSync").mockImplementation(() => undefined);
     const rmSpy = vi.spyOn(fs, "rmSync").mockImplementation(() => undefined);
+    vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
 
     const result = await withPackagingLock(async () => "ok");
 
