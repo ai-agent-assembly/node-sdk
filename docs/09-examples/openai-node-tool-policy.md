@@ -21,7 +21,7 @@ dispatched through `withAssembly`, so every dispatch is policy-checked before it
 ## The framework / library
 
 OpenAI function-calling format (tool schemas), used without a live OpenAI client.
-The example depends only on `@agent-assembly/sdk` (version `0.0.1-beta.5`) and runs
+The example depends only on `@agent-assembly/sdk` (version `0.0.1-rc.1`) and runs
 fully offline — no gateway and no `@langchain/core`.
 
 ## How it works
