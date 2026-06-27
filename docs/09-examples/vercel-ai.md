@@ -22,7 +22,7 @@ top by wrapping the tool map.
 
 [Vercel AI SDK](https://sdk.vercel.ai) — the real `ai` package (version `^6.0.0` in
 `package.json`), plus `zod` (`^3.25.76`) for input schemas and `@agent-assembly/sdk`
-(version `0.0.1-rc.1`). It runs fully offline — no provider key and no live LLM.
+(version `0.0.1-rc.2`). It runs fully offline — no provider key and no live LLM.
 
 ## How it works
 

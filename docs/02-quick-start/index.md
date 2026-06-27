@@ -23,7 +23,7 @@ platform during `postinstall`, so there is no extra build step for typical consu
 The current release line is `0.0.1-beta.x`, published under the npm `beta`
 dist-tag. The public surface (`initAssembly`, `withAssembly`) is stabilizing but may
 change between pre-releases. Pin an exact version for reproducible installs:
-`npm install @agent-assembly/sdk@0.0.1-rc.1`.
+`npm install @agent-assembly/sdk@0.0.1-rc.2`.
 :::
 
 ## 2. Make sure a gateway is reachable
