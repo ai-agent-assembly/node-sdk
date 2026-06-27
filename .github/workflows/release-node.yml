@@ -378,6 +378,62 @@ jobs:
           # shellcheck disable=SC2086
           pnpm publish --access public --no-git-checks $DIST_TAG
 
+      # AAASM-3840: keep the npm `latest` dist-tag current.
+      #
+      # The publish steps above route each build to a *channel* dist-tag derived
+      # from its SemVer pre-release identifier (alpha/beta/rc), and only a bare
+      # GA `X.Y.Z` publish moves `latest` implicitly. Nothing ever advances
+      # `latest` for a pre-release, so on a pre-1.0 project that has only ever
+      # shipped pre-releases, `latest` stays frozen at whatever the very first
+      # publish happened to be — making a bare `npm install @agent-assembly/sdk`
+      # resolve to an ancient alpha (the bug this fixes).
+      #
+      # POLICY (pre-1.0 / pre-GA): `latest` always points at the *highest*
+      # SemVer version currently on npm, across every channel. SemVer precedence
+      # (alpha < beta < rc < GA) makes this self-correcting and monotonic:
+      #   - a GA publish wins over any pre-release of the same base, so `latest`
+      #     naturally tracks the newest GA once one exists;
+      #   - while only pre-releases exist, `latest` tracks the newest pre-release
+      #     (e.g. rc.2 over beta.5 over alpha.9.1) instead of the oldest;
+      #   - it never regresses `latest` to an older build, even if an out-of-band
+      #     hotfix to an older channel is published after a newer one.
+      # Runs in BOTH publish modes (gated only on dry_run, like the main publish
+      # step) so every real publish re-asserts the invariant.
+      - name: Update `latest` dist-tag to newest published version
+        if: steps.tag.outputs.dry_run != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          PKG="@agent-assembly/sdk"
+          # All versions on npm (the just-published one included). `npm view
+          # versions --json` returns an array, or a bare string if exactly one
+          # version exists — normalize both to newline-delimited output.
+          mapfile -t VERSIONS < <(npm view "$PKG" versions --json | node -e '
+            const raw = require("fs").readFileSync(0, "utf8").trim();
+            const data = JSON.parse(raw);
+            for (const v of Array.isArray(data) ? data : [data]) console.log(v);
+          ')
+          if [[ ${#VERSIONS[@]} -eq 0 ]]; then
+            echo "::error::no published versions found for $PKG"
+            exit 1
+          fi
+          # `semver` sorts ascending and includes pre-releases when passed
+          # explicitly, so the last line is the highest by SemVer precedence.
+          NEWEST=$(pnpm dlx semver "${VERSIONS[@]}" | tail -n1)
+          CURRENT=$(npm view "$PKG" dist-tags.latest 2>/dev/null || echo "")
+          echo "newest published=$NEWEST  current latest=$CURRENT"
+          if [[ -z "$NEWEST" ]]; then
+            echo "::error::could not determine newest version for $PKG"
+            exit 1
+          fi
+          if [[ "$NEWEST" == "$CURRENT" ]]; then
+            echo "latest already points at $NEWEST — nothing to do"
+          else
+            npm dist-tag add "${PKG}@${NEWEST}" latest
+            echo "moved latest: ${CURRENT:-<unset>} -> $NEWEST"
+          fi
+
       # AAASM-2955: cut a git tag + GitHub Release at the published npm
       # version so the README "GitHub release" badge tracks the current
       # release. Runs only on the real-publish path (dry-run skips it, same
