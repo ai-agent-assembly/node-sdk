@@ -160,12 +160,16 @@ Three operator-side rules govern every dispatch:
   `repository_dispatch`); refresh docs separately if needed.
 - dist-tag promotion is a separate operator step from an authenticated
   terminal: `npm dist-tag add @agent-assembly/sdk@<X> alpha`.
-- The SonarCloud `sonar.projectVersion` needs **no** manual bump for an SDK-only
-  release. `quality-report.yml` derives it from `package.json` at scan time
+- The CI-side `sonar.projectVersion` override needs no action.
+  `quality-report.yml` derives it from `package.json` at scan time
   (`-Dsonar.projectVersion=<version>`), so once `<npm_version>` is committed to
-  `package.json` the quality gate tracks it automatically (AAASM-2774). Keep the
-  static fallback in `sonar-project.properties` roughly in step so the gate never
-  reverts to `0.0.0` ("Not computed").
+  `package.json` the quality gate tracks it automatically (AAASM-2774). CI never
+  needs the literal — but you **still** bump `sonar.projectVersion` in
+  `sonar-project.properties` to the new version as part of the version-bump prep
+  commit: it is the source-of-truth / local-scan fallback and must track the
+  release, never sitting at `0.0.0` ("Not computed"). Mirrors the core's
+  `release-tag-cut` automation (AAASM-3819); this is the step rc.1 prep PRs
+  missed.
 
 ## Do NOT manually run
 

@@ -140,6 +140,13 @@ the release, *before* the tag is cut.
    `version`. Leave the four runtime sub-package `package.json` files at their
    tree value — `release-node.yml` rewrites all five from `npm_version` at
    publish. Touch `pnpm-lock.yaml` only if it pins the root package's version.
+   **In the same version-bump prep commit, bump `sonar.projectVersion` in
+   `sonar-project.properties`** to the new version. The static value is the
+   source-of-truth / local-scan fallback; CI overrides it dynamically at scan
+   time (`quality-report.yml` passes `-Dsonar.projectVersion=<package.json
+   version>`), so drift never breaks CI — but the static value must still track
+   the release. This is the step rc.1 prep PRs missed and rc.2 had to fix by
+   hand; it mirrors the core's `release-tag-cut` automation (AAASM-3819).
 2. **Sweep the docs site for PINNED versions** — these are NOT auto-updated:
    - `docs/02-quick-start/index.md` — the `npm install @agent-assembly/sdk@<X>`
      command is pinned to an explicit version.
@@ -228,14 +235,16 @@ state machine:
 - Downloading + staging the `aasm-*.tar.gz` binaries.
 - The post-publish `v<version>` git tag + GitHub Release.
 - The Docusaurus docs-version snapshot PR (`version-docs` job).
-- The SonarCloud `sonar.projectVersion`. `quality-report.yml` overrides the
+- The CI-side `sonar.projectVersion` override. `quality-report.yml` overrides the
   `sonar-project.properties` value with `-Dsonar.projectVersion=<package.json
   version>` at scan time, so the quality gate auto-advances once the five
-  `package.json` files are bumped — no manual `sonar.projectVersion` bump is
-  required on the release path (AAASM-2774). Keep the static fallback in
-  `sonar-project.properties` roughly in step with `package.json` so the gate
-  never falls back to `0.0.0` ("Not computed") if the scan ever runs without the
-  CI override.
+  `package.json` files are bumped — CI never needs the literal (AAASM-2774). But
+  you still bump the static `sonar.projectVersion` literal as part of the
+  version-bump prep commit (see "Sync docs version refs + example pins" step 1
+  above): it is the source-of-truth / local-scan fallback and must track the
+  release, never sitting at `0.0.0` ("Not computed") if the scan ever runs
+  without the CI override. Mirrors the core's `release-tag-cut` automation
+  (AAASM-3819).
 
 ## Detailed references
 
