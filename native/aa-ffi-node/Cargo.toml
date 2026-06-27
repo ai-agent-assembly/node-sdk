@@ -26,8 +26,8 @@ crate-type = ["cdylib"]
 # downgrade detection reflects the installed @agent-assembly/sdk release.
 # Re-pin to the squash-merge commit once PR #1226 lands on master. (Prior pin
 # ebc4d7dc / AAASM-3415 added `team_id` / `parent_agent_id`, still forwarded.)
-aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "de19926b5061108b2d9ffddae73bcdb598dc07d5", package = "aa-sdk-client" }
-aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "de19926b5061108b2d9ffddae73bcdb598dc07d5", package = "aa-proto" }
+aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "fc90f85d63dcf2ccffbf4f920b4f41e9bc9b1a0a", package = "aa-sdk-client" }
+aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "fc90f85d63dcf2ccffbf4f920b4f41e9bc9b1a0a", package = "aa-proto" }
 napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "3"
 prost = "0.14"
