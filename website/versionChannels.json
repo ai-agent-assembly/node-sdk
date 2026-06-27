@@ -1,14 +1,18 @@
 {
-  "lastVersion": "0.0.1-rc.1",
+  "lastVersion": "0.0.1-rc.2",
   "versions": {
     "current": {
       "label": "latest (master)",
       "path": "/next/",
       "banner": "unreleased"
     },
-    "0.0.1-rc.1": {
-      "label": "pre-release (0.0.1-rc.1)",
+    "0.0.1-rc.2": {
+      "label": "pre-release (0.0.1-rc.2)",
       "banner": "none"
+    },
+    "0.0.1-rc.1": {
+      "label": "0.0.1-rc.1",
+      "banner": "unmaintained"
     },
     "0.0.1-beta.5": {
       "label": "0.0.1-beta.5",
