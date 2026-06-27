@@ -1,0 +1,571 @@
+name: release-node
+
+# Triggered on every `v*.*.*` tag pushed to this repo. Stages the
+# per-platform `aasm` binaries from agent-assembly's matching GitHub
+# Release, bumps the version across the 5 packages in this workspace
+# (1 SDK + 4 runtime sub-packages), then publishes them to npm in the
+# correct order so the main `@agent-assembly/sdk`'s optionalDependencies
+# resolve to existing npm versions.
+#
+# `workflow_dispatch` lets an operator re-run the publish for an
+# already-pushed tag (e.g. after fixing a partial-publish failure)
+# without having to re-cut the tag.
+#
+# Issue: AAASM-1222 (sub-task of AAASM-1203 / F113)
+# Companion: AAASM-1200 (the agent-assembly release workflow that
+#            produces the aasm-{rust-target}.tar.gz assets consumed here)
+
+on:
+  # Operator-dispatch only. The Node SDK versions independently of the
+  # agent-assembly core, so the npm version must NOT be derived from a core
+  # release tag. Auto-publishing on the core `agent-assembly-release-published`
+  # repository_dispatch set npm_version from the core tag and forced a real
+  # publish, which npm rejected as a duplicate every core release (AAASM-3503).
+  # Per the AAASM-3007 SOP, an SDK release must wait for the FFI-pin PR merge
+  # and be operator-driven via workflow_dispatch. The core's separate
+  # update-node-sdk-ffi-pin PR job handles the FFI-pin handoff, so dropping
+  # this trigger loses nothing.
+  workflow_dispatch:
+    inputs:
+      npm_version:
+        description: "Version to publish to npm (e.g. 0.0.1-alpha.8.1, 0.0.1-alpha.9, 0.0.2)."
+        required: true
+        type: string
+      binary_source_tag:
+        description: "agent-assembly tag whose aasm-* binaries to bundle into the 4 runtime sub-packages (e.g. v0.0.1-alpha.8). Defaults to latest agent-assembly Release."
+        required: false
+        type: string
+      publish_mode:
+        description: "Which packages to publish. 'all' = main SDK + 4 runtime sub-packages (coordinated release). 'main-only' = only @agent-assembly/sdk (SDK hotfix mode)."
+        required: true
+        type: choice
+        default: "all"
+        options:
+          - all
+          - main-only
+      dry-run:
+        description: "Skip the npm publish steps and the docs-version snapshot. Builds run normally; nothing reaches the registry or master. Defaults to false so today's dispatch behavior is unchanged."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write  # npm OIDC Trusted Publishing + SLSA provenance
+
+jobs:
+  publish:
+    name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # AAASM-2955: create the git tag + GitHub Release for the published version
+      id-token: write  # npm OIDC Trusted Publishing + SLSA provenance
+    outputs:
+      binary_source_tag: ${{ steps.tag.outputs.binary_source_tag }}
+      npm_version: ${{ steps.tag.outputs.npm_version }}
+      publish_mode: ${{ steps.tag.outputs.publish_mode }}
+      dry_run: ${{ steps.tag.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v4.2.2
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Resolve release tag
+        id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_BINARY_TAG: ${{ inputs.binary_source_tag }}
+          DISPATCH_NPM_VERSION: ${{ inputs.npm_version }}
+          DISPATCH_PUBLISH_MODE: ${{ inputs.publish_mode }}
+          DISPATCH_DRY_RUN: ${{ inputs.dry-run }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            # Operator path. Precedence for binary_source_tag: explicit
+            # DISPATCH_BINARY_TAG > latest agent-assembly release.
+            if [[ -n "${DISPATCH_BINARY_TAG:-}" ]]; then
+              binary_source_tag="$DISPATCH_BINARY_TAG"
+            else
+              binary_source_tag=$(gh release view --repo ai-agent-assembly/agent-assembly --json tagName --jq .tagName)
+              echo "::notice::binary_source_tag omitted; defaulting to latest agent-assembly release: $binary_source_tag"
+            fi
+            npm_version="$DISPATCH_NPM_VERSION"
+            publish_mode="$DISPATCH_PUBLISH_MODE"
+            # `dry-run` input is a boolean — workflow_dispatch sends 'true'
+            # or 'false' (string-form on the env). Default is false, so the
+            # legacy dispatch behavior is preserved when the operator does
+            # not tick the checkbox.
+            dry_run="$DISPATCH_DRY_RUN"
+          else
+            # AAASM-3503: this workflow is workflow_dispatch-only. The
+            # auto-publish repository_dispatch path was removed because it
+            # derived npm_version from the core tag and forced a publish npm
+            # rejected as a duplicate every core release.
+            echo "::error::unexpected event_name '$EVENT_NAME' — release-node is workflow_dispatch-only"
+            exit 1
+          fi
+          if [[ ! "$binary_source_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::binary_source_tag '$binary_source_tag' does not match v*.*.* (semver) pattern"
+            exit 1
+          fi
+          if [[ ! "$npm_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::npm_version '$npm_version' does not match X.Y.Z semver pattern (must NOT include leading v)"
+            exit 1
+          fi
+          {
+            echo "binary_source_tag=${binary_source_tag}"
+            echo "npm_version=${npm_version}"
+            echo "publish_mode=${publish_mode}"
+            echo "dry_run=${dry_run}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved binary_source_tag=${binary_source_tag} npm_version=${npm_version} publish_mode=${publish_mode} dry_run=${dry_run}"
+
+      # AAASM-2854: main-only mode — bump the root package.json's version
+      # field AND rewrite optionalDependencies['@agent-assembly/runtime-*']
+      # so the published SDK resolves to the existing runtime sub-packages on
+      # npm.
+      #
+      # AAASM-2867: derive the runtime-* version from `binary_source_tag`
+      # (with the leading `v` stripped) rather than leaving the pnpm
+      # `workspace:*` marker in place. Master's root package.json keeps
+      # `workspace:*` for local development resolution, which is unresolvable
+      # on npm — without this rewrite the published SDK would carry
+      # `workspace:*` in optionalDependencies and `npm install` would fail.
+      #
+      # This step must run BEFORE the pre-flight check (also AAASM-2867)
+      # so the pre-flight reads the rewritten version pins rather than
+      # the `workspace:*` marker that lives on master.
+      - name: Bump main SDK version only (main-only mode)
+        if: steps.tag.outputs.publish_mode == 'main-only'
+        env:
+          VERSION: ${{ steps.tag.outputs.npm_version }}
+          BINARY_SOURCE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.VERSION;
+          const binarySourceTag = process.env.BINARY_SOURCE_TAG;
+          // Strip leading 'v' to get the runtime sub-package version, which on
+          // npm matches the agent-assembly tag's body for coordinated releases
+          // (e.g. binary_source_tag=v0.0.1-alpha.8 => runtime-*@0.0.1-alpha.8).
+          const runtimeVersion = binarySourceTag.replace(/^v/, "");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          pkg.version = version;
+          if (pkg.optionalDependencies) {
+            for (const dep of Object.keys(pkg.optionalDependencies)) {
+              if (dep.startsWith("@agent-assembly/runtime-")) {
+                pkg.optionalDependencies[dep] = runtimeVersion;
+              }
+            }
+          }
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          console.log(`bumped package.json -> version=${version} runtime-*=${runtimeVersion}`);
+          NODE
+
+      # AAASM-2854: Pre-flight gate for main-only mode. The SDK hotfix path
+      # reuses the @agent-assembly/runtime-* sub-packages already on npm
+      # (their versions pinned in this repo's package.json optionalDependencies).
+      # If any of those pinned versions does not exist on npm — e.g. operator
+      # forgot to publish them, or the pin points at a future release — fail
+      # fast here rather than ship a broken main SDK that resolves to nothing
+      # at install time.
+      #
+      # AAASM-2867: this step runs AFTER the main-only Bump step, so the
+      # `optionalDependencies` it reads are the post-rewrite real versions
+      # (derived from `binary_source_tag`), not master's `workspace:*` marker.
+      - name: Pre-flight verify runtime sub-packages exist on npm
+        if: steps.tag.outputs.publish_mode == 'main-only'
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const { execSync } = require("node:child_process");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const opt = pkg.optionalDependencies ?? {};
+          const runtimePkgs = Object.entries(opt).filter(([name]) =>
+            name.startsWith("@agent-assembly/runtime-"),
+          );
+          if (runtimePkgs.length === 0) {
+            console.error(
+              "::error::no @agent-assembly/runtime-* entries in optionalDependencies — " +
+              "main-only mode requires existing runtime sub-packages to reuse",
+            );
+            process.exit(1);
+          }
+          let failed = false;
+          for (const [name, version] of runtimePkgs) {
+            try {
+              execSync(`npm view ${name}@${version} version`, { stdio: "pipe" });
+              console.log(`OK: ${name}@${version} exists on npm`);
+            } catch {
+              console.error(
+                `::error::main-only publish blocked — ${name}@${version} is not on npm. ` +
+                `Use publish_mode=all to publish the runtime sub-packages alongside the SDK.`,
+              );
+              failed = true;
+            }
+          }
+          if (failed) process.exit(1);
+          NODE
+
+      - name: Download aasm binaries from agent-assembly release
+        if: steps.tag.outputs.publish_mode == 'all'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p bin-staging
+          # The operator points binary_source_tag at a published agent-assembly
+          # release, so `gh release download` finds the aasm-* assets that were
+          # uploaded when that release was cut.
+          gh release download "$RELEASE_TAG" \
+            --repo ai-agent-assembly/agent-assembly \
+            --pattern "aasm-*.tar.gz" \
+            --dir bin-staging
+          ls -la bin-staging/
+
+      - name: Stage runtime binaries into runtime-* sub-packages
+        if: steps.tag.outputs.publish_mode == 'all'
+        run: |
+          set -euo pipefail
+          # Map Rust target triples to the matching node-sdk runtime
+          # sub-package (per AAASM-1220's package layout).
+          declare -A MAP=(
+            ["x86_64-unknown-linux-gnu"]="runtime-linux-x64"
+            ["aarch64-unknown-linux-gnu"]="runtime-linux-arm64"
+            ["x86_64-apple-darwin"]="runtime-darwin-x64"
+            ["aarch64-apple-darwin"]="runtime-darwin-arm64"
+          )
+          for target in "${!MAP[@]}"; do
+            pkg="${MAP[$target]}"
+            archive="bin-staging/aasm-${target}.tar.gz"
+            if [[ ! -f "$archive" ]]; then
+              echo "::error::missing release asset $archive"
+              exit 1
+            fi
+            tar -xzf "$archive" -C "packages/${pkg}/bin/"
+            chmod +x "packages/${pkg}/bin/aasm"
+            echo "staged ${pkg}/bin/aasm <- ${target}"
+          done
+          # Strip the AAASM-1220 .gitkeep placeholders so they don't end
+          # up in the published tarball alongside the real binary.
+          rm -f packages/*/bin/.gitkeep
+
+      - name: Bump versions across the 5 packages
+        if: steps.tag.outputs.publish_mode == 'all'
+        env:
+          VERSION: ${{ steps.tag.outputs.npm_version }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.VERSION;
+          const files = [
+            "package.json",
+            "packages/runtime-linux-x64/package.json",
+            "packages/runtime-linux-arm64/package.json",
+            "packages/runtime-darwin-x64/package.json",
+            "packages/runtime-darwin-arm64/package.json",
+          ];
+          for (const file of files) {
+            const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+            pkg.version = version;
+            if (pkg.optionalDependencies) {
+              for (const dep of Object.keys(pkg.optionalDependencies)) {
+                if (dep.startsWith("@agent-assembly/runtime-")) {
+                  pkg.optionalDependencies[dep] = version;
+                }
+              }
+            }
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+            console.log(`bumped ${file} -> ${version}`);
+          }
+          NODE
+
+      - name: Build main SDK (ESM + CJS)
+        run: pnpm build
+
+      # AAASM-3619: generate a CycloneDX SBOM for the workspace so every
+      # release ships a consumer-verifiable dependency manifest alongside npm
+      # provenance (NPM_CONFIG_PROVENANCE above). Runs on every dispatch
+      # (incl. dry-run) so a dry-run validates generation; the real-publish
+      # path attaches it to the GitHub Release below.
+      #
+      # AAASM-3723: this repo installs with `pnpm install --frozen-lockfile`,
+      # so node_modules is pnpm's symlinked layout with no package-lock.json.
+      # cyclonedx-npm shells out to `npm ls` to walk the tree, which flags
+      # devDependencies of transitive deps (e.g. safe-publish-latest required
+      # by math-intrinsics) as "missing" and exits non-zero — aborting the
+      # release before publish. `--omit dev` builds a production-only tree
+      # (the right scope for a release SBOM anyway), and `--ignore-npm-errors`
+      # tolerates the residual npm-ls noise from the pnpm node_modules layout.
+      # This is purely the dependency-manifest step; it does not touch the
+      # OIDC trusted-publish / SLSA provenance path below.
+      - name: Generate CycloneDX SBOM
+        run: pnpm dlx @cyclonedx/cyclonedx-npm --omit dev --ignore-npm-errors --output-format JSON --output-file sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: error
+
+      # Publish the 4 runtime sub-packages first. The main SDK's
+      # optionalDependencies (declared under AAASM-1221) point at the
+      # `@agent-assembly/runtime-*` versions we're publishing here;
+      # publishing them out of order would mean the main SDK install
+      # phase produces "no matching version" warnings during the brief
+      # window before all sub-packages land on the registry.
+      - name: Publish 4 runtime sub-packages
+        # AAASM-2862: combine the existing publish_mode gate with a dry_run
+        # gate. workflow_dispatch with dry-run=true must skip every step
+        # that mutates the npm registry.
+        if: steps.tag.outputs.publish_mode == 'all' && steps.tag.outputs.dry_run != 'true'
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          # Derive the npm dist-tag from the SemVer pre-release identifier.
+          # 0.0.1-alpha.1 → --tag alpha, 0.0.1-rc.1 → --tag rc, 0.0.1 → (empty, defaults to @latest)
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([a-zA-Z]+) ]]; then
+            DIST_TAG="--tag ${BASH_REMATCH[1]}"
+          else
+            DIST_TAG=""
+          fi
+          echo "Publishing runtime sub-packages at version=$VERSION dist-tag arg='$DIST_TAG'"
+          for pkg in runtime-linux-x64 runtime-linux-arm64 runtime-darwin-x64 runtime-darwin-arm64; do
+            echo "::group::publish @agent-assembly/${pkg}"
+            # shellcheck disable=SC2086
+            pnpm publish --access public --no-git-checks $DIST_TAG "packages/${pkg}"
+            echo "::endgroup::"
+          done
+
+      - name: Publish main @agent-assembly/sdk
+        # AAASM-2862: this step previously had no `if:` (it runs in BOTH
+        # publish_mode='all' and 'main-only'). Gate ONLY on dry_run so
+        # both modes still skip cleanly when the operator dispatches with
+        # dry-run=true.
+        if: steps.tag.outputs.dry_run != 'true'
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          # Derive the npm dist-tag from the SemVer pre-release identifier.
+          # 0.0.1-alpha.1 → --tag alpha, 0.0.1-rc.1 → --tag rc, 0.0.1 → (empty, defaults to @latest)
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([a-zA-Z]+) ]]; then
+            DIST_TAG="--tag ${BASH_REMATCH[1]}"
+          else
+            DIST_TAG=""
+          fi
+          echo "Publishing main SDK at version=$VERSION dist-tag arg='$DIST_TAG'"
+          # shellcheck disable=SC2086
+          pnpm publish --access public --no-git-checks $DIST_TAG
+
+      # AAASM-3840: keep the npm `latest` dist-tag current.
+      #
+      # The publish steps above route each build to a *channel* dist-tag derived
+      # from its SemVer pre-release identifier (alpha/beta/rc), and only a bare
+      # GA `X.Y.Z` publish moves `latest` implicitly. Nothing ever advances
+      # `latest` for a pre-release, so on a pre-1.0 project that has only ever
+      # shipped pre-releases, `latest` stays frozen at whatever the very first
+      # publish happened to be — making a bare `npm install @agent-assembly/sdk`
+      # resolve to an ancient alpha (the bug this fixes).
+      #
+      # POLICY (pre-1.0 / pre-GA): `latest` always points at the *highest*
+      # SemVer version currently on npm, across every channel. SemVer precedence
+      # (alpha < beta < rc < GA) makes this self-correcting and monotonic:
+      #   - a GA publish wins over any pre-release of the same base, so `latest`
+      #     naturally tracks the newest GA once one exists;
+      #   - while only pre-releases exist, `latest` tracks the newest pre-release
+      #     (e.g. rc.2 over beta.5 over alpha.9.1) instead of the oldest;
+      #   - it never regresses `latest` to an older build, even if an out-of-band
+      #     hotfix to an older channel is published after a newer one.
+      # Runs in BOTH publish modes (gated only on dry_run, like the main publish
+      # step) so every real publish re-asserts the invariant.
+      - name: Update `latest` dist-tag to newest published version
+        if: steps.tag.outputs.dry_run != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          PKG="@agent-assembly/sdk"
+          # All versions on npm (the just-published one included). `npm view
+          # versions --json` returns an array, or a bare string if exactly one
+          # version exists — normalize both to newline-delimited output.
+          mapfile -t VERSIONS < <(npm view "$PKG" versions --json | node -e '
+            const raw = require("fs").readFileSync(0, "utf8").trim();
+            const data = JSON.parse(raw);
+            for (const v of Array.isArray(data) ? data : [data]) console.log(v);
+          ')
+          if [[ ${#VERSIONS[@]} -eq 0 ]]; then
+            echo "::error::no published versions found for $PKG"
+            exit 1
+          fi
+          # `semver` sorts ascending and includes pre-releases when passed
+          # explicitly, so the last line is the highest by SemVer precedence.
+          NEWEST=$(pnpm dlx semver "${VERSIONS[@]}" | tail -n1)
+          CURRENT=$(npm view "$PKG" dist-tags.latest 2>/dev/null || echo "")
+          echo "newest published=$NEWEST  current latest=$CURRENT"
+          if [[ -z "$NEWEST" ]]; then
+            echo "::error::could not determine newest version for $PKG"
+            exit 1
+          fi
+          if [[ "$NEWEST" == "$CURRENT" ]]; then
+            echo "latest already points at $NEWEST — nothing to do"
+          else
+            npm dist-tag add "${PKG}@${NEWEST}" latest
+            echo "moved latest: ${CURRENT:-<unset>} -> $NEWEST"
+          fi
+
+      # AAASM-2955: cut a git tag + GitHub Release at the published npm
+      # version so the README "GitHub release" badge tracks the current
+      # release. Runs only on the real-publish path (dry-run skips it, same
+      # gate as the publish steps above). Idempotent: if the tag/release
+      # already exists (e.g. a workflow_dispatch re-run for a partial
+      # publish), it is left untouched rather than failing the job.
+      - name: Cut git tag + GitHub Release for published version
+        if: steps.tag.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_VERSION: ${{ steps.tag.outputs.npm_version }}
+          BINARY_SOURCE_TAG: ${{ steps.tag.outputs.binary_source_tag }}
+        run: |
+          set -euo pipefail
+          tag="v${NPM_VERSION}"
+          # Create the Release unless it already exists (idempotent re-run).
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::GitHub Release $tag already exists — leaving its metadata untouched (idempotent re-run)."
+          else
+            # Mark pre-release for any SemVer pre-release identifier (e.g.
+            # 0.0.1-beta.1); a bare X.Y.Z is a stable release.
+            prerelease_flag=""
+            if [[ "$NPM_VERSION" == *-* ]]; then
+              prerelease_flag="--prerelease"
+            fi
+            # shellcheck disable=SC2086
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$tag" \
+              $prerelease_flag \
+              --notes "node-sdk @agent-assembly/sdk@${NPM_VERSION} (bundled aasm binaries from agent-assembly ${BINARY_SOURCE_TAG})."
+          fi
+          # AAASM-3619: attach the CycloneDX SBOM to the Release. --clobber
+          # keeps this idempotent across re-runs (overwrites a stale asset).
+          gh release upload "$tag" sbom.cdx.json --repo "$GITHUB_REPOSITORY" --clobber
+
+  # AAASM-2751: cut the immutable Docusaurus docs snapshot for this release
+  # and repoint the channel metadata. This runs ONLY after `publish` succeeds,
+  # so a snapshot is only ever frozen for a real, finished release — never on a
+  # raw tag. It opens a docs-update PR against master (the repo's normal flow)
+  # rather than pushing to master directly.
+  version-docs:
+    name: Cut docs version snapshot and repoint channels
+    needs: publish
+    # AAASM-2862: don't cut an immutable docs snapshot for a version that
+    # was never published. Skip the entire docs-version job when the
+    # publish job ran in dry-run mode.
+    if: needs.publish.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      # `publish` resolved + validated these against semver, so they are safe
+      # to use below. NPM_VERSION drives the Docusaurus snapshot label (it is
+      # what users see in the dropdown + URL); BINARY_SOURCE_TAG is carried
+      # purely as metadata so the docs-version PR records which agent-assembly
+      # Release the bundled aasm binaries came from.
+      NPM_VERSION: ${{ needs.publish.outputs.npm_version }}
+      BINARY_SOURCE_TAG: ${{ needs.publish.outputs.binary_source_tag }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v4.2.2
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install website dependencies
+        # `--ignore-workspace` mirrors publish-docs.yml: without it pnpm 10
+        # inherits the parent workspace and produces no website/node_modules,
+        # so the docusaurus CLI is unavailable.
+        run: pnpm install --no-frozen-lockfile --ignore-workspace
+        working-directory: website
+
+      - name: Cut docs snapshot for the release tag
+        run: pnpm docusaurus docs:version "$NPM_VERSION"
+        working-directory: website
+
+      - name: Repoint version channels (labels, banners, lastVersion)
+        run: node scripts/version-channels.mjs
+
+      - name: Open docs-version PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="docs/version-${NPM_VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add website/versioned_docs website/versioned_sidebars \
+            website/versions.json website/versionChannels.json
+          git commit -m "📸 (docs): Cut docs snapshot for ${NPM_VERSION} and repoint channels"
+          git push origin "$branch"
+          gh pr create \
+            --base master \
+            --head "$branch" \
+            --title "📸 (docs): Cut docs snapshot for ${NPM_VERSION}" \
+            --body-file - <<EOF
+          Automated docs version snapshot cut by release-node.yml after the npm publish of \`${NPM_VERSION}\`. Freezes \`docs/\` into \`website/versioned_docs/version-${NPM_VERSION}\` and repoints the version channels (labels, banners, \`lastVersion\`).
+
+          Bundled aasm: \`${BINARY_SOURCE_TAG}\` (the agent-assembly Release whose per-platform binaries were bundled into the @agent-assembly/runtime-* sub-packages for this npm publish).
+          EOF
+
+      # AAASM-2794: self-approve + enable auto-merge so the snapshot lands on
+      # master without a per-release manual merge. The approve step MUST use a
+      # PAT (DOCS_BOT_PAT) because GitHub forbids self-approval from the same
+      # actor that opened the PR — the PAT is from the operator account, so the
+      # approval comes from a different actor than github-actions[bot]. Auto-
+      # merge waits for any required status checks, then squash-merges. master
+      # branch protection (1 required review + code-owner) is preserved.
+      - name: Self-approve docs-version PR (via PAT)
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_BOT_PAT }}
+        run: |
+          set -euo pipefail
+          branch="docs/version-${NPM_VERSION}"
+          gh pr review "$branch" --approve --body "Auto-approving deterministic docs snapshot (AAASM-2794)."
+
+      - name: Enable auto-merge on docs-version PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="docs/version-${NPM_VERSION}"
+          gh pr merge "$branch" --auto --squash --delete-branch
