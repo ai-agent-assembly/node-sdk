@@ -45,7 +45,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run ESM/CJS smoke tests
         run: pnpm vitest run tests/packaging/esm-resolution.test.ts tests/packaging/cjs-resolution.test.ts

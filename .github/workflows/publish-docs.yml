@@ -43,7 +43,7 @@ jobs:
           cache: pnpm
 
       - name: Install SDK dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Install website dependencies
         # `--ignore-workspace` tells pnpm to skip the parent

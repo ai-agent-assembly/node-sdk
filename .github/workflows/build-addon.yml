@@ -64,7 +64,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       # On PRs, a fast debug build is enough to prove the addon compiles
       # and the napi bindings load. Release builds (optimised, --platform
