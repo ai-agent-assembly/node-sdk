@@ -50,6 +50,29 @@ describe("redactSecrets (AAASM-3645)", () => {
     expect(safe).toContain("http://gw.test");
     expect(safe).toContain("a");
   });
+
+  it("strips the widened secret-key set: password/secret/x-api-key/cookie/set-cookie (AAASM-3896)", () => {
+    const config = {
+      keepMe: "visible",
+      password: "SENTINEL-PASSWORD",
+      Secret: "SENTINEL-SECRET",
+      "X-API-Key": "SENTINEL-XAPIKEY",
+      Cookie: "SENTINEL-COOKIE",
+      "set-cookie": "SENTINEL-SETCOOKIE"
+    };
+    const safe = JSON.stringify(redactSecrets(config));
+    for (const sentinel of [
+      "SENTINEL-PASSWORD",
+      "SENTINEL-SECRET",
+      "SENTINEL-XAPIKEY",
+      "SENTINEL-COOKIE",
+      "SENTINEL-SETCOOKIE"
+    ]) {
+      expect(safe).not.toContain(sentinel);
+    }
+    expect(safe).toContain(REDACTED);
+    expect(safe).toContain("visible");
+  });
 });
 
 describe("redactErrorMessage (AAASM-3645)", () => {

@@ -22,7 +22,15 @@ const SECRET_KEYS: ReadonlySet<string> = new Set([
   "credentialtoken",
   "credential_token",
   "authorization",
-  "token"
+  "token",
+  // AAASM-3896: defence-in-depth for future callers that log arbitrary config
+  // or HTTP header maps. These key names commonly carry credentials even though
+  // the SDK itself does not emit them today, so redact them pre-emptively.
+  "password",
+  "secret",
+  "x-api-key",
+  "cookie",
+  "set-cookie"
 ]);
 
 /** Placeholder substituted for any redacted credential value. */
