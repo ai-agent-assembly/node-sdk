@@ -85,15 +85,32 @@ export function redactSecrets(value: unknown): unknown {
 }
 
 /**
- * Render an unknown error for a log message with any `Bearer <token>` / API-key
- * substring scrubbed. Defends the registration-failure warning path: a wrapped
- * transport error could in principle carry an auth header in its message, so we
- * strip the bearer credential before it reaches `console.*` (AAASM-3645).
+ * Render an unknown error for a log message with credential substrings scrubbed.
+ * Defends the registration-failure warning path: a wrapped transport error could
+ * carry an auth header, a bare token, or a tokenised URL in its message, so we
+ * strip the credential before it reaches `console.*` (AAASM-3645, AAASM-3925).
+ *
+ * Beyond the original `Bearer` / `Authorization:` markers this also scrubs bare,
+ * self-identifying token shapes that travel without a header prefix: JSON Web
+ * Tokens (the `eyJ` base64url header), `sk-`-prefixed API keys, and
+ * credential-bearing URL query parameters (`?token=…`, `&api_key=…`). The
+ * patterns are deliberately shape-specific to avoid mangling ordinary prose.
  */
 export function redactErrorMessage(error: unknown): string {
   const raw = String(error);
-  // Replace the credential that follows a `Bearer ` / `Authorization:` marker.
-  return raw
-    .replace(/(Bearer\s+)[\w.\-+/=]+/gi, `$1${REDACTED}`)
-    .replace(/(Authorization\s*[:=]\s*)\S+/gi, `$1${REDACTED}`);
+  return (
+    raw
+      // Credential following a `Bearer ` / `Authorization:` marker.
+      .replace(/(Bearer\s+)[\w.\-+/=]+/gi, `$1${REDACTED}`)
+      .replace(/(Authorization\s*[:=]\s*)\S+/gi, `$1${REDACTED}`)
+      // Bare JWTs: `eyJ<base64url header>.<payload>[.<signature>]`.
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?/g, REDACTED)
+      // Bare `sk-`-prefixed API keys (OpenAI-style) of credential length.
+      .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, REDACTED)
+      // Credential-bearing URL query parameters (key contains token/secret/etc.).
+      .replace(
+        /([?&][\w-]*(?:token|key|secret|password|credential)[\w-]*=)[^&\s"']+/gi,
+        `$1${REDACTED}`
+      )
+  );
 }
