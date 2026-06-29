@@ -73,14 +73,84 @@ describe("redactSecrets (AAASM-3645)", () => {
     expect(safe).toContain(REDACTED);
     expect(safe).toContain("visible");
   });
+
+  it("strips the AAASM-3925 key set and suffix/substring variants", () => {
+    const config = {
+      access_token: "SENTINEL-ACCESS",
+      refresh_token: "SENTINEL-REFRESH",
+      client_secret: "SENTINEL-CLIENTSECRET",
+      private_key: "SENTINEL-PRIVKEY",
+      credential: "SENTINEL-CRED",
+      passwd: "SENTINEL-PASSWD",
+      session: "SENTINEL-SESSION",
+      "api-key": "SENTINEL-APIKEY",
+      // Suffix / substring matches for future variants.
+      sessionToken: "SENTINEL-SESSIONTOKEN",
+      dbPassword: "SENTINEL-DBPASSWORD",
+      vaultSecret: "SENTINEL-VAULTSECRET"
+    };
+    const safe = JSON.stringify(redactSecrets(config));
+    for (const sentinel of [
+      "SENTINEL-ACCESS",
+      "SENTINEL-REFRESH",
+      "SENTINEL-CLIENTSECRET",
+      "SENTINEL-PRIVKEY",
+      "SENTINEL-CRED",
+      "SENTINEL-PASSWD",
+      "SENTINEL-SESSION",
+      "SENTINEL-APIKEY",
+      "SENTINEL-SESSIONTOKEN",
+      "SENTINEL-DBPASSWORD",
+      "SENTINEL-VAULTSECRET"
+    ]) {
+      expect(safe).not.toContain(sentinel);
+    }
+  });
+
+  it("does NOT over-redact benign keys that only start with a secret word", () => {
+    const config = {
+      secretSantaName: "Alice",
+      tokenCount: 42,
+      keyValueStore: "kv"
+    };
+    const safe = redactSecrets(config) as Record<string, unknown>;
+    expect(safe.secretSantaName).toBe("Alice");
+    expect(safe.tokenCount).toBe(42);
+    expect(safe.keyValueStore).toBe("kv");
+  });
 });
 
-describe("redactErrorMessage (AAASM-3645)", () => {
+describe("redactErrorMessage (AAASM-3645, AAASM-3925)", () => {
   it("scrubs a Bearer credential from an error string", () => {
     const err = new Error(`401 from gateway (Authorization: Bearer ${SENTINEL_KEY})`);
     const scrubbed = redactErrorMessage(err);
     expect(scrubbed).not.toContain(SENTINEL_KEY);
     expect(scrubbed).toContain(REDACTED);
+  });
+
+  it("scrubs a bare JWT carried without a Bearer prefix", () => {
+    const jwt =
+      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJTRU5USU5FTC1KV1QtU1VCIn0.c2lnbmF0dXJlLXNlbnRpbmVs";
+    const scrubbed = redactErrorMessage(new Error(`token rejected: ${jwt}`));
+    expect(scrubbed).not.toContain("SENTINEL-JWT");
+    expect(scrubbed).not.toContain(jwt);
+    expect(scrubbed).toContain(REDACTED);
+  });
+
+  it("scrubs a bare sk- API key", () => {
+    const scrubbed = redactErrorMessage(new Error("openai error: sk-SENTINELabc123XYZ456"));
+    expect(scrubbed).not.toContain("sk-SENTINELabc123XYZ456");
+    expect(scrubbed).toContain(REDACTED);
+  });
+
+  it("scrubs a credential-bearing URL query parameter", () => {
+    const scrubbed = redactErrorMessage(
+      new Error("GET https://gw.test/cb?access_token=SENTINEL-QTOKEN&page=2 failed")
+    );
+    expect(scrubbed).not.toContain("SENTINEL-QTOKEN");
+    expect(scrubbed).toContain(REDACTED);
+    // Non-credential query params are preserved.
+    expect(scrubbed).toContain("page=2");
   });
 });
 
