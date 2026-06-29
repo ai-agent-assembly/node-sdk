@@ -30,8 +30,37 @@ const SECRET_KEYS: ReadonlySet<string> = new Set([
   "secret",
   "x-api-key",
   "cookie",
-  "set-cookie"
+  "set-cookie",
+  // AAASM-3925: additional credential-bearing key names seen in the wild
+  // (OAuth tokens, mTLS material, session handles, hyphenated header forms).
+  "access_token",
+  "refresh_token",
+  "client_secret",
+  "private_key",
+  "credential",
+  "passwd",
+  "session",
+  "api-key"
 ]);
+
+/**
+ * Suffix / substring patterns that catch *future* credential-key variants the
+ * exact {@link SECRET_KEYS} set has not enumerated (AAASM-3925). Applied to the
+ * lower-cased key name.
+ *
+ * `secret` and `token` are matched as **suffixes** (`endsWith`), not substrings,
+ * on purpose: `client_secret` / `clientSecret` and `accessToken` / `csrf_token`
+ * are caught while a benign key that merely *starts* with the word (e.g.
+ * `secretSantaName`, `tokenCount`) is preserved. `password` is matched as a
+ * substring because every key containing it is credential-bearing.
+ */
+function isSecretKey(rawKey: string): boolean {
+  const key = rawKey.toLowerCase();
+  if (SECRET_KEYS.has(key)) {
+    return true;
+  }
+  return key.endsWith("token") || key.endsWith("secret") || key.includes("password");
+}
 
 /** Placeholder substituted for any redacted credential value. */
 export const REDACTED = "<redacted>";
@@ -48,7 +77,7 @@ export function redactSecrets(value: unknown): unknown {
   if (value !== null && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value)) {
-      out[key] = SECRET_KEYS.has(key.toLowerCase()) ? REDACTED : redactSecrets(val);
+      out[key] = isSecretKey(key) ? REDACTED : redactSecrets(val);
     }
     return out;
   }
