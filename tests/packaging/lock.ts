@@ -15,12 +15,10 @@ const EMPTY_LOCK_GRACE_MS = 5_000;
 // dist/. Dead-pid detection, not this TTL, is the primary staleness signal.
 const STALE_LOCK_TTL_MS = 120_000;
 // Bound the acquire wait so a lock held by a live, non-stale process surfaces an
-// actionable error instead of an opaque "Test timed out". Kept just under the
-// 30s per-test budget: every packaging critical section is a multi-second build,
-// so a waiter that has not acquired the lock by here cannot finish before the
-// per-test timeout anyway — this only ever turns a would-be timeout into a clear
-// message, never failing a waiter that would otherwise have acquired in time.
-const LOCK_ACQUIRE_TIMEOUT_MS = 28_000;
+// actionable error instead of an opaque "Test timed out". Keep this just under
+// the packaging test timeout so queued Windows runners can wait for earlier
+// multi-second pack/build checks while still failing with a clear message.
+const LOCK_ACQUIRE_TIMEOUT_MS = 110_000;
 const RETRYABLE_LOCK_ERROR_CODES = new Set(["EEXIST", "EPERM", "EACCES"]);
 
 /**

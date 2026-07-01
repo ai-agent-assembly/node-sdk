@@ -125,10 +125,13 @@ describe("runtime — F115 lifecycle", () => {
     expect(() => assertSafeBinaryPath(join(USER_LOCAL_BIN, BINARY_NAME))).not.toThrow();
   });
 
-  it("startRuntime spawns a detached subprocess and appends to the runtime log", () => {
+  it("startRuntime spawns a detached subprocess and appends to the runtime log", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "aasm-spawn-"));
+    let childPid: number | undefined;
+    let cleanupError: unknown;
     try {
       const child = startRuntime(execPath, 7980, tmp);
+      childPid = child.pid;
 
       expect(typeof child.pid).toBe("number");
       // The log file is opened (O_APPEND) before the spawn, so it exists
@@ -142,9 +145,32 @@ describe("runtime — F115 lifecycle", () => {
       } catch {
         // Already exited — nothing to reap.
       }
+      await new Promise<void>((resolve) => {
+        child.once("close", () => resolve());
+        setTimeout(resolve, 500);
+      });
     } finally {
-      rmSync(tmp, { recursive: true, force: true });
+      try {
+        if (childPid !== undefined) process.kill(childPid);
+      } catch {
+        // Already exited.
+      }
+      try {
+        rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+      } catch (error) {
+        if (
+          !(
+            process.platform === "win32" &&
+            error instanceof Error &&
+            "code" in error &&
+            error.code === "ENOTEMPTY"
+          )
+        ) {
+          cleanupError = error;
+        }
+      }
     }
+    if (cleanupError !== undefined) throw cleanupError;
   });
 
   it("initAssembly is idempotent when a sidecar is already running on the target port", async () => {

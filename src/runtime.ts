@@ -13,7 +13,7 @@ import { existsSync, openSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createConnection } from "node:net";
 import { arch, homedir, platform } from "node:os";
-import { delimiter as PATH_DELIM, dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
+import { delimiter as PATH_DELIM, dirname, isAbsolute, join, resolve as resolvePath, sep } from "node:path";
 import { cwd, env } from "node:process";
 
 export const BINARY_NAME = "aasm";
@@ -147,7 +147,12 @@ export function assertSafeBinaryPath(binaryPath: string): void {
   const resolved = resolvePath(binaryPath);
   const bundled = bundledRuntimeBinaryPath();
   if (bundled !== null && resolvePath(bundled) === resolved) return;
-  const ok = allowedInstallDirs().some((dir) => resolved.startsWith(resolvePath(dir) + "/"));
+  const comparable = platform() === "win32" ? resolved.toLowerCase() : resolved;
+  const ok = allowedInstallDirs().some((dir) => {
+    const resolvedDir = resolvePath(dir);
+    const comparableDir = platform() === "win32" ? resolvedDir.toLowerCase() : resolvedDir;
+    return comparable === comparableDir || comparable.startsWith(comparableDir + sep);
+  });
   if (!ok) {
     throw new Error(
       `Refusing to auto-start 'aasm' from an untrusted location: ${resolved}. ` +

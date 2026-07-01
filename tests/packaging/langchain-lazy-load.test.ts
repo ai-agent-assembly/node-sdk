@@ -22,5 +22,5 @@ describe("packaging langchain lazy-load", () => {
       // It must instead be loaded lazily, only on the langchain code path.
       expect(initAssembly).toMatch(/await import\(\s*["']\.\.\/adapters\/langchain/);
     });
-  }, 60000);
+  }, 120000);
 });
