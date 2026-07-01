@@ -125,10 +125,12 @@ describe("runtime — F115 lifecycle", () => {
     expect(() => assertSafeBinaryPath(join(USER_LOCAL_BIN, BINARY_NAME))).not.toThrow();
   });
 
-  it("startRuntime spawns a detached subprocess and appends to the runtime log", () => {
+  it("startRuntime spawns a detached subprocess and appends to the runtime log", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "aasm-spawn-"));
+    let childPid: number | undefined;
     try {
       const child = startRuntime(execPath, 7980, tmp);
+      childPid = child.pid;
 
       expect(typeof child.pid).toBe("number");
       // The log file is opened (O_APPEND) before the spawn, so it exists
@@ -142,8 +144,17 @@ describe("runtime — F115 lifecycle", () => {
       } catch {
         // Already exited — nothing to reap.
       }
+      await new Promise<void>((resolve) => {
+        child.once("close", () => resolve());
+        setTimeout(resolve, 500);
+      });
     } finally {
-      rmSync(tmp, { recursive: true, force: true });
+      try {
+        if (childPid !== undefined) process.kill(childPid);
+      } catch {
+        // Already exited.
+      }
+      rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
     }
   });
 
