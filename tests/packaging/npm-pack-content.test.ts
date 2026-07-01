@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { withPackagingLock } from "./lock.js";
+import { NPM_COMMAND } from "./npm-command.js";
 
 interface NpmPackEntry {
   filename: string;
@@ -20,7 +21,7 @@ describe("packaging npm pack contents", () => {
       // shell metacharacters, which would corrupt a shell-built command string.
       const packEntries = JSON.parse(
         execFileSync(
-          "npm",
+          NPM_COMMAND,
           [
             "pack",
             "--json",
