@@ -10,6 +10,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, wr
 import { createServer } from "node:net";
 import { arch, platform, tmpdir } from "node:os";
 import { join } from "node:path";
+import { execPath } from "node:process";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,6 +18,7 @@ import {
   ENV_AUTO_START,
   INSTALL_HINT,
   RUNTIME_LOG_FILENAME,
+  USER_LOCAL_BIN,
   assertSafeBinaryPath,
   findAasmBinary,
   initAssembly,
@@ -120,14 +122,13 @@ describe("runtime — F115 lifecycle", () => {
   it("assertSafeBinaryPath rejects relative and untrusted-location binaries", () => {
     expect(() => assertSafeBinaryPath("aasm")).toThrow(/non-absolute/);
     expect(() => assertSafeBinaryPath("/tmp/evil/aasm")).toThrow(/untrusted location/);
-    expect(() => assertSafeBinaryPath("/usr/local/bin/aasm")).not.toThrow();
+    expect(() => assertSafeBinaryPath(join(USER_LOCAL_BIN, BINARY_NAME))).not.toThrow();
   });
 
   it("startRuntime spawns a detached subprocess and appends to the runtime log", () => {
     const tmp = mkdtempSync(join(tmpdir(), "aasm-spawn-"));
     try {
-      const bin = makeFakeAasm(tmp);
-      const child = startRuntime(bin, 7980, tmp);
+      const child = startRuntime(execPath, 7980, tmp);
 
       expect(typeof child.pid).toBe("number");
       // The log file is opened (O_APPEND) before the spawn, so it exists
