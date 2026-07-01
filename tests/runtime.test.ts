@@ -128,6 +128,7 @@ describe("runtime — F115 lifecycle", () => {
   it("startRuntime spawns a detached subprocess and appends to the runtime log", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "aasm-spawn-"));
     let childPid: number | undefined;
+    let cleanupError: unknown;
     try {
       const child = startRuntime(execPath, 7980, tmp);
       childPid = child.pid;
@@ -165,10 +166,11 @@ describe("runtime — F115 lifecycle", () => {
             error.code === "ENOTEMPTY"
           )
         ) {
-          throw error;
+          cleanupError = error;
         }
       }
     }
+    if (cleanupError !== undefined) throw cleanupError;
   });
 
   it("initAssembly is idempotent when a sidecar is already running on the target port", async () => {
