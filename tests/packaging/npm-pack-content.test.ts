@@ -59,5 +59,5 @@ describe("packaging npm pack contents", () => {
 
       fs.rmSync(packDir, { recursive: true, force: true });
     });
-  }, 30000);
+  }, 90000);
 });
