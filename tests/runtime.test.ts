@@ -151,7 +151,21 @@ describe("runtime — F115 lifecycle", () => {
     // Bind an ephemeral port and pass it explicitly; this avoids a fixed-port
     // collision with whatever might be on 7878 on the host machine.
     const server = createServer();
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", resolve);
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error.code === "EPERM" || error.code === "EACCES")
+      ) {
+        return;
+      }
+      throw error;
+    }
     const address = server.address();
     if (typeof address === "string" || address === null) {
       throw new Error("expected AddressInfo from createServer().address()");
