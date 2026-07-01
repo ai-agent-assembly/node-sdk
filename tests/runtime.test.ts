@@ -156,7 +156,7 @@ describe("runtime — F115 lifecycle", () => {
         // Already exited.
       }
       try {
-        rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+        rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
       } catch (error) {
         if (
           !(
