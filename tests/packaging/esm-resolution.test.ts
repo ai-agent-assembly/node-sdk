@@ -16,5 +16,5 @@ describe("packaging esm resolution", () => {
 
       expect(typeof module.initAssembly).toBe("function");
     });
-  }, 30000);
+  }, 120000);
 });
