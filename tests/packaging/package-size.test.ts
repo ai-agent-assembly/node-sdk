@@ -1,9 +1,9 @@
-import { execFileSync, execSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { withPackagingLock } from "./lock.js";
-import { NPM_COMMAND } from "./npm-command.js";
+import { execNpm } from "./npm-command.js";
 
 interface NpmPackEntry {
   filename: string;
@@ -21,8 +21,7 @@ describe("packaging size budget", () => {
       // Pass the temp-dir path as a discrete argument. On Windows, shell-built
       // command strings can corrupt absolute paths used as npm arguments.
       const packEntries = JSON.parse(
-        execFileSync(
-          NPM_COMMAND,
+        execNpm(
           [
             "pack",
             "--json",
@@ -32,10 +31,7 @@ describe("packaging size budget", () => {
             "--pack-destination",
             packDir
           ],
-          {
-            encoding: "utf8",
-            stdio: "pipe"
-          }
+          { encoding: "utf8", stdio: "pipe" }
         )
       ) as NpmPackEntry[];
 
