@@ -154,7 +154,20 @@ describe("runtime — F115 lifecycle", () => {
       } catch {
         // Already exited.
       }
-      rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+      try {
+        rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+      } catch (error) {
+        if (
+          !(
+            process.platform === "win32" &&
+            error instanceof Error &&
+            "code" in error &&
+            error.code === "ENOTEMPTY"
+          )
+        ) {
+          throw error;
+        }
+      }
     }
   });
 
