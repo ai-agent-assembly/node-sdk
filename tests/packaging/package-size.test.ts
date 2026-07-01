@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -17,9 +17,20 @@ describe("packaging size budget", () => {
 
       const packDir = fs.mkdtempSync(path.resolve(process.cwd(), ".pack-"));
 
+      // Pass the temp-dir path as a discrete argument. On Windows, shell-built
+      // command strings can corrupt absolute paths used as npm arguments.
       const packEntries = JSON.parse(
-        execSync(
-          `npm pack --json --ignore-scripts --cache ./.npm-cache --pack-destination ${packDir}`,
+        execFileSync(
+          "npm",
+          [
+            "pack",
+            "--json",
+            "--ignore-scripts",
+            "--cache",
+            "./.npm-cache",
+            "--pack-destination",
+            packDir
+          ],
           {
             encoding: "utf8",
             stdio: "pipe"
