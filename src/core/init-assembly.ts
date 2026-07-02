@@ -133,7 +133,10 @@ export function createClient(
       createNativeClient({
         gateway: config.gatewayUrl ?? "",
         apiKey: config.apiKey ?? "",
-        mode: "napi-inprocess"
+        mode: "napi-inprocess",
+        // AAASM-4013: under enforce, a runtime that returns no authoritative
+        // verdict (fail-open sentinel / unknown decision) must deny, not allow.
+        failClosed: config.enforcementMode === "enforce"
       });
     return createNativeGatewayClient(mode, nativeClient, config.agentId, httpBaseUrl, config.enforcementMode);
   }
@@ -408,7 +411,10 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
     nativeClient = createNativeClient({
       gateway: resolvedGatewayUrl,
       apiKey: resolvedApiKey,
-      mode: resolvedConfig.mode === "napi-inprocess" ? "napi-inprocess" : "grpc-sidecar"
+      mode: resolvedConfig.mode === "napi-inprocess" ? "napi-inprocess" : "grpc-sidecar",
+      // AAASM-4013: under enforce, a runtime that returns no authoritative
+      // verdict (fail-open sentinel / unknown decision) must deny, not allow.
+      failClosed: resolvedConfig.enforcementMode === "enforce"
     });
   }
 

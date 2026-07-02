@@ -118,21 +118,58 @@ export interface NativeClient {
 }
 
 /**
+ * Reason string the native shim attaches to a fail-open `"allow"` when the
+ * runtime does not answer (AAASM-4013). It must stay byte-for-byte identical to
+ * `FAIL_OPEN_REASON` in `native/aa-ffi-node/src/lib.rs`: the shim folds
+ * `QueryFailed` / `ChannelClosed` / `Shutdown` onto `"allow"` + this reason, so
+ * it is the *only* signal the JS layer has to tell "the runtime failed open"
+ * apart from a genuine policy `"allow"`. Under `failClosed` that distinction is
+ * security-critical.
+ */
+export const FAIL_OPEN_REASON = "aa-runtime unreachable or slow; failing open (advisory SDK)";
+
+/**
  * Translate the native `{decision, reason}` verdict into the SDK's
  * `PolicyResult`. Only `"deny"` blocks; `"pending"` routes to the approval
- * path; `"allow"` / `"redact"` / any unrecognized value proceed. This mirrors
- * the shared enforcement contract across the Python / Go / Node SDKs.
+ * path; `"allow"` / `"redact"` proceed. This mirrors the shared enforcement
+ * contract across the Python / Go / Node SDKs.
  *
- * The native primitive already fails open (returns `"allow"`) when the runtime
- * is unreachable or too slow, so a missing or degraded runtime never blocks.
+ * **Fail-closed (AAASM-4013):** the native shim folds an unreachable / slow /
+ * closed runtime onto `"allow"` + {@link FAIL_OPEN_REASON}, and an
+ * unspecified / unrecognized runtime verdict onto the empty decision `""`.
+ * Neither is an authoritative allow — it is "no verdict came back". When
+ * `failClosed` is set (only under `enforcementMode: "enforce"`) these must
+ * **deny** rather than silently proceed, matching the Python SDK's enforce
+ * posture. When `failClosed` is `false` (observe / disabled / unset) they fail
+ * open, preserving the advisory behavior — the proxy / eBPF layers remain
+ * authoritative.
  */
-function mapDecisionToPolicyResult(verdict: NativePolicyDecision): PolicyResult {
+function mapDecisionToPolicyResult(
+  verdict: NativePolicyDecision,
+  failClosed: boolean
+): PolicyResult {
   switch (verdict.decision) {
     case "deny":
       return { denied: true, pending: false, reason: verdict.reason };
     case "pending":
       return { denied: false, pending: true, reason: verdict.reason };
+    case "allow":
+      if (failClosed && verdict.reason === FAIL_OPEN_REASON) {
+        return { denied: true, pending: false, reason: verdict.reason };
+      }
+      return { denied: false, pending: false };
+    case "redact":
+      return { denied: false, pending: false };
     default:
+      // Empty / unrecognized decision: the runtime produced no authoritative
+      // verdict. Deny under enforce (fail closed); otherwise proceed.
+      if (failClosed) {
+        return {
+          denied: true,
+          pending: false,
+          reason: verdict.reason || "runtime returned no authoritative decision"
+        };
+      }
       return { denied: false, pending: false };
   }
 }
@@ -200,6 +237,10 @@ function loadNativeBinding(): NativeBinding {
 
 export function createNativeClient(options: InitAssemblyOptions): NativeClient {
   const mode = options.mode ?? "grpc-sidecar";
+  // Fail-closed posture (AAASM-4013): deny on a non-authoritative verdict only
+  // under enforce. Defaults to fail-open so observe / disabled / unset are
+  // unchanged.
+  const failClosed = options.failClosed ?? false;
 
   if (mode !== "napi-inprocess") {
     return {
@@ -293,7 +334,7 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
       // or too slow, so a missing or degraded runtime never blocks the agent.
       const handle = await getHandle();
       const verdict = await binding.queryPolicy(handle, action);
-      return mapDecisionToPolicyResult(verdict);
+      return mapDecisionToPolicyResult(verdict, failClosed);
     },
     register: async (options: RegisterOptions) => {
       // Register on the same session the queryPolicy path uses, so the token
