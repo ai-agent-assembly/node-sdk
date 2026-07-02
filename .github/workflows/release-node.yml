@@ -51,7 +51,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # npm OIDC Trusted Publishing + SLSA provenance
 
 jobs:
   publish:
