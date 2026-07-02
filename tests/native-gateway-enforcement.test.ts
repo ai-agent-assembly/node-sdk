@@ -177,3 +177,86 @@ describe("native gateway enforcement (AAASM-3050)", () => {
     expect(executeFn).toHaveBeenCalledOnce();
   });
 });
+
+/**
+ * AAASM-4013 — end-to-end fail-closed enforcement through the REAL native client.
+ *
+ * Unlike the suite above (which hand-rolls a `NativeClient`), these tests drive
+ * the actual `createNativeClient` over a mocked native binding so the real
+ * `{decision, reason}` → `PolicyResult` mapping runs. This is what makes the bug
+ * observable: the shim folds a killed / stalled / unreachable runtime onto a
+ * NON-throwing `allow` + `FAIL_OPEN_REASON` (not a thrown error), and folds an
+ * unspecified verdict onto the empty decision `""`. Under `enforcementMode:
+ * "enforce"` (→ `failClosed: true`) both must block the tool; without it they
+ * fail open, so the tool proceeds (observe / disabled posture).
+ */
+async function realNativeClientWithVerdict(
+  verdict: { decision: string; reason: string },
+  failClosed: boolean
+): Promise<NativeClient> {
+  vi.resetModules();
+  vi.doMock("node:module", () => ({
+    createRequire: () => {
+      const binding = {
+        connect: vi.fn(async () => ({ id: "handle-4013" })),
+        sendEvent: vi.fn(() => undefined),
+        queryPolicy: vi.fn(() => verdict),
+        disconnect: vi.fn(async () => undefined)
+      };
+      return () => binding;
+    }
+  }));
+  const mod = await import("../src/native/client.js");
+  return mod.createNativeClient({
+    gateway: "/tmp/aa.sock",
+    apiKey: "test-key",
+    mode: "napi-inprocess",
+    failClosed
+  });
+}
+
+describe("native gateway fail-closed under enforce (AAASM-4013)", () => {
+  const FAIL_OPEN_REASON = "aa-runtime unreachable or slow; failing open (advisory SDK)";
+
+  it("ENFORCE: a runtime-down allow sentinel blocks the tool (never runs its body)", async () => {
+    const nativeClient = await realNativeClientWithVerdict(
+      { decision: "allow", reason: FAIL_OPEN_REASON },
+      true
+    );
+    const gateway = createNativeGatewayClient("napi-inprocess", nativeClient, "agent-1");
+
+    const executeFn = vi.fn(async () => "ran-despite-runtime-down");
+    const tools = { delete_all: { description: "danger", execute: executeFn } };
+    withAssembly(tools, { gatewayClient: gateway });
+
+    await expect(tools.delete_all.execute()).rejects.toThrow(PolicyViolationError);
+    expect(executeFn).not.toHaveBeenCalled();
+  });
+
+  it("ENFORCE: an unknown/empty runtime decision blocks the tool", async () => {
+    const nativeClient = await realNativeClientWithVerdict({ decision: "", reason: "" }, true);
+    const gateway = createNativeGatewayClient("napi-inprocess", nativeClient, "agent-1");
+
+    const executeFn = vi.fn(async () => "ran-on-unknown-decision");
+    const tools = { wire_transfer: { description: "money", execute: executeFn } };
+    withAssembly(tools, { gatewayClient: gateway });
+
+    await expect(tools.wire_transfer.execute()).rejects.toThrow(PolicyViolationError);
+    expect(executeFn).not.toHaveBeenCalled();
+  });
+
+  it("OBSERVE (no failClosed): the same runtime-down sentinel fails open and the tool runs", async () => {
+    const nativeClient = await realNativeClientWithVerdict(
+      { decision: "allow", reason: FAIL_OPEN_REASON },
+      false
+    );
+    const gateway = createNativeGatewayClient("napi-inprocess", nativeClient, "agent-1");
+
+    const executeFn = vi.fn(async () => "ran-fail-open");
+    const tools = { send_email: { description: "email", execute: executeFn } };
+    withAssembly(tools, { gatewayClient: gateway });
+
+    await expect(tools.send_email.execute()).resolves.toBe("ran-fail-open");
+    expect(executeFn).toHaveBeenCalledOnce();
+  });
+});

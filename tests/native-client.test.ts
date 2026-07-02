@@ -187,6 +187,106 @@ describe("createNativeClient", () => {
     await client.close();
   });
 
+  // AAASM-4013: the native shim folds an unreachable/slow/closed runtime onto a
+  // NON-throwing `allow` + FAIL_OPEN_REASON, and an unspecified runtime verdict
+  // onto the empty decision "". Under `failClosed` (enforce) neither is an
+  // authoritative allow, so both must deny rather than silently proceed.
+  describe("fail-closed on non-authoritative verdicts (AAASM-4013)", () => {
+    it("napi-inprocess + failClosed: the fail-open allow sentinel denies", async () => {
+      const mod = await loadNativeClientWithBinding(() => ({
+        connect: vi.fn(async () => ({ id: "handle-sentinel" })),
+        sendEvent: vi.fn(() => undefined),
+        // The REAL runtime-down verdict: a non-throwing allow tagged with the
+        // shim's fail-open reason (not a synthetic throw).
+        queryPolicy: vi.fn(() => ({ decision: "allow", reason: mod.FAIL_OPEN_REASON })),
+        disconnect: vi.fn(async () => undefined)
+      }));
+
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess",
+        failClosed: true
+      });
+
+      await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+        denied: true,
+        pending: false,
+        reason: mod.FAIL_OPEN_REASON
+      });
+      await client.close();
+    });
+
+    it("napi-inprocess + failClosed: an unknown/empty decision denies", async () => {
+      const mod = await loadNativeClientWithBinding(() => ({
+        connect: vi.fn(async () => ({ id: "handle-unknown" })),
+        sendEvent: vi.fn(() => undefined),
+        // Unspecified/garbled runtime verdict maps to "" via decision_to_str.
+        queryPolicy: vi.fn(() => ({ decision: "", reason: "" })),
+        disconnect: vi.fn(async () => undefined)
+      }));
+
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess",
+        failClosed: true
+      });
+
+      await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+        denied: true,
+        pending: false,
+        reason: "runtime returned no authoritative decision"
+      });
+      await client.close();
+    });
+
+    it("napi-inprocess without failClosed: the sentinel still fails open (observe/disabled)", async () => {
+      const mod = await loadNativeClientWithBinding(() => ({
+        connect: vi.fn(async () => ({ id: "handle-open" })),
+        sendEvent: vi.fn(() => undefined),
+        queryPolicy: vi.fn(() => ({ decision: "allow", reason: mod.FAIL_OPEN_REASON })),
+        disconnect: vi.fn(async () => undefined)
+      }));
+
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess"
+      });
+
+      await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+        denied: false,
+        pending: false
+      });
+      await client.close();
+    });
+
+    it("napi-inprocess + failClosed: a genuine authoritative allow still proceeds", async () => {
+      const mod = await loadNativeClientWithBinding(() => ({
+        connect: vi.fn(async () => ({ id: "handle-genuine" })),
+        sendEvent: vi.fn(() => undefined),
+        // A real policy allow (not the fail-open sentinel) must not be denied,
+        // even under enforce.
+        queryPolicy: vi.fn(() => ({ decision: "allow", reason: "policy: permitted" })),
+        disconnect: vi.fn(async () => undefined)
+      }));
+
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess",
+        failClosed: true
+      });
+
+      await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+        denied: false,
+        pending: false
+      });
+      await client.close();
+    });
+  });
+
   it("maps connect failure to NativeConnectError", async () => {
     const mod = await loadNativeClientWithBinding(() => ({
       connect: vi.fn(async () => {
