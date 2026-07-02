@@ -3,10 +3,12 @@
 # (Codecov via `files: ./coverage/lcov.info`, Sonar via
 # `sonar.javascript.lcov.reportPaths`). The report source is therefore unified —
 # any residual % delta between the two dashboards is engine-level only (Sonar's
-# analyzer vs vitest/v8 line counting) plus scope (Sonar limits to
-# `sonar.sources=src/`), NOT a coverage regression. The `ignore` list below is
-# kept in lockstep with Sonar's exclusions (`src/proto/generated/**`) so both
-# tools measure the same code.
+# analyzer vs vitest/v8 line counting), NOT a coverage regression. The `ignore`
+# list below reconciles Codecov's measured file set with Sonar's scope
+# (`sonar.sources=src/`): it drops the generated proto (`src/proto/generated/**`,
+# mirroring `sonar.coverage.exclusions`) AND the build/release helper scripts
+# (`scripts/**`) that vitest pulls into lcov.info but Sonar never measures, so
+# both tools now count the same effective set (`src/` minus generated code).
 codecov:
   token: $CODECOV_TOKEN
   branch: master
@@ -16,3 +18,8 @@ ignore:
   # Generated protoc-gen-ts_proto output; Sonar excludes it too
   # (sonar.coverage.exclusions in sonar-project.properties).
   - "src/proto/generated/**"
+  # Build/release helper scripts. vitest's coverage.include pulls scripts/*.mjs
+  # into lcov.info, but Sonar measures only sonar.sources=src/, so Codecov
+  # counted them and Sonar did not — the sole cause of the headline % gap.
+  # Ignoring them makes Codecov's measured set equal src/ (minus generated proto).
+  - "scripts/**"
