@@ -135,7 +135,7 @@ export function createClient(
         apiKey: config.apiKey ?? "",
         mode: "napi-inprocess"
       });
-    return createNativeGatewayClient(mode, nativeClient, config.agentId, httpBaseUrl);
+    return createNativeGatewayClient(mode, nativeClient, config.agentId, httpBaseUrl, config.enforcementMode);
   }
 
   return createNoopGatewayClient(mode, httpBaseUrl);
