@@ -7,6 +7,7 @@ import type {
   GatewayResultRecord
 } from "../types/gateway-governance.js";
 import type { AssemblyMode } from "../types/assembly-mode.js";
+import type { EnforcementMode } from "../types/enforcement-mode.js";
 import type { NativeClient } from "../native/client.js";
 
 export interface GatewayClient {
@@ -75,18 +76,25 @@ function toNativeQuery(
  *   - `pending` → `{ pending: true }` (routes to the approval path)
  *   - allow / redact / unspecified → `{ denied: false }`
  *
- * **Fail-open (security-critical):** the SDK is advisory, not a security
- * boundary. The native primitive already returns `allow` when the runtime is
- * unreachable or too slow; on top of that, any local fault while querying is
- * swallowed here and resolves neutral, so a missing or degraded runtime never
- * blocks the agent. The proxy / eBPF layers remain authoritative.
+ * **Enforcement posture (AAASM-3996 — py/go parity, AAASM-3920):** under
+ * `enforce` the SDK is a fail-closed control: a caught local fault or an
+ * unreachable runtime while querying resolves to `{ denied: true }` so a
+ * stalled/killed sidecar cannot turn deny-on-failure into allow-on-failure.
+ * In any other posture (`observe` / `disabled` / unset) the SDK stays advisory
+ * — the fault is swallowed and resolves neutral (`{ denied: false }`) so a
+ * missing or degraded runtime never blocks the agent. The proxy / eBPF layers
+ * remain authoritative in every posture.
  */
 export function createNativeGatewayClient(
   mode: AssemblyMode,
   nativeClient: NativeClient,
   agentId?: string,
-  httpBaseUrl?: string
+  httpBaseUrl?: string,
+  enforcementMode?: EnforcementMode
 ): GatewayClient {
+  // Fail-closed posture mirrors the go SDK's `failClosed` and the Python
+  // enforce guard: only an explicit `"enforce"` denies on fault (AAASM-3920).
+  const failClosed = enforcementMode === "enforce";
   return {
     mode,
     ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
@@ -103,8 +111,10 @@ export function createNativeGatewayClient(
           ...(verdict.reason === undefined ? {} : { reason: verdict.reason })
         };
       } catch {
-        // Fail open: a local fault talking to the runtime must never block.
-        return { denied: false, pending: false };
+        // Under enforce a local fault / unreachable runtime must deny rather
+        // than downgrade to allow-on-failure (AAASM-3996). Otherwise the SDK
+        // stays advisory and fails open.
+        return { denied: failClosed, pending: false };
       }
     },
     waitForApproval: async () => ({ denied: false }),

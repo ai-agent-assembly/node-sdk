@@ -88,6 +88,50 @@ describe("native gateway enforcement (AAASM-3050)", () => {
     expect(executeFn).toHaveBeenCalledOnce();
   });
 
+  it("FAIL-CLOSED: under enforce, an unreachable runtime denies the tool (AAASM-3996)", async () => {
+    // py/go parity (AAASM-3920): when the caller opts into enforce, a caught
+    // local fault / unreachable runtime must deny rather than fail open, so a
+    // stalled or killed sidecar cannot downgrade deny-on-failure to allow.
+    const gateway = createNativeGatewayClient(
+      "napi-inprocess",
+      fakeNativeClient(async () => {
+        throw new Error("AA_ERR_CONNECT:no runtime listening");
+      }),
+      "agent-1",
+      undefined,
+      "enforce"
+    );
+
+    // The gateway decision itself denies on fault under enforce.
+    const decision = await gateway.check({ action: "tool_call", toolName: "delete_all", runId: "run-1" });
+    expect(decision).toEqual({ denied: true, pending: false });
+
+    // End-to-end: the wrapper blocks the tool and never runs its body.
+    const executeFn = vi.fn(async () => "should-not-run");
+    const tools = { delete_all: { description: "danger", execute: executeFn } };
+    withAssembly(tools, { gatewayClient: gateway });
+
+    await expect(tools.delete_all.execute()).rejects.toThrow(PolicyViolationError);
+    expect(executeFn).not.toHaveBeenCalled();
+  });
+
+  it("ADVISORY: under observe, an unreachable runtime still fails open", async () => {
+    // Non-enforce postures keep the advisory fail-open: a missing runtime must
+    // not block the agent.
+    const gateway = createNativeGatewayClient(
+      "napi-inprocess",
+      fakeNativeClient(async () => {
+        throw new Error("AA_ERR_CONNECT:no runtime listening");
+      }),
+      "agent-1",
+      undefined,
+      "observe"
+    );
+
+    const decision = await gateway.check({ action: "tool_call", toolName: "search", runId: "run-2" });
+    expect(decision).toEqual({ denied: false, pending: false });
+  });
+
   it("defaults denied/pending to false and omits reason when the verdict is bare", async () => {
     // A verdict object with no denied/pending/reason exercises the `?? false`
     // fallbacks and the reason-omission branch.
