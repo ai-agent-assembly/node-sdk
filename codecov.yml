@@ -1,6 +1,18 @@
+# Codecov and SonarCloud consume the SAME report: coverage/lcov.info, produced by
+# the single `pnpm test:coverage` run in .github/workflows/quality-report.yml
+# (Codecov via `files: ./coverage/lcov.info`, Sonar via
+# `sonar.javascript.lcov.reportPaths`). The report source is therefore unified —
+# any residual % delta between the two dashboards is engine-level only (Sonar's
+# analyzer vs vitest/v8 line counting) plus scope (Sonar limits to
+# `sonar.sources=src/`), NOT a coverage regression. The `ignore` list below is
+# kept in lockstep with Sonar's exclusions (`src/proto/generated/**`) so both
+# tools measure the same code.
 codecov:
   token: $CODECOV_TOKEN
   branch: master
   strict_yaml_branch: master
 ignore:
   - "native/aa-ffi-node/index.cjs"
+  # Generated protoc-gen-ts_proto output; Sonar excludes it too
+  # (sonar.coverage.exclusions in sonar-project.properties).
+  - "src/proto/generated/**"
