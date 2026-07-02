@@ -4,3 +4,4 @@ codecov:
   strict_yaml_branch: master
 ignore:
   - "native/aa-ffi-node/index.cjs"
+  - "src/proto/generated/**"
