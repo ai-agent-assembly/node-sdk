@@ -16,3 +16,8 @@ ignore:
   # Generated protoc-gen-ts_proto output; Sonar excludes it too
   # (sonar.coverage.exclusions in sonar-project.properties).
   - "src/proto/generated/**"
+  # Build/release helper scripts. vitest's coverage.include pulls scripts/*.mjs
+  # into lcov.info, but Sonar measures only sonar.sources=src/, so Codecov
+  # counted them and Sonar did not — the sole cause of the headline % gap.
+  # Ignoring them makes Codecov's measured set equal src/ (minus generated proto).
+  - "scripts/**"
