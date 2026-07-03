@@ -78,6 +78,50 @@ describe("createClient mode routing (AAASM-3050)", () => {
     await client.close();
   });
 
+  // AAASM-4013: `createClient` must derive the native fail-closed posture from
+  // `enforcementMode`. Under enforce, a runtime that fails open (returns the
+  // allow sentinel because it is unreachable / slow) must be DENIED end-to-end
+  // through `check()`; without enforce the same sentinel proceeds. This exercises
+  // the `failClosed: config.enforcementMode === "enforce"` plumbing (both ternary
+  // branches) via the real, non-overridden native-client path.
+  const FAIL_OPEN_REASON = "aa-runtime unreachable or slow; failing open (advisory SDK)";
+
+  it("napi-inprocess + enforce: a runtime-down fail-open sentinel is DENIED through check()", async () => {
+    const binding = makeBinding("allow", FAIL_OPEN_REASON);
+    const mod = await loadCreateClientWithBinding(binding);
+
+    const client = mod.createClient({
+      gatewayUrl: "/tmp/aa.sock",
+      apiKey: "k",
+      agentId: "agent-enforce",
+      mode: "napi-inprocess",
+      enforcementMode: "enforce"
+    });
+
+    await expect(
+      client.check({ action: "tool_call", toolName: "rm", runId: "run-enforce" })
+    ).resolves.toEqual({ denied: true, pending: false, reason: FAIL_OPEN_REASON });
+    await client.close();
+  });
+
+  it("napi-inprocess + observe: the same fail-open sentinel proceeds (advisory)", async () => {
+    const binding = makeBinding("allow", FAIL_OPEN_REASON);
+    const mod = await loadCreateClientWithBinding(binding);
+
+    const client = mod.createClient({
+      gatewayUrl: "/tmp/aa.sock",
+      apiKey: "k",
+      agentId: "agent-observe",
+      mode: "napi-inprocess",
+      enforcementMode: "observe"
+    });
+
+    await expect(
+      client.check({ action: "tool_call", toolName: "search", runId: "run-observe" })
+    ).resolves.toEqual({ denied: false, pending: false });
+    await client.close();
+  });
+
   it("sdk-only: check() is allow-by-default and never loads the native binding", async () => {
     const binding = makeBinding("deny", "must-not-be-consulted");
     const mod = await loadCreateClientWithBinding(binding);
