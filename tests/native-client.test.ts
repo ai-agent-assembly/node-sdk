@@ -285,6 +285,56 @@ describe("createNativeClient", () => {
       });
       await client.close();
     });
+
+    it("napi-inprocess + failClosed: a REDACT verdict is authoritative and proceeds", async () => {
+      // `redact` is a real runtime verdict (the tool runs, with output
+      // redaction applied downstream), NOT a "no verdict" sentinel — so it must
+      // proceed even under enforce. Only the fail-open sentinel / unknown
+      // decision deny under failClosed.
+      const mod = await loadNativeClientWithBinding(() => ({
+        connect: vi.fn(async () => ({ id: "handle-redact" })),
+        sendEvent: vi.fn(() => undefined),
+        queryPolicy: vi.fn(() => ({ decision: "redact", reason: "secrets stripped" })),
+        disconnect: vi.fn(async () => undefined)
+      }));
+
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess",
+        failClosed: true
+      });
+
+      await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+        denied: false,
+        pending: false
+      });
+      await client.close();
+    });
+
+    it("napi-inprocess without failClosed: an unknown/empty decision still fails open (observe/disabled)", async () => {
+      // The observe/disabled counterpart of the failClosed unknown-decision
+      // test above: with no enforce posture, an unspecified runtime verdict must
+      // NOT start blocking — the proxy / eBPF layers stay authoritative.
+      const mod = await loadNativeClientWithBinding(() => ({
+        connect: vi.fn(async () => ({ id: "handle-unknown-open" })),
+        sendEvent: vi.fn(() => undefined),
+        queryPolicy: vi.fn(() => ({ decision: "", reason: "" })),
+        disconnect: vi.fn(async () => undefined)
+      }));
+
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess"
+      });
+
+      await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+        denied: false,
+        pending: false
+      });
+      await client.close();
+    });
   });
 
   it("maps connect failure to NativeConnectError", async () => {
