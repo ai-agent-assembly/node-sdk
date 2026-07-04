@@ -17,8 +17,8 @@ TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 
 ## Project status
 
-> **Pre-1.0 / beta.** The current release line is `0.0.1-beta.x`, published to npm under
-> the `beta` dist-tag and cut as a [GitHub Release](https://github.com/ai-agent-assembly/node-sdk/releases).
+> **Pre-1.0 / release candidate.** The current release line is `0.0.1-rc.x`, published to npm under
+> the `rc` dist-tag and cut as a [GitHub Release](https://github.com/ai-agent-assembly/node-sdk/releases).
 > The public surface (`initAssembly`, `withAssembly`) is stabilizing but **may change between
 > pre-releases**, and per-platform native packaging is still being hardened. Pin an exact
 > version for reproducible installs and review the
@@ -26,8 +26,8 @@ TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 > Production deployments should track the first `0.1.0` release.
 
 ```bash
-pnpm add @agent-assembly/sdk@beta              # latest beta (tracks @beta dist-tag)
-pnpm add @agent-assembly/sdk@<X.Y.Z-beta.N>    # pin exact — replace the placeholder with the
+pnpm add @agent-assembly/sdk@rc                # latest rc (tracks @rc dist-tag)
+pnpm add @agent-assembly/sdk@<X.Y.Z-rc.N>      # pin exact — replace the placeholder with the
                                                # desired version from npmjs.com/package/@agent-assembly/sdk
 ```
 
