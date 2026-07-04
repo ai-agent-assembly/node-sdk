@@ -21,7 +21,7 @@ the policy first.
 
 ## The framework / library
 
-None. The example depends only on `@agent-assembly/sdk` (version `0.0.1-rc.2`
+None. The example depends only on `@agent-assembly/sdk` (version `0.0.1-rc.3`
 in its `package.json`). It runs fully offline — no gateway and no `@langchain/core`.
 
 ## How it works
