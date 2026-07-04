@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
 [![Docs](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml)
-[![npm version](https://img.shields.io/npm/v/%40agent-assembly%2Fsdk/beta?logo=npm)](https://www.npmjs.com/package/@agent-assembly/sdk/v/beta)
+[![npm version](https://img.shields.io/npm/v/%40agent-assembly%2Fsdk/rc?logo=npm)](https://www.npmjs.com/package/@agent-assembly/sdk/v/rc)
 [![GitHub release](https://img.shields.io/github/v/release/ai-agent-assembly/node-sdk?include_prereleases&sort=semver&label=release&logo=github)](https://github.com/ai-agent-assembly/node-sdk/releases)
 [![TypeScript types](https://img.shields.io/npm/types/@agent-assembly/sdk?logo=typescript)](https://www.npmjs.com/package/@agent-assembly/sdk)
 [![Bundle size](https://img.shields.io/bundlephobia/min/@agent-assembly/sdk?logo=webpack&label=min)](https://bundlephobia.com/package/@agent-assembly/sdk)
