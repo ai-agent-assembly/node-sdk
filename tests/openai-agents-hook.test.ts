@@ -271,7 +271,7 @@ describe("openai agents adapter", () => {
     });
   });
 
-  it("fails open and executes original tool when gateway check throws", async () => {
+  it("propagates the fault and blocks the tool when gateway check throws", async () => {
     const gateway = createGatewayClientMock();
     gateway.check = vi.fn(async () => {
       throw new Error("gateway unavailable");
@@ -284,7 +284,7 @@ describe("openai agents adapter", () => {
       approvalTimeoutMs: 4_000
     });
 
-    const result = await patchedRunTool(
+    const error = await patchedRunTool(
       {
         function: {
           name: "critical_tool",
@@ -294,13 +294,14 @@ describe("openai agents adapter", () => {
       {
         runId: "run-6"
       }
-    );
+    ).catch((e: Error) => e);
 
-    expect(result).toEqual({ ok: "fallback-path" });
-    expect(originalRunTool).toHaveBeenCalledTimes(1);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("gateway unavailable");
+    expect(originalRunTool).not.toHaveBeenCalled();
   });
 
-  it("fails open and executes original tool when approval handling throws on PENDING", async () => {
+  it("propagates the fault and blocks the tool when approval handling throws on PENDING", async () => {
     const gateway = createGatewayClientMock();
     gateway.check = vi.fn(async () => ({ pending: true, denied: false }));
     gateway.waitForApproval = vi.fn(async () => {
@@ -314,13 +315,14 @@ describe("openai agents adapter", () => {
       approvalTimeoutMs: 2_000
     });
 
-    const result = await patchedRunTool(
+    const error = await patchedRunTool(
       { function: { name: "pending_tool", arguments: "{}" } },
       { runId: "run-pending-throw" }
-    );
+    ).catch((e: Error) => e);
 
-    expect(result).toEqual({ ok: "approval-fail-open" });
-    expect(originalRunTool).toHaveBeenCalledTimes(1);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("approval channel unavailable");
+    expect(originalRunTool).not.toHaveBeenCalled();
   });
 
   it("returns true without re-patching when already patched", async () => {

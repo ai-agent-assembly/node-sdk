@@ -130,17 +130,17 @@ export function createPatchedRunTool(
       return result;
     };
 
-    let decision;
-    try {
-      decision = await gatewayClient.check({
-        action: "tool_call",
-        toolName,
-        args,
-        runId
-      });
-    } catch {
-      return executeOriginal();
-    }
+    // Let check / approval faults propagate (reject) instead of swallowing them
+    // into a silent fail-open. A caller-supplied gatewayClient that throws on a
+    // transport error must NOT be treated as ALLOW — this matches the
+    // with-assembly / wrap-tool wrappers, whose un-caught check() rejects and
+    // blocks the tool under enforce (AAASM-4137).
+    const decision = await gatewayClient.check({
+      action: "tool_call",
+      toolName,
+      args,
+      runId
+    });
 
     if (decision.denied) {
       return formatDeniedToolCallOutput(
@@ -150,16 +150,11 @@ export function createPatchedRunTool(
     }
 
     if (decision.pending) {
-      let pendingOutput;
-      try {
-        pendingOutput = await handlePendingApproval(gatewayClient, {
-          toolName,
-          runId,
-          timeoutMs: options.approvalTimeoutMs
-        });
-      } catch {
-        return executeOriginal();
-      }
+      const pendingOutput = await handlePendingApproval(gatewayClient, {
+        toolName,
+        runId,
+        timeoutMs: options.approvalTimeoutMs
+      });
       if (pendingOutput) {
         return pendingOutput;
       }

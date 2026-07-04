@@ -159,7 +159,7 @@ describe("vercel ai sdk adapter", () => {
     );
   });
 
-  it("fails open and executes original tool when gateway check throws", async () => {
+  it("propagates the fault and blocks the tool when gateway check throws", async () => {
     const gateway = createGatewayClientMock();
     gateway.check = vi.fn(async () => {
       throw new Error("gateway unavailable");
@@ -174,13 +174,14 @@ describe("vercel ai sdk adapter", () => {
       { approvalTimeoutMs: 4_000, fallbackRunId: "fallback" }
     );
 
-    const result = await wrappedExecute(
+    const error = await wrappedExecute(
       { x: 1 },
       { toolCallId: "call-6" }
-    );
+    ).catch((e: Error) => e);
 
-    expect(result).toEqual({ ok: "fallback-path" });
-    expect(originalExecute).toHaveBeenCalledTimes(1);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("gateway unavailable");
+    expect(originalExecute).not.toHaveBeenCalled();
   });
 
   it("records results in fire-and-forget mode without surfacing recorder failures", async () => {
@@ -242,7 +243,7 @@ describe("vercel ai sdk adapter", () => {
     expect(fakeModule.tool).toBe(originalTool);
   });
 
-  it("fails open and executes the original tool when approval-wait throws on PENDING", async () => {
+  it("propagates the fault and blocks the tool when approval-wait throws on PENDING", async () => {
     const gateway = createGatewayClientMock();
     gateway.check = vi.fn(async () => ({ pending: true, denied: false }));
     gateway.waitForApproval = vi.fn(async () => {
@@ -258,10 +259,13 @@ describe("vercel ai sdk adapter", () => {
       { approvalTimeoutMs: 2_000, fallbackRunId: "fallback" }
     );
 
-    const result = await wrappedExecute({ x: 1 }, { toolCallId: "call-pending-throw" });
+    const error = await wrappedExecute({ x: 1 }, { toolCallId: "call-pending-throw" }).catch(
+      (e: Error) => e
+    );
 
-    expect(result).toEqual({ ok: "approval-fail-open" });
-    expect(originalExecute).toHaveBeenCalledTimes(1);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("approval channel unavailable");
+    expect(originalExecute).not.toHaveBeenCalled();
   });
 
   it("returns true without re-patching when patchVercelAiSdk is already patched", async () => {
