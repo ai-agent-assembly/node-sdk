@@ -1,9 +1,24 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
-const requireFromHere = createRequire(import.meta.url);
+/**
+ * Native-binding provisioning check run at install time.
+ *
+ * The napi-rs `.node` binaries ship *inside* `@agent-assembly/sdk` under
+ * `native/aa-ffi-node/` (see package.json `files` → `native/aa-ffi-node/*.node`)
+ * and are resolved at load time by `native/aa-ffi-node/index.cjs`. There is no
+ * separately published per-platform `@agent-assembly/<platform>` binary package
+ * to install from — the declared `@agent-assembly/runtime-*` optionalDependencies
+ * ship the `aasm` CLI, not a `.node`. The earlier postinstall resolved phantom
+ * `@agent-assembly/<platformKey>` names that were never published, so it always
+ * threw, got caught, warned, and no-opped — masking a genuine missing-binary
+ * regression until the loud failure at first native load (AAASM-4137).
+ *
+ * This script therefore *verifies* the bundled binding for the current platform
+ * is present (mirroring `index.cjs` resolution) so a provisioning regression
+ * fails at install time rather than only at first `initAssembly`.
+ */
 
 const SUPPORTED_PLATFORM_KEYS = {
   "darwin-arm64": "darwin-arm64",
@@ -12,58 +27,33 @@ const SUPPORTED_PLATFORM_KEYS = {
   "win32-x64": "win32-x64-msvc"
 };
 
+const NATIVE_BINDING_DIR = "native/aa-ffi-node";
+
 export function detectPlatformKey(platform = process.platform, arch = process.arch) {
   return SUPPORTED_PLATFORM_KEYS[`${platform}-${arch}`] ?? null;
 }
 
-export function resolveBinaryPackageName(platform = process.platform, arch = process.arch) {
-  const platformKey = detectPlatformKey(platform, arch);
+/**
+ * Locate the bundled native binding inside `native/aa-ffi-node/`, mirroring the
+ * runtime loader in `native/aa-ffi-node/index.cjs`: prefer the exact
+ * `index.node`, otherwise the first platform-suffixed `index.<triple>.node`.
+ * Returns the absolute path, or `null` when no binding is present.
+ */
+export function findBundledNativeBinary(nativeDir) {
+  const directPath = path.join(nativeDir, "index.node");
+  if (fs.existsSync(directPath)) {
+    return directPath;
+  }
 
-  if (!platformKey) {
+  if (!fs.existsSync(nativeDir)) {
     return null;
   }
 
-  return `@agent-assembly/${platformKey}`;
-}
+  const platformAddon = fs
+    .readdirSync(nativeDir)
+    .find((name) => /^index\..+\.node$/.test(name));
 
-export function findFirstNodeBinary(dirPath) {
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const entryPath = path.join(dirPath, entry.name);
-
-    if (entry.isDirectory()) {
-      const nested = findFirstNodeBinary(entryPath);
-      if (nested) {
-        return nested;
-      }
-    }
-
-    if (entry.isFile() && entry.name.endsWith(".node")) {
-      return entryPath;
-    }
-  }
-
-  return null;
-}
-
-export function resolveBinaryFromPackage(
-  packageName,
-  options = {}
-) {
-  const { cwd = process.cwd() } = options;
-
-  const packageJsonPath = requireFromHere.resolve(`${packageName}/package.json`, {
-    paths: [cwd]
-  });
-  const packageDir = path.dirname(packageJsonPath);
-  const binaryPath = findFirstNodeBinary(packageDir);
-
-  if (!binaryPath) {
-    throw new Error(`No .node file found in ${packageName}`);
-  }
-
-  return binaryPath;
+  return platformAddon ? path.join(nativeDir, platformAddon) : null;
 }
 
 export function selectBinaryForCurrentPlatform(options = {}) {
@@ -71,31 +61,34 @@ export function selectBinaryForCurrentPlatform(options = {}) {
     platform = process.platform,
     arch = process.arch,
     cwd = process.cwd(),
-    targetNativeDir = path.resolve(cwd, "native/aa-ffi-node"),
+    nativeDir = path.resolve(cwd, NATIVE_BINDING_DIR),
     logger = console
   } = options;
 
-  const packageName = resolveBinaryPackageName(platform, arch);
+  const platformKey = detectPlatformKey(platform, arch);
 
-  if (!packageName) {
+  if (!platformKey) {
     logger.warn(
-      `[agent-assembly] Unsupported platform: ${platform}-${arch}; skipping binary selection.`
+      `[agent-assembly] Unsupported platform: ${platform}-${arch}; skipping native binding check.`
     );
     return null;
   }
 
-  const sourceBinaryPath = resolveBinaryFromPackage(packageName, { cwd });
-  const targetBinaryPath = path.join(targetNativeDir, "index.node");
+  const binaryPath = findBundledNativeBinary(nativeDir);
 
-  fs.mkdirSync(targetNativeDir, { recursive: true });
-  fs.copyFileSync(sourceBinaryPath, targetBinaryPath);
+  if (!binaryPath) {
+    throw new Error(
+      `No bundled native binding (.node) found in ${NATIVE_BINDING_DIR} for ${platformKey}`
+    );
+  }
 
-  logger.info(`[agent-assembly] Selected binary package ${packageName}`);
+  logger.info(
+    `[agent-assembly] Native binding present for ${platformKey}: ${path.basename(binaryPath)}`
+  );
 
   return {
-    packageName,
-    sourceBinaryPath,
-    targetBinaryPath
+    platformKey,
+    binaryPath
   };
 }
 
@@ -107,7 +100,7 @@ export function runPostinstall(options = {}) {
     return true;
   } catch (error) {
     logger.warn(
-      `[agent-assembly] Failed to select native binary: ${error instanceof Error ? error.message : String(error)}`
+      `[agent-assembly] Failed to verify native binding: ${error instanceof Error ? error.message : String(error)}`
     );
     return false;
   }
