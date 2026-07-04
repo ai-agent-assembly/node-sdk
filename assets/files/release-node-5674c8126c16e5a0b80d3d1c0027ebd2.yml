@@ -375,8 +375,13 @@ jobs:
             # npm publish (not pnpm) drives OIDC trusted publishing; --provenance
             # attaches the SLSA attestation. --no-git-checks was pnpm-only and
             # has no npm equivalent (npm does not gate publish on git state).
+            # AAASM-4067: the target MUST carry a leading `./`. A bare
+            # `packages/<name>` matches npm's GitHub `owner/repo` shorthand, so
+            # newer npm resolves it as `git ls-remote ssh://git@github.com/packages/<name>.git`
+            # (Permission denied) instead of publishing the local folder. `./`
+            # forces the local-directory interpretation.
             # shellcheck disable=SC2086
-            npm publish --access public --provenance $DIST_TAG "packages/${pkg}"
+            npm publish --access public --provenance $DIST_TAG "./packages/${pkg}"
             echo "::endgroup::"
           done
 
