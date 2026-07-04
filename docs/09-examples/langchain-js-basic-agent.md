@@ -20,7 +20,7 @@ on every tool call the agent makes.
 ## The framework / library
 
 [LangChain.js](https://js.langchain.com)-style agent. The example depends only on
-`@agent-assembly/sdk` (version `0.0.1-rc.2`); it deliberately avoids
+`@agent-assembly/sdk` (version `0.0.1-rc.3`); it deliberately avoids
 `@langchain/core` so it runs fully offline in CI with no API keys.
 
 ## How it works
