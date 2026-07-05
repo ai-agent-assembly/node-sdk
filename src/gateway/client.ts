@@ -117,7 +117,18 @@ export function createNativeGatewayClient(
         return { denied: failClosed, pending: false };
       }
     },
-    waitForApproval: async () => ({ denied: false }),
+    // A `pending` verdict routes here to solicit an approval decision. The node
+    // SDK does not yet wire a real approval channel (poll/stream), so no
+    // decision can be obtained (AAASM-4129). Under `enforce` this must fail
+    // closed — deny — rather than silently downgrade an approval-required
+    // verdict to allow, matching python's `_resolve_pending_approval` and go's
+    // `WaitForApproval`, both of which deny when no approval channel is wired.
+    // In any advisory posture (observe / disabled / unset) it stays neutral so
+    // a missing approval channel never blocks the agent.
+    waitForApproval: async () =>
+      failClosed
+        ? { denied: true, reason: "approval required but no approval channel is configured" }
+        : { denied: false },
     record: async () => undefined,
     recordResult: async () => undefined,
     scanPrompts: async () => undefined

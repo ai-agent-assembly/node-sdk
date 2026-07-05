@@ -169,12 +169,38 @@ describe("native gateway enforcement (AAASM-3050)", () => {
 
     const executeFn = vi.fn(async () => "approved-and-ran");
     const tools = { wire_transfer: { description: "money", execute: executeFn } };
-    // No approval push is wired in the node SDK yet, so the noop approval path
-    // resolves to "not denied" and the tool proceeds (per the shared contract).
+    // No approval channel is wired in the node SDK yet; in the ADVISORY posture
+    // (no enforcementMode) that resolves to "not denied" and the tool proceeds,
+    // so a missing approval channel never blocks the agent (AAASM-4129).
     withAssembly(tools, { gatewayClient: gateway });
 
     await expect(tools.wire_transfer.execute()).resolves.toBe("approved-and-ran");
     expect(executeFn).toHaveBeenCalledOnce();
+  });
+
+  it("PENDING under enforce: no approval channel fails closed and blocks the tool (AAASM-4129)", async () => {
+    // py/go parity: python's `_resolve_pending_approval` and go's
+    // `WaitForApproval` DENY a pending verdict when no approval channel is
+    // wired. Under enforce the node SDK must not auto-approve — the tool is
+    // blocked (never runs its body) rather than silently downgraded to allow.
+    const gateway = createNativeGatewayClient(
+      "napi-inprocess",
+      fakeNativeClient(async () => ({
+        denied: false,
+        pending: true,
+        reason: "awaiting approval"
+      })),
+      "agent-1",
+      undefined,
+      "enforce"
+    );
+
+    const executeFn = vi.fn(async () => "should-not-run-without-approval");
+    const tools = { wire_transfer: { description: "money", execute: executeFn } };
+    withAssembly(tools, { gatewayClient: gateway });
+
+    await expect(tools.wire_transfer.execute()).rejects.toThrow(PolicyViolationError);
+    expect(executeFn).not.toHaveBeenCalled();
   });
 });
 
