@@ -54,7 +54,7 @@ above reflects the intended support floor once that bug is fixed.
 This page is the **authoritative** reference for the Node SDK's framework support. The
 product-wide, cross-SDK **index/hub** that points at each language SDK's matrix lives in
 the core documentation:
-[Framework compatibility](https://ai-agent-assembly.github.io/agent-assembly/stable/reference/framework-compatibility.html)
+[Framework compatibility](https://docs.agent-assembly.com/core/stable/reference/framework-compatibility.html)
 (the `/stable/` link goes live at GA).
 
 ## Package manager
@@ -89,5 +89,5 @@ Practical guidance:
 
 The cross-repo **core ↔ SDK compatibility matrix** — which SDK versions pair with which
 core runtime releases across all language SDKs — is published on the
-[Agent Assembly documentation hub](https://ai-agent-assembly.github.io/agent-assembly-docs/).
+[Agent Assembly documentation hub](https://docs.agent-assembly.com/).
 Consult it when running a standalone gateway you upgrade independently of the SDK.

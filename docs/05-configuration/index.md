@@ -78,7 +78,7 @@ time. See [Troubleshooting](../08-troubleshooting/index.md) for the recovery pat
 
 The `aasm` binary and the gateway it starts are part of the core runtime. For the full
 list of gateway subcommands and flags, see the core
-[CLI Reference](https://ai-agent-assembly.github.io/agent-assembly/latest/cli/overview.html).
+[CLI Reference](https://docs.agent-assembly.com/core/latest/cli/overview.html).
 
 ## `AssemblyConfig` fields
 

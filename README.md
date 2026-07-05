@@ -105,7 +105,7 @@ selects ESM or CJS automatically based on how the consumer imports it.
 `initAssembly()` registers the LangChain callback handler and auto-wraps the configured
 tools, so each is checked against gateway policy before invocation. For more frameworks
 and the lower-level `withAssembly()` wrapper, see the **Examples** guide on the
-[documentation site](https://ai-agent-assembly.github.io/node-sdk/).
+[documentation site](https://docs.agent-assembly.com/node-sdk/).
 
 ## Supported Node.js versions
 
@@ -129,11 +129,11 @@ binding requires Node 18.18 or newer.
 each framework's optional peer dependency, supported version range, and current status
 (including the [known Vercel AI SDK caveat](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532)) —
 is the **authoritative** reference and lives on the docs site:
-[Framework compatibility](https://ai-agent-assembly.github.io/node-sdk/compatibility-versioning/compatibility).
+[Framework compatibility](https://docs.agent-assembly.com/node-sdk/compatibility-versioning/compatibility).
 
 For the product-wide, cross-SDK index/hub that links every language SDK's matrix, see the
 core documentation:
-[Framework compatibility index](https://ai-agent-assembly.github.io/agent-assembly/stable/reference/framework-compatibility.html)
+[Framework compatibility index](https://docs.agent-assembly.com/core/stable/reference/framework-compatibility.html)
 (the `/stable/` link goes live at GA).
 
 ## How it works
@@ -163,7 +163,7 @@ call is checked against policy before it runs.
 
 Type-only exports (`AssemblyConfig`, `AssemblyContext`, `AssemblyMode`, `EnforcementMode`,
 `ToolMap`, `GatewayClient`, the `Gateway*` governance types, and friends) are documented in
-the [API reference](https://ai-agent-assembly.github.io/node-sdk/api-reference).
+the [API reference](https://docs.agent-assembly.com/node-sdk/api-reference).
 
 ## Governing tools offline
 
@@ -237,7 +237,7 @@ tests/                    # unit + architecture tests
 ```
 
 For how these layers fit together, see the
-[Architecture guide](https://ai-agent-assembly.github.io/node-sdk/core-concepts/architecture).
+[Architecture guide](https://docs.agent-assembly.com/node-sdk/core-concepts/architecture).
 
 ## Building the native binding
 
@@ -284,7 +284,7 @@ CI verifies the published shape with:
 
 Full guides, architecture deep-dives, and the complete API reference are published at:
 
-**https://ai-agent-assembly.github.io/node-sdk/**
+**https://docs.agent-assembly.com/node-sdk/**
 
 The site is built from the `docs/` (content) and `website/` (Docusaurus app) directories
 and is re-published on every push to `master` via the `publish-docs.yml` workflow.
@@ -298,7 +298,7 @@ across all SDKs.
 | Project                                                                                 | What it is                                                                                                                                                                        |
 | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [agent-assembly](https://github.com/ai-agent-assembly/agent-assembly)                   | Core Rust runtime — gateway, policy engine, proxy, eBPF, CLI (`aasm`). The protocol specification lives here.                                                                     |
-| [Documentation site](https://ai-agent-assembly.github.io/agent-assembly-docs/)          | Canonical, cross-repo documentation for the whole platform.                                                                                                                       |
+| [Documentation site](https://docs.agent-assembly.com/)          | Canonical, cross-repo documentation for the whole platform.                                                                                                                       |
 | [python-sdk](https://github.com/ai-agent-assembly/python-sdk)                           | Sibling SDK for Python.                                                                                                                                                           |
 | [go-sdk](https://github.com/ai-agent-assembly/go-sdk)                                   | Sibling SDK for Go.                                                                                                                                                               |
 | [agent-assembly-examples](https://github.com/ai-agent-assembly/agent-assembly-examples) | Runnable examples — learn by running small, framework-specific Node.js/TypeScript (and Python/Go) samples for policy enforcement, approvals, audit, trace, and runtime workflows. |

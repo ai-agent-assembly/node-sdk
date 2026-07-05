@@ -152,4 +152,4 @@ pages by hand.
 
 When you push your branch, the `publish-docs.yml` workflow builds the site and
 deploys to the `gh-pages` branch on push to `master`. The published site is at
-**https://ai-agent-assembly.github.io/node-sdk/**.
+**https://docs.agent-assembly.com/node-sdk/**.
