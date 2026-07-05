@@ -137,7 +137,7 @@ Full `INSTALL_HINT` text from `src/runtime.ts`:
 ```
 agent-assembly runtime not found.
   Install with: pnpm add agent-assembly
-  Or manually:  brew install agent-assembly/tap/aasm
+  Or manually:  brew install ai-agent-assembly/tap/aasm
                curl -fsSL https://agent-assembly.com/install.sh | sh
 ```
 
