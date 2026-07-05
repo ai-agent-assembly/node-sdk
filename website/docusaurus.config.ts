@@ -247,19 +247,19 @@ const config: Config = {
           items: [
             {
               label: "Docs Hub",
-              href: "https://ai-agent-assembly.github.io/agent-assembly-docs/",
+              href: "https://docs.agent-assembly.com/",
             },
             {
               label: "Python SDK",
-              href: "https://ai-agent-assembly.github.io/python-sdk/",
+              href: "https://docs.agent-assembly.com/python-sdk/",
             },
             {
               label: "Node SDK",
-              href: "https://ai-agent-assembly.github.io/node-sdk/",
+              href: "https://docs.agent-assembly.com/node-sdk/",
             },
             {
               label: "Go SDK",
-              href: "https://ai-agent-assembly.github.io/go-sdk/",
+              href: "https://docs.agent-assembly.com/go-sdk/",
             },
           ],
         },
@@ -300,19 +300,19 @@ const config: Config = {
           items: [
             {
               label: "Docs Hub",
-              href: "https://ai-agent-assembly.github.io/agent-assembly-docs/",
+              href: "https://docs.agent-assembly.com/",
             },
             {
               label: "Python SDK",
-              href: "https://ai-agent-assembly.github.io/python-sdk/",
+              href: "https://docs.agent-assembly.com/python-sdk/",
             },
             {
               label: "Node SDK",
-              href: "https://ai-agent-assembly.github.io/node-sdk/",
+              href: "https://docs.agent-assembly.com/node-sdk/",
             },
             {
               label: "Go SDK",
-              href: "https://ai-agent-assembly.github.io/go-sdk/",
+              href: "https://docs.agent-assembly.com/go-sdk/",
             },
           ],
         },

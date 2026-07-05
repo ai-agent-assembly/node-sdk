@@ -25,8 +25,8 @@ so the gateway evaluates each call before it executes.
 The gateway, the policy engine, and the audit trail live in the core runtime. For the
 platform-level picture — how the gateway renders decisions and how this SDK relates to
 the sidecar-proxy and eBPF layers — see the core
-[Architecture](https://ai-agent-assembly.github.io/agent-assembly/latest/architecture/) and
-[Security Model](https://ai-agent-assembly.github.io/agent-assembly/latest/security/overview.html) docs.
+[Architecture](https://docs.agent-assembly.com/core/latest/architecture/) and
+[Security Model](https://docs.agent-assembly.com/core/latest/security/overview.html) docs.
 
 ## The napi-rs native FFI
 
