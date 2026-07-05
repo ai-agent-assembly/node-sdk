@@ -86,17 +86,17 @@ export function createWrappedExecute<TArgs, TResult>(
       return options.agentId ? runWithAgentId(options.agentId, run) : run();
     };
 
-    let decision;
-    try {
-      decision = await gatewayClient.check({
-        action: "tool_call",
-        toolName: description,
-        args,
-        runId
-      });
-    } catch {
-      return executeOriginal();
-    }
+    // Let check / approval faults propagate (reject) instead of swallowing them
+    // into a silent fail-open. A caller-supplied gatewayClient that throws on a
+    // transport error must NOT be treated as ALLOW — this matches the
+    // with-assembly / wrap-tool wrappers, whose un-caught check() rejects and
+    // blocks the tool under enforce (AAASM-4137).
+    const decision = await gatewayClient.check({
+      action: "tool_call",
+      toolName: description,
+      args,
+      runId
+    });
 
     if (decision.denied) {
       throw new PolicyViolationError(
@@ -105,16 +105,11 @@ export function createWrappedExecute<TArgs, TResult>(
     }
 
     if (decision.pending) {
-      let approval;
-      try {
-        approval = await gatewayClient.waitForApproval(
-          description,
-          runId,
-          options.approvalTimeoutMs
-        );
-      } catch {
-        return executeOriginal();
-      }
+      const approval = await gatewayClient.waitForApproval(
+        description,
+        runId,
+        options.approvalTimeoutMs
+      );
       if (approval.denied) {
         throw new PolicyViolationError(
           `Approval rejected: ${approval.reason ?? "Rejected"}`

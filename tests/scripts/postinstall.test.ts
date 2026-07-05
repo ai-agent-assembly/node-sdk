@@ -4,8 +4,8 @@ import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   detectPlatformKey,
+  findBundledNativeBinary,
   isExecutedDirectly,
-  resolveBinaryPackageName,
   runPostinstallEntrypoint,
   runPostinstall,
   selectBinaryForCurrentPlatform
@@ -19,20 +19,16 @@ function createTempDir() {
   return dir;
 }
 
-function seedPlatformPackage(
-  cwd: string,
-  packageName: string,
-  options: { withBinary: boolean }
-) {
-  const packageDir = path.join(cwd, "node_modules", ...packageName.split("/"));
-  fs.mkdirSync(packageDir, { recursive: true });
-  fs.writeFileSync(path.join(packageDir, "package.json"), JSON.stringify({ name: packageName }, null, 2));
-
-  if (options.withBinary) {
-    const binaryDir = path.join(packageDir, "prebuilds");
-    fs.mkdirSync(binaryDir, { recursive: true });
-    fs.writeFileSync(path.join(binaryDir, "index.node"), "fake-native-binary");
-  }
+/**
+ * Seed a bundled native binding under `native/aa-ffi-node/` in a temp cwd,
+ * mirroring the actually-published layout (the `.node` ships in-package and is
+ * resolved by native/aa-ffi-node/index.cjs — not from a separate npm package).
+ */
+function seedBundledBinary(cwd: string, fileName: string) {
+  const nativeDir = path.join(cwd, "native", "aa-ffi-node");
+  fs.mkdirSync(nativeDir, { recursive: true });
+  fs.writeFileSync(path.join(nativeDir, fileName), "fake-native-binary");
+  return nativeDir;
 }
 
 afterEach(() => {
@@ -42,16 +38,36 @@ afterEach(() => {
 });
 
 describe("postinstall script", () => {
-  it("maps platform and arch to supported package names", () => {
+  it("maps platform and arch to supported platform keys", () => {
     expect(detectPlatformKey("linux", "x64")).toBe("linux-x64-gnu");
     expect(detectPlatformKey("darwin", "arm64")).toBe("darwin-arm64");
-    expect(resolveBinaryPackageName("win32", "x64")).toBe("@agent-assembly/win32-x64-msvc");
-    expect(resolveBinaryPackageName("sunos", "x64")).toBeNull();
+    expect(detectPlatformKey("win32", "x64")).toBe("win32-x64-msvc");
+    expect(detectPlatformKey("sunos", "x64")).toBeNull();
   });
 
-  it("copies the selected platform binary into native/aa-ffi-node/index.node", () => {
+  it("resolves the bundled binary the same way index.cjs does", () => {
     const cwd = createTempDir();
-    seedPlatformPackage(cwd, "@agent-assembly/linux-x64-gnu", { withBinary: true });
+    const nativeDir = seedBundledBinary(cwd, "index.node");
+
+    // Exact index.node is preferred.
+    expect(findBundledNativeBinary(nativeDir)).toBe(path.join(nativeDir, "index.node"));
+
+    // Falls back to a platform-suffixed index.<triple>.node.
+    fs.rmSync(path.join(nativeDir, "index.node"));
+    fs.writeFileSync(path.join(nativeDir, "index.linux-x64-gnu.node"), "fake");
+    expect(findBundledNativeBinary(nativeDir)).toBe(
+      path.join(nativeDir, "index.linux-x64-gnu.node")
+    );
+
+    // Returns null when no binding is present.
+    fs.rmSync(path.join(nativeDir, "index.linux-x64-gnu.node"));
+    expect(findBundledNativeBinary(nativeDir)).toBeNull();
+    expect(findBundledNativeBinary(path.join(cwd, "does-not-exist"))).toBeNull();
+  });
+
+  it("confirms the bundled binding present for the current platform", () => {
+    const cwd = createTempDir();
+    seedBundledBinary(cwd, "index.node");
 
     const logger = {
       info: vi.fn(),
@@ -65,13 +81,12 @@ describe("postinstall script", () => {
       logger
     });
 
-    expect(result?.packageName).toBe("@agent-assembly/linux-x64-gnu");
-    expect(result?.targetBinaryPath).toBe(
-      path.join(cwd, "native/aa-ffi-node", "index.node")
+    expect(result?.platformKey).toBe("linux-x64-gnu");
+    expect(result?.binaryPath).toBe(
+      path.join(cwd, "native", "aa-ffi-node", "index.node")
     );
-    expect(fs.readFileSync(result!.targetBinaryPath, "utf8")).toBe("fake-native-binary");
     expect(logger.info).toHaveBeenCalledWith(
-      "[agent-assembly] Selected binary package @agent-assembly/linux-x64-gnu"
+      "[agent-assembly] Native binding present for linux-x64-gnu: index.node"
     );
     expect(logger.warn).not.toHaveBeenCalled();
   });
@@ -90,13 +105,13 @@ describe("postinstall script", () => {
 
     expect(result).toBeNull();
     expect(logger.warn).toHaveBeenCalledWith(
-      "[agent-assembly] Unsupported platform: freebsd-arm64; skipping binary selection."
+      "[agent-assembly] Unsupported platform: freebsd-arm64; skipping native binding check."
     );
   });
 
-  it("returns true for successful postinstall selection", () => {
+  it("returns true when the bundled binding is present", () => {
     const cwd = createTempDir();
-    seedPlatformPackage(cwd, "@agent-assembly/darwin-arm64", { withBinary: true });
+    seedBundledBinary(cwd, "index.darwin-arm64.node");
 
     const logger = {
       info: vi.fn(),
@@ -114,9 +129,10 @@ describe("postinstall script", () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it("returns false and warns when package exists but no binary is found", () => {
+  it("returns false and warns loudly when no bundled binding is found", () => {
     const cwd = createTempDir();
-    seedPlatformPackage(cwd, "@agent-assembly/linux-x64-gnu", { withBinary: false });
+    // native/aa-ffi-node exists but ships no .node — a provisioning regression.
+    fs.mkdirSync(path.join(cwd, "native", "aa-ffi-node"), { recursive: true });
 
     const logger = {
       info: vi.fn(),
@@ -133,20 +149,20 @@ describe("postinstall script", () => {
     expect(ok).toBe(false);
     expect(logger.warn).toHaveBeenCalledTimes(1);
     expect(logger.warn.mock.calls[0]?.[0]).toContain(
-      "[agent-assembly] Failed to select native binary: No .node file found in @agent-assembly/linux-x64-gnu"
+      "[agent-assembly] Failed to verify native binding: No bundled native binding (.node) found in native/aa-ffi-node for linux-x64-gnu"
     );
   });
 
   it("stringifies non-Error throwables when logging postinstall failure", () => {
     const cwd = createTempDir();
-    seedPlatformPackage(cwd, "@agent-assembly/linux-x64-gnu", { withBinary: true });
+    seedBundledBinary(cwd, "index.node");
 
     const logger = {
       info: vi.fn(),
       warn: vi.fn()
     };
 
-    const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation(() => {
+    const readSpy = vi.spyOn(fs, "existsSync").mockImplementation(() => {
       throw "raw-failure";
     });
 
@@ -154,16 +170,16 @@ describe("postinstall script", () => {
       platform: "linux",
       arch: "x64",
       cwd,
-      logger,
+      logger
     });
 
     expect(ok).toBe(false);
     expect(logger.warn).toHaveBeenCalledTimes(1);
     expect(logger.warn).toHaveBeenCalledWith(
-      "[agent-assembly] Failed to select native binary: raw-failure"
+      "[agent-assembly] Failed to verify native binding: raw-failure"
     );
 
-    copySpy.mockRestore();
+    readSpy.mockRestore();
   });
 
   it("detects direct execution and runs entrypoint only in main mode", () => {
