@@ -138,7 +138,7 @@ Full `INSTALL_HINT` text from `src/runtime.ts`:
 agent-assembly runtime not found.
   Install with: pnpm add agent-assembly
   Or manually:  brew install agent-assembly/tap/aasm
-               curl -fsSL https://get.agent-assembly.io | sh
+               curl -fsSL https://agent-assembly.com/install.sh | sh
 ```
 
 `initAssembly()` throws `Error(INSTALL_HINT)` when no binary is
