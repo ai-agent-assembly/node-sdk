@@ -20,4 +20,12 @@ describe("SDK entrypoint — runtime helpers re-export (AAASM-1221)", () => {
     expect(typeof INSTALL_HINT).toBe("string");
     expect(INSTALL_HINT).toContain("agent-assembly runtime not found");
   });
+
+  // AAASM-4192: the hint must never point users at the unscoped, unregistered
+  // (claimable) `agent-assembly` npm name — that is a supply-chain squat vector.
+  // Any npm install guidance must use the scoped `@agent-assembly/...` package.
+  it("never suggests installing the claimable unscoped npm name", () => {
+    expect(INSTALL_HINT).not.toMatch(/(?:pnpm add|npm i(?:nstall)?|yarn add)\s+agent-assembly\b/);
+    expect(INSTALL_HINT).toContain("@agent-assembly/sdk");
+  });
 });
