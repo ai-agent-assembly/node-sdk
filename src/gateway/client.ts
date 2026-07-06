@@ -7,7 +7,7 @@ import type {
   GatewayResultRecord
 } from "../types/gateway-governance.js";
 import type { AssemblyMode } from "../types/assembly-mode.js";
-import type { EnforcementMode } from "../types/enforcement-mode.js";
+import { type EnforcementMode, resolveFailClosed } from "../types/enforcement-mode.js";
 import type { NativeClient } from "../native/client.js";
 
 export interface GatewayClient {
@@ -93,8 +93,9 @@ export function createNativeGatewayClient(
   enforcementMode?: EnforcementMode
 ): GatewayClient {
   // Fail-closed posture mirrors the go SDK's `failClosed` and the Python
-  // enforce guard: only an explicit `"enforce"` denies on fault (AAASM-3920).
-  const failClosed = enforcementMode === "enforce";
+  // enforce guard: an explicit `"enforce"` — or an omitted posture, which
+  // defaults to enforce like py/go (AAASM-4172) — denies on fault (AAASM-3920).
+  const failClosed = resolveFailClosed(enforcementMode);
   return {
     mode,
     ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
