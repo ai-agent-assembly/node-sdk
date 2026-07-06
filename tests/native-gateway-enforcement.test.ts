@@ -69,15 +69,19 @@ describe("native gateway enforcement (AAASM-3050)", () => {
     expect(executeFn).toHaveBeenCalledOnce();
   });
 
-  it("FAIL-OPEN: no runtime (native query rejects) lets the tool proceed", async () => {
+  it("FAIL-OPEN: no runtime (native query rejects) lets the tool proceed under observe", async () => {
     // The native primitive already returns "allow" when the runtime is
     // unreachable; on top of that, even a hard local fault must fail open.
+    // `"observe"` is the explicit advisory posture — an omitted posture now
+    // defaults to fail-closed (AAASM-4172), so this exercises observe directly.
     const gateway = createNativeGatewayClient(
       "napi-inprocess",
       fakeNativeClient(async () => {
         throw new Error("AA_ERR_CONNECT:no runtime listening");
       }),
-      "agent-1"
+      "agent-1",
+      undefined,
+      "observe"
     );
 
     const executeFn = vi.fn(async () => "ran-without-runtime");
@@ -156,7 +160,7 @@ describe("native gateway enforcement (AAASM-3050)", () => {
     expect(native.close).toHaveBeenCalledOnce();
   });
 
-  it("PENDING: a runtime pending verdict routes to the approval path", async () => {
+  it("PENDING: a runtime pending verdict routes to the approval path under observe", async () => {
     const gateway = createNativeGatewayClient(
       "napi-inprocess",
       fakeNativeClient(async () => ({
@@ -164,14 +168,17 @@ describe("native gateway enforcement (AAASM-3050)", () => {
         pending: true,
         reason: "awaiting approval"
       })),
-      "agent-1"
+      "agent-1",
+      undefined,
+      "observe"
     );
 
     const executeFn = vi.fn(async () => "approved-and-ran");
     const tools = { wire_transfer: { description: "money", execute: executeFn } };
     // No approval channel is wired in the node SDK yet; in the ADVISORY posture
-    // (no enforcementMode) that resolves to "not denied" and the tool proceeds,
-    // so a missing approval channel never blocks the agent (AAASM-4129).
+    // (`observe`) that resolves to "not denied" and the tool proceeds, so a
+    // missing approval channel never blocks the agent (AAASM-4129). An omitted
+    // posture now defaults to fail-closed (AAASM-4172), hence explicit observe.
     withAssembly(tools, { gatewayClient: gateway });
 
     await expect(tools.wire_transfer.execute()).resolves.toBe("approved-and-ran");
