@@ -35,9 +35,15 @@ export const RUNTIME_LOG_FILENAME = ".aasm-runtime.log";
 /** npm sub-package name for the bundled platform binary (esbuild pattern). */
 export const RUNTIME_SUBPACKAGE: string = `runtime-${platform()}-${arch()}`;
 
+// The runtime ships as the `@agent-assembly/runtime-{platform}-{arch}`
+// optionalDependency of `@agent-assembly/sdk` (or via brew/curl) — never as a
+// standalone bare, unscoped npm package. That unscoped name is unregistered and
+// claimable, so a hint that installed it would be a supply-chain squat vector
+// (AAASM-4192). Reinstalling the scoped SDK re-resolves this platform's runtime
+// sub-package.
 export const INSTALL_HINT: string = [
   "agent-assembly runtime not found.",
-  "  Install with: pnpm add agent-assembly",
+  "  Install with: pnpm add @agent-assembly/sdk",
   "  Or manually:  brew install ai-agent-assembly/tap/aasm",
   "               curl -fsSL https://agent-assembly.com/install.sh | sh",
 ].join("\n");
