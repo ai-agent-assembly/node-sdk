@@ -18,7 +18,7 @@ import { ConfigurationError } from "../errors/index.js";
 import type { AssemblyConfig } from "../types/assembly-config.js";
 import type { AssemblyContext } from "../types/assembly-context.js";
 import type { AssemblyMode } from "../types/assembly-mode.js";
-import { ENFORCEMENT_MODES } from "../types/enforcement-mode.js";
+import { ENFORCEMENT_MODES, resolveFailClosed } from "../types/enforcement-mode.js";
 import type {
   LangChainCallbackHandlerLike,
   LangChainToolLike
@@ -136,7 +136,8 @@ export function createClient(
         mode: "napi-inprocess",
         // AAASM-4013: under enforce, a runtime that returns no authoritative
         // verdict (fail-open sentinel / unknown decision) must deny, not allow.
-        failClosed: config.enforcementMode === "enforce"
+        // AAASM-4172: an omitted posture defaults to enforce (py/go parity).
+        failClosed: resolveFailClosed(config.enforcementMode)
       });
     return createNativeGatewayClient(mode, nativeClient, config.agentId, httpBaseUrl, config.enforcementMode);
   }
@@ -414,7 +415,8 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
       mode: resolvedConfig.mode === "napi-inprocess" ? "napi-inprocess" : "grpc-sidecar",
       // AAASM-4013: under enforce, a runtime that returns no authoritative
       // verdict (fail-open sentinel / unknown decision) must deny, not allow.
-      failClosed: resolvedConfig.enforcementMode === "enforce"
+      // AAASM-4172: an omitted posture defaults to enforce (py/go parity).
+      failClosed: resolveFailClosed(resolvedConfig.enforcementMode)
     });
   }
 
