@@ -236,7 +236,9 @@ function loadNativeBinding(): NativeBinding {
   }
 
   throw new NativeConnectError(
-    `Failed to load native binding from known paths: ${String(lastError)}`
+    `Failed to load native binding from known paths: ${String(lastError)}. ` +
+      `For non-standard install layouts, set AA_ALLOW_CWD_NATIVE_FALLBACK=1 ` +
+      `to also probe <cwd>/native/aa-ffi-node/index.cjs (see AAASM-4302).`
   );
 }
 
