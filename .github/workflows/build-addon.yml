@@ -81,6 +81,11 @@ jobs:
         run: pnpm vitest run tests/native-napi-integration.test.ts
         env:
           AA_NATIVE_TEST: "1"
+          # Repo-root CWD is a "non-standard install layout" as far as the loader
+          # is concerned. Opt in to the CWD fallback so it probes
+          # <cwd>/native/aa-ffi-node/index.cjs (built by the previous step)
+          # in addition to the two relative-path candidates. See AAASM-4302.
+          AA_ALLOW_CWD_NATIVE_FALLBACK: "1"
 
       - name: Upload prebuilt artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
