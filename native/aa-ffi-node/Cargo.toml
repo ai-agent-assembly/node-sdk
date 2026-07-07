@@ -47,7 +47,7 @@ tokio = { version = "1", features = ["rt", "macros", "net", "io-util", "time"] }
 # signs `nonce || sdk_version` before any heartbeat), so the test verifies the
 # Ed25519 proof. `rand` is value-returning for the nonce (no `[0u8; N]` literal
 # in the signing data-flow → CodeQL-clean).
-ed25519-dalek = "2"
+ed25519-dalek = "3"
 sha2 = "0.11"
 hex = "0.4"
 rand = "0.10"
