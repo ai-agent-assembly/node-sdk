@@ -37,7 +37,7 @@ export const RUNTIME_SUBPACKAGE: string = `runtime-${platform()}-${arch()}`;
 
 export const INSTALL_HINT: string = [
   "agent-assembly runtime not found.",
-  "  Install with: pnpm add agent-assembly",
+  "  Install with: pnpm add @agent-assembly/sdk",
   "  Or manually:  brew install ai-agent-assembly/tap/aasm",
   "               curl -fsSL https://agent-assembly.com/install.sh | sh",
 ].join("\n");
