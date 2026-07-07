@@ -213,9 +213,14 @@ function loadNativeBinding(): NativeBinding {
   const requireFromHere = createRequire(path.resolve(process.cwd(), "package.json"));
   const candidates = [
     "../../native/aa-ffi-node/index.cjs",
-    "../../../native/aa-ffi-node/index.cjs",
-    `${process.cwd()}/native/aa-ffi-node/index.cjs`
+    "../../../native/aa-ffi-node/index.cjs"
   ];
+  if (process.env.AA_ALLOW_CWD_NATIVE_FALLBACK === "1") {
+    // Explicit opt-in for non-standard install layouts. See AAASM-4302.
+    // Without this env var the CWD candidate is skipped so a malicious
+    // package dropped into an attacker-writable CWD cannot hijack the loader.
+    candidates.push(`${process.cwd()}/native/aa-ffi-node/index.cjs`);
+  }
 
   let lastError: unknown;
   for (const candidate of candidates) {
