@@ -524,34 +524,48 @@ describe("createNativeClient", () => {
   });
 
   it("tries known native binding paths and succeeds on fallback path", async () => {
-    const binding = {
-      connect: vi.fn(async () => ({ id: "handle-5" })),
-      sendEvent: vi.fn(() => undefined),
-      queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
-      disconnect: vi.fn(async () => undefined)
-    } satisfies MockBinding;
+    // AAASM-4302: the CWD candidate is now gated behind AA_ALLOW_CWD_NATIVE_FALLBACK=1
+    // to prevent hijack by an attacker-writable CWD. This test preserves the original
+    // three-candidate fallback-chain intent by opting in via the env var; without it,
+    // the loader only probes the two relative-path candidates.
+    const previousFallbackFlag = process.env.AA_ALLOW_CWD_NATIVE_FALLBACK;
+    process.env.AA_ALLOW_CWD_NATIVE_FALLBACK = "1";
+    try {
+      const binding = {
+        connect: vi.fn(async () => ({ id: "handle-5" })),
+        sendEvent: vi.fn(() => undefined),
+        queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
+        disconnect: vi.fn(async () => undefined)
+      } satisfies MockBinding;
 
-    const mod = await loadNativeClientWithRequire(() => {
-      let calls = 0;
-      return () => {
-        calls += 1;
-        if (calls < 3) {
-          throw new Error("not found");
-        }
-        return binding;
-      };
-    });
+      const mod = await loadNativeClientWithRequire(() => {
+        let calls = 0;
+        return () => {
+          calls += 1;
+          if (calls < 3) {
+            throw new Error("not found");
+          }
+          return binding;
+        };
+      });
 
-    const client = mod.createNativeClient({
-      gateway: "/tmp/aa.sock",
-      apiKey: "test-key",
-      mode: "napi-inprocess"
-    });
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess"
+      });
 
-    await expect(client.queryPolicy({ action: "check" })).resolves.toEqual({
-      denied: false,
-      pending: false
-    });
+      await expect(client.queryPolicy({ action: "check" })).resolves.toEqual({
+        denied: false,
+        pending: false
+      });
+    } finally {
+      if (previousFallbackFlag === undefined) {
+        delete process.env.AA_ALLOW_CWD_NATIVE_FALLBACK;
+      } else {
+        process.env.AA_ALLOW_CWD_NATIVE_FALLBACK = previousFallbackFlag;
+      }
+    }
   });
 
   it("throws NativeConnectError when native binding cannot be loaded from known paths", async () => {
