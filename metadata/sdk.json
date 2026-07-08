@@ -1,0 +1,23 @@
+{
+  "$comment": "Authoritative shared metadata for Node SDK docs generation (AAASM-4312 / Epic AAASM-4309). package.json remains the source of truth for name, version, homepage, repository, and engines. This file holds the values that do NOT live in package.json but must be kept in sync across README, docs/, and error hints — see CONTRIBUTING.md for the add-a-value workflow.",
+  "docsUrl": "https://docs.agent-assembly.com/node-sdk/",
+  "distTag": "rc",
+  "cliPackageName": "@agent-assembly/cli",
+  "installCommands": {
+    "latest": {
+      "npm": "npm install @agent-assembly/sdk",
+      "pnpm": "pnpm add @agent-assembly/sdk",
+      "yarn": "yarn add @agent-assembly/sdk"
+    },
+    "distTag": {
+      "npm": "npm install @agent-assembly/sdk@rc",
+      "pnpm": "pnpm add @agent-assembly/sdk@rc",
+      "yarn": "yarn add @agent-assembly/sdk@rc"
+    },
+    "pinned": {
+      "npm": "npm install @agent-assembly/sdk@<VERSION>",
+      "pnpm": "pnpm add @agent-assembly/sdk@<VERSION>",
+      "yarn": "yarn add @agent-assembly/sdk@<VERSION>"
+    }
+  }
+}
