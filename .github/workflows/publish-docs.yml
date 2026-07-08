@@ -48,6 +48,14 @@ jobs:
       - name: Install SDK dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check docs metadata is not stale
+        # AAASM-4312: regenerate the bounded docs metadata blocks and fail if
+        # anything changed. Keeps README/docs install-command and version-pin
+        # snippets in lock-step with package.json + metadata/sdk.json.
+        run: |
+          pnpm run generate:docs-metadata
+          git diff --exit-code -- README.md docs
+
       - name: Install website dependencies
         # `--ignore-workspace` tells pnpm to skip the parent
         # `pnpm-workspace.yaml` (added under AAASM-1220) when installing
