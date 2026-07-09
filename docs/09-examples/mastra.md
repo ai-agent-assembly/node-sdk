@@ -4,7 +4,7 @@ sidebar_position: 8
 
 # Mastra
 
-Source: [`node/mastra`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/mastra)
+Source: [`node/mastra`](https://github.com/ai-agent-assembly/examples/tree/master/node/mastra)
 
 ## What this example demonstrates
 
@@ -120,6 +120,6 @@ Done. Mastra tool calls governed by withAssembly + the local policy.
 
 ## Links
 
-- Example directory: [`node/mastra`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/mastra)
-- Example README: [`README.md`](https://github.com/ai-agent-assembly/agent-assembly-examples/blob/master/node/mastra/README.md)
+- Example directory: [`node/mastra`](https://github.com/ai-agent-assembly/examples/tree/master/node/mastra)
+- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/master/node/mastra/README.md)
 - [Mastra](https://mastra.ai)
