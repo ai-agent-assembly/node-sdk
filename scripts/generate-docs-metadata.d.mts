@@ -28,10 +28,17 @@ export interface RunGeneratorOptions {
   logger?: Pick<Console, "log">;
 }
 
+export interface InstallHintsWriteResult {
+  changed: boolean;
+}
+
 export interface RunGeneratorResult {
   meta: GeneratedMetadata;
   results: FileRewriteReport[];
+  installHints: InstallHintsWriteResult;
 }
+
+export const INSTALL_HINTS_TS_PATH: string;
 
 export function loadMetadata(repoRoot: string): GeneratedMetadata;
 
@@ -40,5 +47,12 @@ export function rewriteFile(
   meta: GeneratedMetadata,
   relPath: string
 ): FileRewriteResult;
+
+export function renderInstallHintsModule(meta: GeneratedMetadata): string;
+
+export function writeInstallHintsModule(
+  repoRoot: string,
+  meta: GeneratedMetadata
+): InstallHintsWriteResult;
 
 export function runGenerator(options?: RunGeneratorOptions): RunGeneratorResult;
