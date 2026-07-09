@@ -4,6 +4,10 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import { ConfigurationError, GatewayError } from "../errors/index.js";
+import {
+  INSTALL_HINT_NPM_SDK_GLOBAL_CLI,
+  INSTALL_HINT_PNPM_GLOBAL_CLI
+} from "../generated/install-hints.js";
 
 /**
  * Resolve the gateway URL and API key for ``initAssembly``.
@@ -295,7 +299,7 @@ export async function autoStartGateway(
   if (aasmPath === null) {
     throw new ConfigurationError(
       `No gateway found at ${baseUrl} and 'aasm' is not on PATH. ` +
-        "Install it with: npm install -g @agent-assembly/cli (or pnpm add -g)"
+        `Install it with: ${INSTALL_HINT_NPM_SDK_GLOBAL_CLI} (or ${INSTALL_HINT_PNPM_GLOBAL_CLI})`
     );
   }
 
