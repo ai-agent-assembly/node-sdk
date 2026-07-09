@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # LangChain.js basic agent
 
-Source: [`node/langchain-js-basic-agent`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/langchain-js-basic-agent)
+Source: [`node/langchain-js-basic-agent`](https://github.com/ai-agent-assembly/examples/tree/master/node/langchain-js-basic-agent)
 
 ## What this example demonstrates
 
@@ -112,6 +112,6 @@ Done. Tool calls governed by withAssembly + the local policy.
 
 ## Links
 
-- Example directory: [`node/langchain-js-basic-agent`](https://github.com/ai-agent-assembly/agent-assembly-examples/tree/master/node/langchain-js-basic-agent)
-- Example README: [`README.md`](https://github.com/ai-agent-assembly/agent-assembly-examples/blob/master/node/langchain-js-basic-agent/README.md)
+- Example directory: [`node/langchain-js-basic-agent`](https://github.com/ai-agent-assembly/examples/tree/master/node/langchain-js-basic-agent)
+- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/master/node/langchain-js-basic-agent/README.md)
 - [LangChain.js](https://js.langchain.com)

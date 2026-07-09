@@ -5,7 +5,7 @@ sidebar_position: 2
 # Preparing the runtime environment
 
 Every Node example in the
-[`agent-assembly-examples`](https://github.com/ai-agent-assembly/agent-assembly-examples)
+[`agent-assembly-examples`](https://github.com/ai-agent-assembly/examples)
 repository is a self-contained TypeScript project that shares the same prerequisites
 and run commands. This page collects that common setup once so the per-example pages
 can focus on what each example actually demonstrates.
@@ -25,7 +25,7 @@ dependency. The framework-specific examples add one extra package each
 Clone the examples monorepo and change into the example you want to run:
 
 ```bash
-git clone https://github.com/ai-agent-assembly/agent-assembly-examples.git
+git clone https://github.com/ai-agent-assembly/examples.git
 cd agent-assembly-examples/node/<example-name>
 ```
 
