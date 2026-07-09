@@ -16,6 +16,8 @@ import { arch, homedir, platform } from "node:os";
 import { delimiter as PATH_DELIM, dirname, isAbsolute, join, resolve as resolvePath, sep } from "node:path";
 import { cwd, env } from "node:process";
 
+import { INSTALL_HINT_PNPM_SDK } from "./generated/install-hints.js";
+
 export const BINARY_NAME = "aasm";
 export const DEFAULT_PORT = 7878;
 export const DEFAULT_RUNTIME_HOST = "127.0.0.1";
@@ -43,7 +45,7 @@ export const RUNTIME_SUBPACKAGE: string = `runtime-${platform()}-${arch()}`;
 // sub-package.
 export const INSTALL_HINT: string = [
   "agent-assembly runtime not found.",
-  "  Install with: pnpm add @agent-assembly/sdk",
+  `  Install with: ${INSTALL_HINT_PNPM_SDK}`,
   "  Or manually:  brew install ai-agent-assembly/tap/aasm",
   "               curl -fsSL https://agent-assembly.com/install.sh | sh",
 ].join("\n");
