@@ -260,7 +260,7 @@ export function renderInstallHintsModule(meta) {
 export function writeInstallHintsModule(repoRoot, meta) {
   const abs = resolve(repoRoot, INSTALL_HINTS_TS_PATH);
   const body = renderInstallHintsModule(meta);
-  let previous = null;
+  let previous;
   try {
     previous = readFileSync(abs, "utf8");
   } catch {
