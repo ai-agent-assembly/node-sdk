@@ -6,6 +6,12 @@ on:
       - "docs/**"
       - "website/**"
       - ".github/workflows/publish-docs.yml"
+      # AAASM-4327: shared-metadata drift now also affects runtime source
+      # under src/generated/, so any change there must retrigger the drift
+      # check even when docs/ and website/ are untouched.
+      - "src/generated/**"
+      - "metadata/**"
+      - "scripts/generate-docs-metadata.mjs"
   push:
     branches:
       - master
@@ -52,9 +58,11 @@ jobs:
         # AAASM-4312: regenerate the bounded docs metadata blocks and fail if
         # anything changed. Keeps README/docs install-command and version-pin
         # snippets in lock-step with package.json + metadata/sdk.json.
+        # AAASM-4327: the same generator also emits src/generated/install-hints.ts
+        # for runtime error strings, so the drift check now covers that path.
         run: |
           pnpm run generate:docs-metadata
-          git diff --exit-code -- README.md docs
+          git diff --exit-code -- README.md docs src/generated
 
       - name: Install website dependencies
         # `--ignore-workspace` tells pnpm to skip the parent
