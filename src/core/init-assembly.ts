@@ -82,6 +82,36 @@ function buildRegisterOptions(
 }
 
 /**
+ * Emit a prominent, unconditional stderr warning that the agent was **not**
+ * registered with the gateway by this SDK (AAASM-4468).
+ *
+ * The default `grpc-sidecar` mode's native `register` is a no-op stub that
+ * resolves to `""` — a success-shaped value — so `initAssembly` would otherwise
+ * report a clean init for an agent that never registered and will never appear
+ * in the dashboard / `/api/v1/agents`. A governance SDK must never emit a false
+ * clean-init signal when registration structurally did not happen, so we say so
+ * loudly. Written straight to `process.stderr` (not `console`/a swappable
+ * logger) so it cannot be silenced by log configuration, and once per
+ * `initAssembly` call — at init, not per policy query.
+ *
+ * This does not fail init: `grpc-sidecar` may legitimately delegate
+ * registration to an external sidecar process, so the honest posture is "warn +
+ * surface, don't break". The real in-SDK registration (direct `:50051` via the
+ * `aa-sdk-client` binding) is gated on AAASM-4467.
+ */
+function warnAgentUnregistered(mode: AssemblyMode | "auto"): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: the agent is NOT registered with the governance ` +
+      `gateway in "${mode}" mode. This SDK build cannot perform gateway ` +
+      `registration on this path, so the agent will NOT appear in the dashboard ` +
+      `or GET /api/v1/agents unless an external sidecar registers it out-of-band. ` +
+      `In-SDK registration is pending the native binding (AAASM-4467). Inspect ` +
+      `the "registered" flag on the returned assembly context to detect this ` +
+      `programmatically.\n`
+  );
+}
+
+/**
  * The only built-in {@link AssemblyMode} for which {@link createClient}
  * constructs a gateway client whose `check()` consults a real authoritative
  * verdict (the native `queryPolicy` against a reachable `aa-runtime`). Every
@@ -425,21 +455,34 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
 
   await startNetworkLayerIfNeeded(client, resolvedConfig);
 
+  // Whether this SDK actually registered the agent with the gateway. Surfaced on
+  // the returned context (AAASM-4468) so callers can detect the unregistered
+  // state programmatically, not only via the stderr warning below.
+  let registered = false;
   if (nativeClient !== undefined) {
-    // AAASM-3403: register the agent over the native SDK→gateway gRPC call so
-    // the gateway issues a credential token (stored on this session) that
-    // unblocks subsequent policy queries. Advisory: a failed registration must
-    // not abort init — the agent proceeds unregistered and the proxy / eBPF
-    // layers remain authoritative.
-    try {
-      await nativeClient.register(buildRegisterOptions(resolvedConfig, frameworks));
-    } catch (error) {
-      // Redact any Bearer/auth credential the error message might carry before
-      // it reaches the console — the apiKey/credentialToken must never be logged
-      // (AAASM-3645).
-      console.warn(
-        `[agent-assembly] agent registration failed; proceeding unregistered: ${redactErrorMessage(error)}`
-      );
+    if (nativeClient.canRegister) {
+      // AAASM-3403: register the agent over the native SDK→gateway gRPC call so
+      // the gateway issues a credential token (stored on this session) that
+      // unblocks subsequent policy queries. Advisory: a failed registration must
+      // not abort init — the agent proceeds unregistered and the proxy / eBPF
+      // layers remain authoritative.
+      try {
+        await nativeClient.register(buildRegisterOptions(resolvedConfig, frameworks));
+        registered = true;
+      } catch (error) {
+        // Redact any Bearer/auth credential the error message might carry before
+        // it reaches the console — the apiKey/credentialToken must never be logged
+        // (AAASM-3645).
+        console.warn(
+          `[agent-assembly] agent registration failed; proceeding unregistered: ${redactErrorMessage(error)}`
+        );
+      }
+    } else {
+      // AAASM-4468: the default `grpc-sidecar` transport's `register` is a no-op
+      // stub that resolves to a success-shaped `""`, so the try/catch above would
+      // never fire and init would falsely report success. Fail loud instead:
+      // emit the unregistered warning and leave `registered` false.
+      warnAgentUnregistered(resolvedConfig.mode ?? "auto");
     }
     // Topology lineage metadata still flows as an audit event (parent / team /
     // delegation), which `register` does not carry.
@@ -450,6 +493,7 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
 
   return {
     activeAdapters: buildActiveAdapters(adapters, patches),
+    registered,
     ...(resolvedConfig.parentAgentId !== undefined && {
       parentAgentId: resolvedConfig.parentAgentId
     }),

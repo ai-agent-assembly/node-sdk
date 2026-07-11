@@ -7,6 +7,7 @@ import type { GatewayClient } from "../src/gateway/client.js";
 function createClient(mode: NativeClient["mode"]): NativeClient {
   return {
     mode,
+    canRegister: mode === "napi-inprocess",
     close: async () => undefined,
     sendEvent: () => undefined,
     queryPolicy: async () => ({ denied: false, pending: false }),

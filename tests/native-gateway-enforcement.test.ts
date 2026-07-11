@@ -17,6 +17,7 @@ import { withAssembly } from "../src/wrappers/with-assembly.js";
 function fakeNativeClient(queryPolicy: NativeClient["queryPolicy"]): NativeClient {
   return {
     mode: "napi-inprocess",
+    canRegister: true,
     close: vi.fn(async () => undefined),
     sendEvent: vi.fn(() => undefined),
     queryPolicy,
