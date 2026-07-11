@@ -48,9 +48,9 @@
   "peerDependencies": {
     "@langchain/core": ">=0.3.0",
     "@langchain/langgraph": ">=1.0.0",
-    "ai": ">=5.0.0",
     "@mastra/core": ">=0.20.0",
-    "@openai/agents": ">=0.1.0"
+    "@openai/agents": ">=0.1.0",
+    "ai": ">=5.0.0"
   },
   "peerDependenciesMeta": {
     "@langchain/core": {
@@ -71,21 +71,21 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@napi-rs/cli": "3.7.1",
+    "@napi-rs/cli": "3.7.2",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^25.9.1",
-    "@vitest/coverage-v8": "^3.2.6",
-    "ai": "^6.0.0",
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "ai": "^7.0.22",
     "blocked-at": "^1.2.0",
-    "eslint": "^10.4.1",
+    "eslint": "^10.7.0",
     "grpc-tools": "^1.13.1",
-    "js-yaml": "^4.1.1",
-    "langchain": "^1.4.0",
-    "prettier": "^3.5.3",
-    "ts-proto": "^2.11.8",
+    "js-yaml": "^5.2.1",
+    "langchain": "^1.5.3",
+    "prettier": "^3.9.5",
+    "ts-proto": "^2.12.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.60.0",
-    "vitest": "^3.2.6"
+    "typescript-eslint": "^8.63.0",
+    "vitest": "^4.1.10"
   },
   "keywords": [
     "agent-assembly",
@@ -110,7 +110,7 @@
   ],
   "types": "./dist/types/index.d.ts",
   "dependencies": {
-    "@bufbuild/protobuf": "^2.12.0",
+    "@bufbuild/protobuf": "^2.12.1",
     "@grpc/grpc-js": "^1.14.4"
   },
   "pnpm": {
@@ -120,11 +120,12 @@
       "protobufjs": "^7.6.1",
       "ws": ">=8.21.0",
       "vite": "^6.4.3",
-      "hono": "^4.12.21",
+      "hono": "^4.12.29",
       "ip-address": "^10.1.1",
-      "qs": "^6.15.2",
+      "qs": "^6.15.3",
       "tar": "^7.5.16",
-      "uuid": ">=11.1.1"
+      "uuid": ">=11.1.1",
+      "@langchain/core": "^1.2.1"
     }
   }
 }
