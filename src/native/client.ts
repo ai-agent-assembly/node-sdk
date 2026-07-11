@@ -100,6 +100,20 @@ export class NativeDisconnectError extends Error {
 
 export interface NativeClient {
   readonly mode: "grpc-sidecar" | "napi-inprocess";
+  /**
+   * Whether {@link register} on this transport actually attempts an SDK-side
+   * registration against the gateway. `true` only for the in-process
+   * (`napi-inprocess`) path, which dials the native binding. The default
+   * `grpc-sidecar` transport is a hardcoded no-op stub whose `register` resolves
+   * to `""` without contacting anything (see {@link createNativeClient}), so it
+   * is `false` there — callers must treat a `false` here as "this SDK did not
+   * register the agent" rather than trusting `register`'s empty-string success.
+   * Surfaced so `initAssembly` can fail loud instead of reporting a clean init
+   * for a registration that structurally never happened (AAASM-4468). The real
+   * `grpc-sidecar` registration (direct `:50051` via the `aa-sdk-client`
+   * binding) is gated on AAASM-4467.
+   */
+  readonly canRegister: boolean;
   close: () => Promise<void>;
   sendEvent: (event: unknown) => void;
   queryPolicy: (action: unknown) => Promise<PolicyResult>;
@@ -252,6 +266,14 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
   if (mode !== "napi-inprocess") {
     return {
       mode,
+      // This transport cannot register the agent itself: it has no native
+      // session to register against, so `register` below is a no-op stub. The
+      // gRPC sidecar mode assumes a separate sidecar process performs the real
+      // gateway registration. `canRegister: false` is what lets `initAssembly`
+      // fail loud about the unregistered agent instead of trusting the stub's
+      // empty-string "success" (AAASM-4468). Real in-SDK grpc-sidecar
+      // registration is gated on AAASM-4467.
+      canRegister: false,
       close: async () => undefined,
       sendEvent: () => undefined,
       queryPolicy: async () => ({ denied: false, pending: false }),
@@ -290,6 +312,9 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
 
   return {
     mode,
+    // The in-process path dials the native binding and attempts a real
+    // SDK→gateway registration below, so it is registration-capable.
+    canRegister: true,
     close: async () => {
       if (pendingSendError) {
         const error = pendingSendError;
