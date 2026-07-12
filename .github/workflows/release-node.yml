@@ -53,9 +53,95 @@ permissions:
   contents: read
 
 jobs:
+  # AAASM-4467: build the napi `.node` addon for every supported platform and
+  # upload each as an artifact. The `publish` job downloads all of them into
+  # native/aa-ffi-node/ before `npm publish`, so the published
+  # @agent-assembly/sdk tarball actually bundles the in-package native binding
+  # (package.json `files` → native/aa-ffi-node/*.node, loaded at runtime by
+  # native/aa-ffi-node/index.cjs and verified at install time by
+  # scripts/postinstall.mjs).
+  #
+  # Before this job existed the release ran only `pnpm build` (TypeScript) and
+  # shipped ZERO `.node` on every platform — so `napi-inprocess` mode was broken
+  # in every published release. build-addon.yml already builds the exact same
+  # addon for PR/CI verification, but its artifact was never consumed by the
+  # release; this job mirrors build-addon.yml's toolchain (Rust + protoc +
+  # `pnpm native:build:release`) and hands the result to `publish`.
+  #
+  # Platforms match scripts/postinstall.mjs SUPPORTED_PLATFORM_KEYS minus win32:
+  # the SDK ships no Windows native runtime (Windows consumers use grpc-sidecar
+  # mode — see build-addon.yml's matrix comment + optionalDependencies). Each
+  # runner builds its own host target natively, so `pnpm native:build:release`
+  # needs no cross-compile toolchain; napi's `--platform` names the output
+  # index.<triple>.node (linux-x64-gnu / darwin-arm64 / darwin-x64) — exactly the
+  # filenames index.cjs and postinstall.mjs resolve. napi produces N-API (ABI-
+  # stable) binaries, so a single Node version per platform is sufficient.
+  build-native:
+    name: Build napi .node (${{ matrix.napi_triple }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            napi_triple: linux-x64-gnu
+          - os: macos-latest
+            napi_triple: darwin-arm64
+          # darwin-x64 builds natively on the Intel macOS runner (macos-latest
+          # is Apple Silicon / arm64), so no cross-compile toolchain is needed.
+          - os: macos-15-intel
+            napi_triple: darwin-x64
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v4.2.2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Setup protoc
+        # aa-ffi-node depends transitively (via aa-sdk-client) on aa-proto, whose
+        # build script compiles .proto sources with protoc.
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build napi addon (release)
+        run: pnpm native:build:release
+
+      # Fail the release before publishing if a freshly built .node cannot load
+      # (mirrors build-addon.yml's acceptance gate). AA_ALLOW_CWD_NATIVE_FALLBACK
+      # opts the loader into probing <cwd>/native/aa-ffi-node/index.cjs, which is
+      # a non-standard install layout as far as the loader is concerned
+      # (AAASM-4302).
+      - name: Verify the built addon loads
+        run: pnpm vitest run tests/native-napi-integration.test.ts
+        env:
+          AA_NATIVE_TEST: "1"
+          AA_ALLOW_CWD_NATIVE_FALLBACK: "1"
+
+      - name: Upload prebuilt .node artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-${{ matrix.napi_triple }}
+          path: native/aa-ffi-node/*.node
+          if-no-files-found: error
+
   publish:
     name: Publish @agent-assembly/sdk + 4 runtime sub-packages to npm
     runs-on: ubuntu-latest
+    # AAASM-4467: the per-platform napi `.node` addons this job bundles into the
+    # published tarball are produced by build-native; block publish on it.
+    needs: build-native
     # AAASM-4017: gate the OIDC-authenticated npm publish behind a protected
     # GitHub Environment. The npm "trusted publisher" config on npmjs.com must
     # name this repo + this workflow file + THIS environment; adding required
@@ -310,6 +396,37 @@ jobs:
             console.log(`bumped ${file} -> ${version}`);
           }
           NODE
+
+      # AAASM-4467: pull every per-platform `.node` built by the build-native
+      # job into native/aa-ffi-node/ so the published tarball bundles the
+      # in-package native binding for all supported platforms. package.json
+      # `files` (native/aa-ffi-node/*.node) then captures them and `npm publish`
+      # ships them; without this the tarball carried zero native binding and
+      # napi-inprocess mode was broken in every release. `merge-multiple`
+      # flattens the three artifacts (native-linux-x64-gnu / native-darwin-arm64
+      # / native-darwin-x64) into the single directory. Runs in every mode,
+      # including dry-run, so a dry-run validates the download+pack path.
+      - name: Download prebuilt .node addons into the package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: native-*
+          path: native/aa-ffi-node
+          merge-multiple: true
+
+      # Fail loudly before publish if no binding was staged — shipping a tarball
+      # with zero `.node` is the exact regression this ticket fixes, so it must
+      # never publish silently again.
+      - name: Verify bundled native bindings are present
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          nodes=(native/aa-ffi-node/*.node)
+          if [[ ${#nodes[@]} -eq 0 ]]; then
+            echo "::error::no .node addons staged in native/aa-ffi-node — the published tarball would ship no native binding (napi-inprocess mode would be broken). Check the build-native job."
+            exit 1
+          fi
+          echo "bundled native bindings:"
+          printf '  %s\n' "${nodes[@]}"
 
       - name: Build main SDK (ESM + CJS)
         run: pnpm build
