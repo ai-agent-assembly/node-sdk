@@ -397,6 +397,37 @@ jobs:
           }
           NODE
 
+      # AAASM-4467: pull every per-platform `.node` built by the build-native
+      # job into native/aa-ffi-node/ so the published tarball bundles the
+      # in-package native binding for all supported platforms. package.json
+      # `files` (native/aa-ffi-node/*.node) then captures them and `npm publish`
+      # ships them; without this the tarball carried zero native binding and
+      # napi-inprocess mode was broken in every release. `merge-multiple`
+      # flattens the three artifacts (native-linux-x64-gnu / native-darwin-arm64
+      # / native-darwin-x64) into the single directory. Runs in every mode,
+      # including dry-run, so a dry-run validates the download+pack path.
+      - name: Download prebuilt .node addons into the package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: native-*
+          path: native/aa-ffi-node
+          merge-multiple: true
+
+      # Fail loudly before publish if no binding was staged — shipping a tarball
+      # with zero `.node` is the exact regression this ticket fixes, so it must
+      # never publish silently again.
+      - name: Verify bundled native bindings are present
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          nodes=(native/aa-ffi-node/*.node)
+          if [[ ${#nodes[@]} -eq 0 ]]; then
+            echo "::error::no .node addons staged in native/aa-ffi-node — the published tarball would ship no native binding (napi-inprocess mode would be broken). Check the build-native job."
+            exit 1
+          fi
+          echo "bundled native bindings:"
+          printf '  %s\n' "${nodes[@]}"
+
       - name: Build main SDK (ESM + CJS)
         run: pnpm build
 
