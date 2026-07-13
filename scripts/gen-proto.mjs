@@ -30,7 +30,7 @@ const DEFAULT_PROTO_DIR = resolve(REPO_ROOT, "..", "agent-assembly", "proto");
 // Only generate the protos the SDK actually consumes. Keeping the set
 // tight keeps the committed-stubs diff readable and avoids accidentally
 // coupling the SDK to RPCs it doesn't use.
-const PROTO_FILES = ["common.proto", "policy.proto"];
+const PROTO_FILES = ["common.proto", "policy.proto", "agent.proto"];
 
 const OUTPUT_DIR = resolve(REPO_ROOT, "src", "proto", "generated");
 
