@@ -1,3 +1,11 @@
+export interface QuickstartTab {
+  frameworkId: string;
+  label: string;
+  status: "validated" | "experimental";
+  lang: string;
+  code: string;
+}
+
 export interface GeneratedMetadata {
   packageName: string;
   version: string;
@@ -11,6 +19,7 @@ export interface GeneratedMetadata {
     distTag?: { pnpm?: string; npm?: string; yarn?: string };
     pinned?: { pnpm?: string; npm?: string; yarn?: string };
   };
+  quickstartTabs: QuickstartTab[];
 }
 
 export interface FileRewriteResult {
@@ -39,8 +48,24 @@ export interface RunGeneratorResult {
 }
 
 export const INSTALL_HINTS_TS_PATH: string;
+export const QUICKSTART_SNIPPETS_DIR: string;
 
 export function loadMetadata(repoRoot: string): GeneratedMetadata;
+
+export function loadQuickstartTabs(repoRoot: string): QuickstartTab[];
+
+export function renderQuickstartFrameworkTabs(
+  meta: {
+    quickstartTabs: ReadonlyArray<{
+      frameworkId: string;
+      label: string;
+      status: string;
+      lang: string;
+      code: string;
+    }>;
+  },
+  dialect: { header(id: string): string }
+): string;
 
 export function rewriteFile(
   filePath: string,
