@@ -10,7 +10,11 @@ export default tseslint.config(
       "native/aa-ffi-node/index.cjs",
       "native/aa-ffi-node/index.d.ts",
       "website/**",
-      "docs/api/**"
+      "docs/api/**",
+      // Vendored quick-start snippets (AAASM-4514): verbatim excerpts of the
+      // examples repo's runnable regions, not compiled by any tsconfig. They are
+      // doc fixtures, not source — linting them trips the typed-project parser.
+      "metadata/quickstart-snippets/**"
     ]
   },
   js.configs.recommended,

@@ -4,3 +4,8 @@ node_modules
 website
 docs/api
 
+# Vendored quick-start snippets (AAASM-4514): verbatim copies of the examples
+# repo's runnable regions, drift-gated against them. Reformatting here would
+# desync the byte-for-byte copy and the generated tab block — keep them as-is.
+metadata/quickstart-snippets
+

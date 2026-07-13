@@ -1,0 +1,55 @@
+{
+  "$comment": "Vendored slice (node only) of the examples repo snippet manifest (AAASM-4512 / Epic AAASM-4511). Copied into this repo — NOT fetched at build time — so the quick-start framework tabs build offline and are drift-gated locally. Each `snippet_path` is relative to this file; each `.ts` under node/ is a verbatim copy of the `region: quickstart` slice of the referenced runnable example. `status` (validated | experimental) is curated display metadata that drives tab label + order: validated frameworks render first with a plain label, experimental frameworks render after with an `(Experimental)` label suffix. To refresh: re-copy the snippets from the examples repo and re-run `pnpm run generate:docs-metadata`.",
+  "schema_version": 1,
+  "source": "ai-agent-assembly/examples snippets/manifest.json (sdks.node)",
+  "node": [
+    {
+      "framework_id": "langchain-js-basic-agent",
+      "label": "LangChain.js",
+      "status": "validated",
+      "lang": "typescript",
+      "snippet_path": "node/langchain-js-basic-agent.ts",
+      "source_example": "node/langchain-js-basic-agent/src/index.ts"
+    },
+    {
+      "framework_id": "custom-tool-policy",
+      "label": "Custom (no framework)",
+      "status": "validated",
+      "lang": "typescript",
+      "snippet_path": "node/custom-tool-policy.ts",
+      "source_example": "node/custom-tool-policy/src/index.ts"
+    },
+    {
+      "framework_id": "openai-node-tool-policy",
+      "label": "OpenAI (Node)",
+      "status": "experimental",
+      "lang": "typescript",
+      "snippet_path": "node/openai-node-tool-policy.ts",
+      "source_example": "node/openai-node-tool-policy/src/index.ts"
+    },
+    {
+      "framework_id": "vercel-ai",
+      "label": "Vercel AI SDK",
+      "status": "experimental",
+      "lang": "typescript",
+      "snippet_path": "node/vercel-ai.ts",
+      "source_example": "node/vercel-ai/src/index.ts"
+    },
+    {
+      "framework_id": "langgraph-js",
+      "label": "LangGraph.js",
+      "status": "experimental",
+      "lang": "typescript",
+      "snippet_path": "node/langgraph-js.ts",
+      "source_example": "node/langgraph-js/src/index.ts"
+    },
+    {
+      "framework_id": "mastra",
+      "label": "Mastra",
+      "status": "experimental",
+      "lang": "typescript",
+      "snippet_path": "node/mastra.ts",
+      "source_example": "node/mastra/src/index.ts"
+    }
+  ]
+}

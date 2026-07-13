@@ -60,6 +60,11 @@ jobs:
         # snippets in lock-step with package.json + metadata/sdk.json.
         # AAASM-4327: the same generator also emits src/generated/install-hints.ts
         # for runtime error strings, so the drift check now covers that path.
+        # AAASM-4514: the generator also rewrites the quickstart-framework-tabs
+        # block in docs/02-quick-start/index.md from the vendored snippet
+        # manifest under metadata/quickstart-snippets/, so an edited snippet or a
+        # hand-tweaked tab block that was not regenerated fails here (docs is
+        # already in the diff scope; metadata/** is already a trigger path).
         run: |
           pnpm run generate:docs-metadata
           git diff --exit-code -- README.md docs src/generated
