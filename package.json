@@ -112,7 +112,6 @@
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.1",
     "@grpc/grpc-js": "^1.14.4",
-    "@noble/ed25519": "^2.3.0",
     "bs58": "^6.0.0"
   },
   "pnpm": {

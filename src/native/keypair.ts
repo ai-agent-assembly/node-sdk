@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import * as ed25519 from "@noble/ed25519";
+import { createHash, createPrivateKey, sign as edSign } from "node:crypto";
 import bs58 from "bs58";
 
 /**
@@ -32,6 +31,18 @@ import bs58 from "bs58";
  */
 const ED25519_MULTICODEC_PREFIX = Uint8Array.of(0xed, 0x01);
 
+/**
+ * Fixed PKCS#8 DER header for an Ed25519 private key whose 32-byte raw seed
+ * follows immediately. Prepending this to the SHA-256 seed produces the DER
+ * `node:crypto.createPrivateKey` accepts, letting us build the deterministic
+ * signing key from raw bytes with the built-in crypto module — no third-party
+ * Ed25519 dependency. `node:crypto` is used deliberately over an npm package so
+ * derivation/signing stay synchronous and work on every supported runtime
+ * (Node ≥ 18.18, ESM and CJS) without the global WebCrypto (`crypto.subtle`)
+ * that an async pure-JS Ed25519 library requires but Node 18 does not expose.
+ */
+const PKCS8_ED25519_SEED_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
+
 /** A deterministic Ed25519 keypair derived from an agent identifier. */
 export interface AgentKeypair {
   /** The 32-byte SHA-256 seed the signing key was derived from. */
@@ -45,8 +56,8 @@ export interface AgentKeypair {
   /**
    * Sign `message` with the agent's Ed25519 signing key, returning the raw
    * 64-byte signature. Used to prove key possession over the server-issued
-   * registration nonce. Async because it derives the SHA-512 the Ed25519
-   * signature needs via WebCrypto (no ambient hash configuration required).
+   * registration nonce. Returns a promise for a stable async call contract even
+   * though `node:crypto` signs synchronously under the hood.
    */
   sign: (message: Uint8Array) => Promise<Uint8Array>;
 }
@@ -71,7 +82,15 @@ function didKeyForPublicKey(publicKey: Uint8Array): string {
  */
 export async function deriveAgentKeypair(identifier: string): Promise<AgentKeypair> {
   const seed = new Uint8Array(createHash("sha256").update(identifier, "utf8").digest());
-  const publicKey = await ed25519.getPublicKeyAsync(seed);
+  const privateKey = createPrivateKey({
+    key: Buffer.concat([PKCS8_ED25519_SEED_PREFIX, Buffer.from(seed)]),
+    format: "der",
+    type: "pkcs8"
+  });
+  // An Ed25519 JWK export carries the raw 32-byte verifying key as the
+  // base64url `x` parameter — the gateway's `public_key` in canonical form.
+  const jwk = privateKey.export({ format: "jwk" }) as { x?: string };
+  const publicKey = new Uint8Array(Buffer.from(jwk.x ?? "", "base64url"));
   const publicKeyHex = Buffer.from(publicKey).toString("hex");
   const didKey = didKeyForPublicKey(publicKey);
   return {
@@ -79,7 +98,7 @@ export async function deriveAgentKeypair(identifier: string): Promise<AgentKeypa
     publicKey,
     publicKeyHex,
     didKey,
-    sign: (message: Uint8Array) => ed25519.signAsync(message, seed)
+    sign: (message: Uint8Array) => Promise.resolve(new Uint8Array(edSign(null, Buffer.from(message), privateKey)))
   };
 }
 

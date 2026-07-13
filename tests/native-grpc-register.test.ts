@@ -1,6 +1,21 @@
+import { createPublicKey, verify as edVerify } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as ed25519 from "@noble/ed25519";
 import { deriveAgentKeypair } from "../src/native/keypair.js";
+
+/**
+ * Fixed SPKI DER header for an Ed25519 public key whose 32-byte raw key follows.
+ * Wrapping the derived raw public key with it lets `node:crypto` verify the
+ * possession proof independently — no third-party Ed25519 dependency in tests.
+ */
+const SPKI_ED25519_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+
+function ed25519PublicKeyFromRaw(raw: Uint8Array): ReturnType<typeof createPublicKey> {
+  return createPublicKey({
+    key: Buffer.concat([SPKI_ED25519_PREFIX, Buffer.from(raw)]),
+    format: "der",
+    type: "spki"
+  });
+}
 
 /**
  * AAASM-4468 — the pure-JS `grpc-sidecar` registration transport. These tests
@@ -119,10 +134,11 @@ describe("registerViaGrpc handshake construction (AAASM-4468)", () => {
     // derived public key — this is exactly what the gateway re-checks.
     expect(Buffer.from(register.registrationNonce).equals(NONCE)).toBe(true);
     expect(register.possessionProof).toHaveLength(64);
-    const verified = await ed25519.verifyAsync(
-      new Uint8Array(register.possessionProof),
+    const verified = edVerify(
+      null,
       new Uint8Array(NONCE),
-      keypair.publicKey
+      ed25519PublicKeyFromRaw(keypair.publicKey),
+      new Uint8Array(register.possessionProof)
     );
     expect(verified).toBe(true);
   });
