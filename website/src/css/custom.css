@@ -29,6 +29,9 @@
 /* readability measure cap on the article body */
 .markdown { max-width: 72ch; }
 
+/* tighter tab-title font size — sitewide <Tabs>, noticeably smaller than body text */
+.tabs__item { font-size: 0.85rem; }
+
 [data-theme='dark'] {
   --ifm-color-primary: #818cf8;
   --ifm-color-primary-dark: #6366f1;
