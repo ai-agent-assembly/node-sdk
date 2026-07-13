@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { InitAssemblyOptions } from "../types/policy.js";
+import { registerViaGrpc } from "./grpc-register.js";
 
 export interface PolicyResult {
   denied?: boolean;
@@ -102,16 +103,12 @@ export interface NativeClient {
   readonly mode: "grpc-sidecar" | "napi-inprocess";
   /**
    * Whether {@link register} on this transport actually attempts an SDK-side
-   * registration against the gateway. `true` only for the in-process
-   * (`napi-inprocess`) path, which dials the native binding. The default
-   * `grpc-sidecar` transport is a hardcoded no-op stub whose `register` resolves
-   * to `""` without contacting anything (see {@link createNativeClient}), so it
-   * is `false` there — callers must treat a `false` here as "this SDK did not
-   * register the agent" rather than trusting `register`'s empty-string success.
-   * Surfaced so `initAssembly` can fail loud instead of reporting a clean init
-   * for a registration that structurally never happened (AAASM-4468). The real
-   * `grpc-sidecar` registration (direct `:50051` via the `aa-sdk-client`
-   * binding) is gated on AAASM-4467.
+   * registration against the gateway. `true` for both built-in transports: the
+   * in-process (`napi-inprocess`) path dials the native binding, and the default
+   * `grpc-sidecar` path dials the gateway's gRPC `AgentLifecycleService` on
+   * `:50051` directly in pure JS (AAASM-4468). Callers treat a `false` here as
+   * "this SDK did not register the agent"; `initAssembly` fails loud in that case
+   * rather than reporting a clean init for a registration that never happened.
    */
   readonly canRegister: boolean;
   close: () => Promise<void>;
@@ -266,21 +263,20 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
   if (mode !== "napi-inprocess") {
     return {
       mode,
-      // This transport cannot register the agent itself: it has no native
-      // session to register against, so `register` below is a no-op stub. The
-      // gRPC sidecar mode assumes a separate sidecar process performs the real
-      // gateway registration. `canRegister: false` is what lets `initAssembly`
-      // fail loud about the unregistered agent instead of trusting the stub's
-      // empty-string "success" (AAASM-4468). Real in-SDK grpc-sidecar
-      // registration is gated on AAASM-4467.
-      canRegister: false,
+      // AAASM-4468: `register` dials the gateway's gRPC `AgentLifecycleService`
+      // directly in pure JS (see `registerViaGrpc`) — no native binding needed —
+      // so the agent actually registers on the default path instead of the old
+      // no-op stub. `canRegister: true` routes `initAssembly` through the real
+      // register call; a failure rejects and surfaces as the advisory
+      // "proceeding unregistered" warning rather than a false clean init.
+      canRegister: true,
       close: async () => undefined,
+      // `sendEvent` / `queryPolicy` still no-op on this path: event emission and
+      // authoritative policy checks flow through the sidecar proxy / runtime, not
+      // this transport. Only registration is served here (AAASM-4468).
       sendEvent: () => undefined,
       queryPolicy: async () => ({ denied: false, pending: false }),
-      // No native session to register against off the in-process path; the
-      // gRPC sidecar registers the agent in its own process. Resolve neutrally
-      // so init never blocks on a transport that does not own a handle.
-      register: async () => ""
+      register: (options: RegisterOptions) => registerViaGrpc(options, resolveSdkVersion())
     };
   }
 
