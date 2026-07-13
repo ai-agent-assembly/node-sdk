@@ -1,0 +1,41 @@
+{
+  "description": "Golden Ed25519 keypair-derivation vectors emitted by the authoritative Rust aa-sdk-client crate (AgentKeypair in keypair.rs) for AAASM-4468. The Node SDK's deriveAgentKeypair must reproduce every field byte-for-byte so an agent registered from any SDK resolves to the same gateway identity. Regenerate by running AgentKeypair::derive(agent_id) + .sign(nonce) in-tree; nonce is the fixed [7u8; 32] used by the crate's own tests.",
+  "nonce_hex": "0707070707070707070707070707070707070707070707070707070707070707",
+  "vectors": [
+    {
+      "agent_id": "my-agent",
+      "seed_hex": "178890c4e2da4e09bf88145042177f7f8e3d4fc47bd985d337f8f3914dfb97e2",
+      "public_key_hex": "422d38b142997b57591596c5e5143f4b43257b9bb09a1a267269443d68184f9d",
+      "did_key": "did:key:z6Mkiuawv2ptvhkNwATNd6QEcn6ZZzD5DAhetWCgnCtEfk8U",
+      "nonce_signature_hex": "0dadf1ee78ce9ad5624ecbaeaae9e311332eefc4f6b24950c5797a690cf7b6f881f0dc91c3c273e28d52db5bb99a138736a1886ffabb591eb0af78e482c90a02"
+    },
+    {
+      "agent_id": "agent-a",
+      "seed_hex": "a51d7389ba2cb760d233154216317fcee00e2065e3dc42efacfebbc8a53b6ef0",
+      "public_key_hex": "18e5fd50c5c318cb2caf21f054f719e1a77fcbe6c8266d5f6f6ed50ea71ab7a9",
+      "did_key": "did:key:z6Mkg8TEXpp3K5BdUpybfLQUjfQCsVnu1UZ9wBBj4sxWyNyN",
+      "nonce_signature_hex": "cd1b681efea415d0106a3d89b31355dd70d8b42af92e220739ca3aa47bc5a23ac2204927a60450b15bd59e03dbf93a29c47f4c4e60a4fb9b6a81b92d7567c60c"
+    },
+    {
+      "agent_id": "agent-001",
+      "seed_hex": "69d99cbc695ffc1013bc5d7f2414c2707188d9088e1082c6b30ef75523ac3a86",
+      "public_key_hex": "55d00d1f0d6b3dbc4d7e2c46c1e83df17558ddbd9b5c8871e14fcfb245777d3c",
+      "did_key": "did:key:z6MkkEEhdg7bdhk3JPdJVvWuxPLVSWLTLcwXaL4HrdWiPAZR",
+      "nonce_signature_hex": "c89d6da9de1331cb6f7c8173073399a3bccf0a4a0ffa5d9b362bbc2916614809bc2ec151c5bd51ee702ddf9cdbd97ab262d73524398d311438d663dd7354580a"
+    },
+    {
+      "agent_id": "research-bot",
+      "seed_hex": "ea9de0be616eb69caa577dd2618ce4cbe2e127db5d89aa3fa1b9d7a09fee80d8",
+      "public_key_hex": "10a9ccc03b20418d78f2041457220e570d7a68be2505802c561f8929ef006d07",
+      "did_key": "did:key:z6MkfaJju9H7jDaBQX8dsZ3xjA6e8aKDzarxK8UEL2vc6wxa",
+      "nonce_signature_hex": "ea9ebf6a1929ec613b677b6f9aec5c81b39cf13e5fed8ac7ce37d06b594d0b4991d706d92c7bfdb1b724fa380c17bb7192e4c655eca9d8ecc91baeb66f50bb00"
+    },
+    {
+      "agent_id": "did:key:zAlreadyDid",
+      "seed_hex": "422f10230a500b446177ce5c173273df08425540e397410a13d8c63814614066",
+      "public_key_hex": "c2dfce42242eec29f142218820c1d0223766d2785026df26d3013e9bc15d83e5",
+      "did_key": "did:key:z6MksZy5EJosbj5qbAtWEAuAuPzYoC1oXUtukDPjQQQbbrkt",
+      "nonce_signature_hex": "bd0efebd9275e7d842f4053ba36d4a0100b8dc0a75db9ffc87055041c3584492ce092169740b1e351b5d7372ae98f9832a6e6e61ea27bfe8060a7f542673d001"
+    }
+  ]
+}
