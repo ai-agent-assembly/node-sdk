@@ -1,6 +1,6 @@
 {
   "name": "@agent-assembly/sdk",
-  "version": "0.0.1-rc.3",
+  "version": "0.0.1-rc.4",
   "description": "TypeScript SDK for Agent Assembly",
   "license": "Apache-2.0",
   "type": "module",
