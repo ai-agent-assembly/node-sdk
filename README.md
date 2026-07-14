@@ -130,6 +130,10 @@ system. The matrix is enforced by `.github/workflows/test-matrix.yml`:
 Older Node.js lines (≤ 16) are unsupported because the napi-rs ABI used by the native
 binding requires Node 18.18 or newer.
 
+> The Windows column above reflects the **JavaScript/TypeScript** test suite only. The
+> native governance binding is not built for Windows, so a Windows agent runs unregistered —
+> see [Platform support](#platform-support).
+
 ## Framework compatibility
 
 `initAssembly()` auto-detects and governs five optional framework integrations
@@ -265,8 +269,21 @@ Run the native integration acceptance test (skipped unless the binding is built)
 
 The `build-addon` GitHub workflow compiles the native addon (Node 20 and 22): an
 ubuntu-only debug build on pull requests, and ubuntu + macOS builds on `master` and release
-tags. The addon embeds a Unix-domain-socket transport and **does not build on Windows**;
-Windows consumers use `grpc-sidecar` mode.
+tags. The addon embeds a Unix-domain-socket transport and **does not build on Windows** —
+see [Platform support](#platform-support) below.
+
+## Platform support
+
+**Windows is not supported yet.** The governance core (`aa-sdk-client` and its
+Unix-domain-socket transport) is Unix-only, so no native `.node` binding is built for
+Windows. The SDK still installs and its JavaScript API is fully usable on Windows, but it
+**cannot register the agent with the governance gateway** — the agent runs **unregistered /
+ungoverned**, does not appear in the dashboard or `GET /api/v1/agents`, and both install and
+`initAssembly()` say so explicitly (postinstall prints an informational notice; `initAssembly`
+writes a prominent stderr warning and sets `registered: false` on the returned context). Use
+Linux or macOS for a governed agent until Windows support lands.
+
+Supported today: **Linux** (`x64`) and **macOS** (`arm64`, `x64`).
 
 ## Packaging layout
 
