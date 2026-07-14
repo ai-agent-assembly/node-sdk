@@ -53,6 +53,12 @@ connect to a real gateway, set `AAASM_GATEWAY_URL` in your environment directly.
 The policy is a simple rule table, evaluated by tool name:
 
 ```ts title="src/policy.ts"
+export interface PolicyRule {
+  tool: string;
+  action: "allow" | "deny";
+  reason: string;
+}
+
 export const POLICY_RULES: PolicyRule[] = [
   { tool: "read_file", action: "allow", reason: "Read-only file access is safe to execute." },
   { tool: "write_file", action: "deny", reason: "Write operations to the filesystem require explicit approval." },
@@ -74,6 +80,10 @@ check: async (request) => {
 `PolicyViolationError`:
 
 ```ts title="src/index.ts"
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { readFile, writeFile } from "./tools.js";
+
 const tools = withAssembly(
   {
     read_file: { execute: async (args) => readFile(String(args.path ?? "")).output },

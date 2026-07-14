@@ -59,6 +59,12 @@ set `AAASM_GATEWAY_URL` in your environment directly.
 The policy allows the knowledge-base search and denies shell execution:
 
 ```ts title="src/policy.ts"
+export interface PolicyRule {
+  tool: string;
+  action: "allow" | "deny";
+  reason: string;
+}
+
 export const POLICY_RULES: PolicyRule[] = [
   { tool: "search_docs", action: "allow", reason: "Read-only knowledge-base search — safe to execute." },
   { tool: "execute_shell", action: "deny", reason: "Arbitrary shell execution is never allowed from a graph node." },
@@ -68,7 +74,32 @@ export const POLICY_RULES: PolicyRule[] = [
 Governed tools are built once, then called from inside the graph nodes:
 
 ```ts title="src/index.ts"
-const tools = buildGovernedTools(); // withAssembly(...)
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { END, StateGraph } from "./graph.js";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOLS } from "./tools.js";
+
+interface GraphState {
+  query: string;
+  log: string[];
+}
+
+// Build the governed tools once, wrapping the raw TOOLS with withAssembly.
+function buildGovernedTools() {
+  return withAssembly(
+    {
+      search_docs: {
+        execute: async (args: Record<string, unknown>) => TOOLS.search_docs(args).output,
+      },
+      execute_shell: {
+        execute: async (args: Record<string, unknown>) => TOOLS.execute_shell(args).output,
+      },
+    },
+    { gatewayClient: createPolicyGatewayClient(), agentId: "langgraph-js-example-agent" }
+  );
+}
+
+const tools = buildGovernedTools();
 
 const graph = new StateGraph<GraphState>()
   .addNode("search", async (state) => {
