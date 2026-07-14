@@ -86,26 +86,40 @@ describe("initAssembly fail-loud when the native binding is unavailable (AAASM-4
   });
 
   it("default mode with no loadable binding: reports registered=false and writes a prominent stderr warning", async () => {
+    // Pin a non-win32 platform so this exercises the generic "could not be
+    // loaded" branch deterministically regardless of the host OS. On a real
+    // Windows CI runner `process.platform` is `win32`, so `warnAgentUnregistered`
+    // would emit the Windows-specific wording (asserted separately below) and
+    // this generic assertion would fail — the Windows message intentionally omits
+    // "could not be loaded".
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const { initAssembly } = await loadWithUnloadableBinding();
+    try {
+      const { initAssembly } = await loadWithUnloadableBinding();
 
-    const ctx = await initAssembly({
-      gatewayUrl: "https://gateway.example.com",
-      apiKey: "test-key",
-      agentId: "agent-x"
-    });
+      const ctx = await initAssembly({
+        gatewayUrl: "https://gateway.example.com",
+        apiKey: "test-key",
+        agentId: "agent-x"
+      });
 
-    // Programmatic surface: the unregistered state is detectable, not silent.
-    expect(ctx.registered).toBe(false);
+      // Programmatic surface: the unregistered state is detectable, not silent.
+      expect(ctx.registered).toBe(false);
 
-    // Warning surface: unconditional stderr naming the concrete consequence and
-    // why registration did not happen.
-    const warning = collectStderr(stderr);
-    expect(warning).toContain("NOT registered");
-    expect(warning).toContain("/api/v1/agents");
-    expect(warning).toContain("could not be loaded");
+      // Warning surface: unconditional stderr naming the concrete consequence and
+      // why registration did not happen.
+      const warning = collectStderr(stderr);
+      expect(warning).toContain("NOT registered");
+      expect(warning).toContain("/api/v1/agents");
+      expect(warning).toContain("could not be loaded");
 
-    await ctx.shutdown();
+      await ctx.shutdown();
+    } finally {
+      if (originalPlatform) {
+        Object.defineProperty(process, "platform", originalPlatform);
+      }
+    }
   });
 
   it("on Windows with no loadable binding: the unregistered warning names Windows-not-supported", async () => {
