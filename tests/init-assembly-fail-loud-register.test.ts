@@ -108,6 +108,37 @@ describe("initAssembly fail-loud when the native binding is unavailable (AAASM-4
     await ctx.shutdown();
   });
 
+  it("on Windows with no loadable binding: the unregistered warning names Windows-not-supported", async () => {
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const { initAssembly } = await loadWithUnloadableBinding();
+
+      const ctx = await initAssembly({
+        gatewayUrl: "https://gateway.example.com",
+        apiKey: "test-key",
+        agentId: "agent-x"
+      });
+
+      expect(ctx.registered).toBe(false);
+
+      const warning = collectStderr(stderr);
+      // Windows-specific honesty: names Windows + "not supported", not the
+      // generic "could not be loaded" (which reads as a fixable missing binary).
+      expect(warning).toContain("Windows is not supported yet");
+      expect(warning).toContain("NOT registered");
+      expect(warning).toContain("/api/v1/agents");
+      expect(warning).not.toContain("could not be loaded");
+
+      await ctx.shutdown();
+    } finally {
+      if (originalPlatform) {
+        Object.defineProperty(process, "platform", originalPlatform);
+      }
+    }
+  });
+
   it("napi-inprocess with a real register path: reports registered=true and emits no unregistered warning", async () => {
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const binding = makeBinding();
