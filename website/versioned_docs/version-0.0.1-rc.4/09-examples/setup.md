@@ -53,7 +53,7 @@ pnpm start
 
 ## Mock mode vs. real-provider mode
 
-:::tip Examples run offline by default
+:::tip[Examples run offline by default]
 Every Node example runs **fully offline** out of the box. The tools return mock
 output and the policy is enforced in-process by a local-policy `GatewayClient`, so
 no gateway, no API key, and no live LLM are required. This is what makes the smoke

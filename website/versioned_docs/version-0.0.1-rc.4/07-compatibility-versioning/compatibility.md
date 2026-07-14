@@ -44,7 +44,7 @@ releases on the same major line are expected to work. These ranges mirror the
 | Mastra        | `@mastra/core`         | `>=0.20.0`      |
 | OpenAI Agents | `@openai/agents`       | `>=0.1.0`       |
 
-:::caution Vercel AI SDK status
+:::caution[Vercel AI SDK status]
 The Vercel AI SDK adapter is **not yet usable** with real `ai` 5.x/6.x releases. It
 currently crashes trying to mutate the frozen ESM `tool` export
 ([AAASM-3532](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532)). The range

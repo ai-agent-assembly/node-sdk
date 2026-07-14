@@ -87,12 +87,12 @@ try {
 
 ## Notes & caveats
 
-:::note No @langchain/core dependency
+:::note[No @langchain/core dependency]
 The example uses a LangChain.js-style agent without installing `@langchain/core`, so
 it runs offline in CI with no API keys.
 :::
 
-:::caution Gateway connection refused
+:::caution[Gateway connection refused]
 If a real gateway is unreachable, omit `AAASM_GATEWAY_URL` to use offline mode.
 :::
 
