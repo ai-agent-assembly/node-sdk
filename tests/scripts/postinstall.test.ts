@@ -41,7 +41,9 @@ describe("postinstall script", () => {
   it("maps platform and arch to supported platform keys", () => {
     expect(detectPlatformKey("linux", "x64")).toBe("linux-x64-gnu");
     expect(detectPlatformKey("darwin", "arm64")).toBe("darwin-arm64");
-    expect(detectPlatformKey("win32", "x64")).toBe("win32-x64-msvc");
+    // win32 is not a supported key: no win32 .node is built, so it must NOT map
+    // to a phantom `win32-x64-msvc` triple (AAASM-4467).
+    expect(detectPlatformKey("win32", "x64")).toBeNull();
     expect(detectPlatformKey("sunos", "x64")).toBeNull();
   });
 
@@ -136,6 +138,44 @@ describe("postinstall script", () => {
     expect(logger.info).toHaveBeenCalledWith(
       "[agent-assembly] Native binding present for linux-x64-gnu: index.node"
     );
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  // AAASM-4467: Windows is unsupported (no win32 .node is ever built). Rather
+  // than resolving a phantom `win32-x64-msvc` triple and throwing a misleading
+  // "binding missing" error, postinstall emits an honest, non-error notice and
+  // returns cleanly so the install still succeeds.
+  it("emits an honest Windows-not-supported notice, not a phantom-binary error", () => {
+    const logger = { info: vi.fn(), warn: vi.fn() };
+
+    const result = selectBinaryForCurrentPlatform({
+      platform: "win32",
+      arch: "x64",
+      logger
+    });
+
+    expect(result).toBeNull();
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining("Windows is not supported yet")
+    );
+    // No phantom triple leaks into any message, and it is not treated as an error.
+    const allMessages = [...logger.info.mock.calls, ...logger.warn.mock.calls]
+      .flat()
+      .join(" ");
+    expect(allMessages).not.toContain("win32-x64-msvc");
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("runPostinstall succeeds cleanly on Windows (install never hard-fails)", () => {
+    const logger = { info: vi.fn(), warn: vi.fn() };
+
+    const ok = runPostinstall({
+      platform: "win32",
+      arch: "x64",
+      logger
+    });
+
+    expect(ok).toBe(true);
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
