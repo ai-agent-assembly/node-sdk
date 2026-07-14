@@ -23,7 +23,7 @@ originates — including from inside a graph node.
 A hand-rolled [LangGraph.js](https://langchain-ai.github.io/langgraphjs/)-style graph.
 The example depends only on `@agent-assembly/sdk` (version `0.0.1-rc.4`).
 
-:::note Why a hand-rolled graph instead of `@langchain/langgraph`
+:::note[Why a hand-rolled graph instead of `@langchain/langgraph`]
 The real `@langchain/langgraph` package transitively installs `@langchain/core`. These
 non-LangChain examples deliberately avoid that dependency so they run offline in CI
 with no API keys. `src/graph.ts` replays the LangGraph.js shape — a typed state,
@@ -96,12 +96,12 @@ const graph = new StateGraph<GraphState>()
 
 ## Notes & caveats
 
-:::note Offline by design
+:::note[Offline by design]
 The example uses only mock/offline mode. No provider key, no live LLM, and no
 `@langchain/core` are required.
 :::
 
-:::tip Governance is location-independent
+:::tip[Governance is location-independent]
 The denied `execute_shell` call is blocked the same way whether it is invoked
 top-level or from inside a graph node — `withAssembly` enforces the policy at the call
 site.

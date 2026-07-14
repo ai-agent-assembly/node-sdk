@@ -28,7 +28,7 @@ yarn add @agent-assembly/sdk
 The package ships dual ESM/CJS entries and selects a prebuilt native binding for your
 platform during `postinstall`, so there is no extra build step for typical consumers.
 
-:::note Pre-1.0 / release candidate
+:::note[Pre-1.0 / release candidate]
 The public surface (`initAssembly`, `withAssembly`) is stabilizing but may change
 between pre-releases. Pin an exact version for reproducible installs:
 {/* BEGIN GENERATED: current-version-pin */}

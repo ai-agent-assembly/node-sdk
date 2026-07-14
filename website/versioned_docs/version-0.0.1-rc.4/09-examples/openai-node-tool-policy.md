@@ -102,11 +102,11 @@ try {
 
 ## Notes & caveats
 
-:::note Offline by default
+:::note[Offline by default]
 All tests run offline — no gateway or API key required.
 :::
 
-:::caution Gateway connection refused
+:::caution[Gateway connection refused]
 If real-provider mode fails to connect, remove `AAASM_GATEWAY_URL` from `.env` to fall
 back to offline mode.
 :::
