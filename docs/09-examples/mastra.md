@@ -69,6 +69,9 @@ export const getStockPriceTool = createTool({
 `index.ts` wraps the Mastra tools and delegates to their real `execute`:
 
 ```ts title="src/index.ts"
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+
 const tools = withAssembly(
   {
     get_stock_price: { execute: async (args) => runMastraTool(getStockPriceTool, args) },

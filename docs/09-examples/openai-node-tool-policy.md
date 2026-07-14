@@ -58,6 +58,19 @@ cp .env.example .env
 Tools are declared in OpenAI function-calling format:
 
 ```ts title="src/tools.ts"
+export interface OpenAITool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, { type: string; description: string }>;
+      required: string[];
+    };
+  };
+}
+
 export const TOOL_DEFINITIONS: OpenAITool[] = [
   {
     type: "function",
@@ -83,6 +96,9 @@ export const POLICY_RULES: PolicyRule[] = [
 `index.ts` dispatches each governed tool and catches the denied one:
 
 ```ts title="src/index.ts"
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+
 const tools = withAssembly(
   {
     search_web: { execute: async (args) => searchWeb(String(args.query ?? "")).output },

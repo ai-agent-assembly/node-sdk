@@ -70,6 +70,9 @@ export const getWeatherTool = tool({
 signature:
 
 ```ts title="src/index.ts"
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+
 const tools = withAssembly(
   { get_weather: getWeatherTool, send_email: sendEmailTool },
   { gatewayClient: createPolicyGatewayClient(), agentId: "vercel-ai-example-agent" }
