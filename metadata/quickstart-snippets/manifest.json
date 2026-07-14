@@ -1,5 +1,5 @@
 {
-  "$comment": "Vendored slice (node only) of the examples repo snippet manifest (AAASM-4512 / Epic AAASM-4511). Copied into this repo — NOT fetched at build time — so the quick-start framework tabs build offline and are drift-gated locally. Each `snippet_path` is relative to this file; each `.ts` under node/ is a verbatim copy of the `region: quickstart` slice of the referenced runnable example. `status` (validated | experimental) is curated display metadata that drives tab label + order: validated frameworks render first with a plain label, experimental frameworks render after with an `(Experimental)` label suffix. To refresh: re-copy the snippets from the examples repo and re-run `pnpm run generate:docs-metadata`.",
+  "$comment": "Vendored slice (node only) of the examples repo snippet manifest (AAASM-4512 / Epic AAASM-4511). Copied into this repo — NOT fetched at build time — so the quick-start framework tabs build offline and are drift-gated locally. Each `snippet_path` is relative to this file; each `.ts` under node/ is a verbatim copy of the `region: quickstart` slice of the referenced runnable example. `status` (validated | experimental) is curated display metadata that drives tab label + order: validated frameworks render first with a plain label, experimental frameworks render after with an `(Experimental)` label suffix. Optional `compat_note` (AAASM-4589) renders a `:::note[title]` admonition beneath that tab's code block — set ONLY when the framework has a real, citable import-path break in its own migration guide/changelog/npm history; most entries intentionally have none. To refresh: re-copy the snippets from the examples repo and re-run `pnpm run generate:docs-metadata`.",
   "schema_version": 1,
   "source": "ai-agent-assembly/examples snippets/manifest.json (sdks.node)",
   "node": [
@@ -9,7 +9,11 @@
       "status": "validated",
       "lang": "typescript",
       "snippet_path": "node/langchain-js-basic-agent.ts",
-      "source_example": "node/langchain-js-basic-agent/src/index.ts"
+      "source_example": "node/langchain-js-basic-agent/src/index.ts",
+      "compat_note": {
+        "title": "Version compatibility",
+        "body": "Base tool abstractions like `Tool` moved out of the `langchain` monolith into `@langchain/core` when LangChain split the package in [v0.1.0](https://www.langchain.com/blog/langchain-v0-1-0) (Jan 2024; `@langchain/core` first published to npm 2023-11-22).\n\n- **`langchain` < 0.1.0:** `import { Tool } from \"langchain/tools\";`\n- **`langchain` / `@langchain/core` ≥ 0.1.0 (current):** `import { tool } from \"@langchain/core/tools\";`"
+      }
     },
     {
       "framework_id": "custom-tool-policy",
@@ -33,7 +37,11 @@
       "status": "experimental",
       "lang": "typescript",
       "snippet_path": "node/vercel-ai.ts",
-      "source_example": "node/vercel-ai/src/index.ts"
+      "source_example": "node/vercel-ai/src/index.ts",
+      "compat_note": {
+        "title": "Version compatibility",
+        "body": "The React UI hooks were extracted out of the core `ai` package into a dedicated package in [AI SDK 5.0](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0), which removed the deprecated `ai/react` export. The `tool()` factory used above is unaffected — it still imports from `\"ai\"` unchanged through the 7.x line this example pins.\n\n- **AI SDK 4.x:** `import { useChat } from \"ai/react\";`\n- **AI SDK ≥ 5.0 (current):** `import { useChat } from \"@ai-sdk/react\";`"
+      }
     },
     {
       "framework_id": "langgraph-js",
@@ -49,7 +57,11 @@
       "status": "experimental",
       "lang": "typescript",
       "snippet_path": "node/mastra.ts",
-      "source_example": "node/mastra/src/index.ts"
+      "source_example": "node/mastra/src/index.ts",
+      "compat_note": {
+        "title": "Version compatibility",
+        "body": "Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved every export except `Mastra` itself off the `@mastra/core` root entry point onto subpaths (see the `npx @mastra/codemod@latest v1/mastra-core-imports` codemod). This example's `@mastra/core` pin (`^1.50.1`) already uses the new layout.\n\n- **`@mastra/core` 0.x:** `import { Agent, Workflow, createTool } from \"@mastra/core\";`\n- **`@mastra/core` ≥ 1.0 (current):** `import { createTool } from \"@mastra/core/tools\";` (similarly `Agent` from `@mastra/core/agent`, `Workflow` from `@mastra/core/workflows`)"
+      }
     }
   ]
 }

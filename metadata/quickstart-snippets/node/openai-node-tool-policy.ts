@@ -1,3 +1,7 @@
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { searchWeb, sendEmail } from "./tools.js";
+
 const tools = withAssembly(
   {
     search_web: {

@@ -1,3 +1,7 @@
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOLS } from "./tools.js";
+
 /**
  * Build governed tools once, then call them from inside graph nodes.
  * withAssembly enforces the local policy before each tool runs.

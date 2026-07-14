@@ -152,7 +152,16 @@ export function loadQuickstartTabs(repoRoot) {
     code: readFileSync(
       resolve(snippetsRoot, String(entry.snippet_path)),
       "utf8"
-    ).replace(/\s+$/, "")
+    ).replace(/\s+$/, ""),
+    // Optional, curated (AAASM-4589): only set for a framework with a real,
+    // citable import-path break across its own version history — verified
+    // against that framework's own migration guide/changelog, never guessed.
+    compatNote: entry.compat_note
+      ? {
+          title: String(entry.compat_note.title ?? "Version compatibility"),
+          body: String(entry.compat_note.body)
+        }
+      : null
   }));
 }
 
@@ -286,6 +295,12 @@ export function renderQuickstartFrameworkTabs(meta, dialect) {
       "```" + fence,
       tab.code,
       "```",
+      // A blank line before the fence's closing ``` is already required above;
+      // the note needs the same blank-line isolation to parse as MDX inside a
+      // JSX <TabItem>, same as the fence itself (see comment above this fn).
+      ...(tab.compatNote
+        ? ["", `:::note[${tab.compatNote.title}]`, tab.compatNote.body, ":::"]
+        : []),
       "",
       "</TabItem>"
     );

@@ -103,6 +103,10 @@ The excerpts are ESM / TypeScript; under CommonJS, swap the import for
 <TabItem value="langchain-js-basic-agent" label="LangChain.js" default>
 
 ```ts
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOLS } from "./tools.js";
+
 const tools = withAssembly(
   {
     get_weather: {
@@ -116,10 +120,21 @@ const tools = withAssembly(
 );
 ```
 
+:::note[Version compatibility]
+Base tool abstractions like `Tool` moved out of the `langchain` monolith into `@langchain/core` when LangChain split the package in [v0.1.0](https://www.langchain.com/blog/langchain-v0-1-0) (Jan 2024; `@langchain/core` first published to npm 2023-11-22).
+
+- **`langchain` < 0.1.0:** `import { Tool } from "langchain/tools";`
+- **`langchain` / `@langchain/core` ≥ 0.1.0 (current):** `import { tool } from "@langchain/core/tools";`
+:::
+
 </TabItem>
 <TabItem value="custom-tool-policy" label="Custom (no framework)">
 
 ```ts
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { readFile, writeFile } from "./tools.js";
+
 const tools = withAssembly(
   {
     read_file: {
@@ -142,6 +157,10 @@ const tools = withAssembly(
 <TabItem value="openai-node-tool-policy" label="OpenAI (Node) (Experimental)">
 
 ```ts
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { searchWeb, sendEmail } from "./tools.js";
+
 const tools = withAssembly(
   {
     search_web: {
@@ -164,6 +183,10 @@ const tools = withAssembly(
 <TabItem value="vercel-ai" label="Vercel AI SDK (Experimental)">
 
 ```ts
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { getWeatherTool, sendEmailTool } from "./tools.js";
+
 // withAssembly wraps each tool's `execute`, keying the policy by the map key.
 // The Vercel AI SDK tools run unchanged; only governance is layered on top.
 const tools = withAssembly(
@@ -175,10 +198,21 @@ const tools = withAssembly(
 );
 ```
 
+:::note[Version compatibility]
+The React UI hooks were extracted out of the core `ai` package into a dedicated package in [AI SDK 5.0](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0), which removed the deprecated `ai/react` export. The `tool()` factory used above is unaffected — it still imports from `"ai"` unchanged through the 7.x line this example pins.
+
+- **AI SDK 4.x:** `import { useChat } from "ai/react";`
+- **AI SDK ≥ 5.0 (current):** `import { useChat } from "@ai-sdk/react";`
+:::
+
 </TabItem>
 <TabItem value="langgraph-js" label="LangGraph.js (Experimental)">
 
 ```ts
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOLS } from "./tools.js";
+
 /**
  * Build governed tools once, then call them from inside graph nodes.
  * withAssembly enforces the local policy before each tool runs.
@@ -202,6 +236,10 @@ function buildGovernedTools() {
 <TabItem value="mastra" label="Mastra (Experimental)">
 
 ```ts
+import { withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { getStockPriceTool, placeTradeTool } from "./tools.js";
+
 // Wrap the Mastra tools with withAssembly. Each governed entry delegates to the
 // real Mastra tool's execute, so the policy is enforced before the tool runs.
 const tools = withAssembly(
@@ -216,6 +254,13 @@ const tools = withAssembly(
   { gatewayClient: createPolicyGatewayClient(), agentId: "mastra-example-agent" }
 );
 ```
+
+:::note[Version compatibility]
+Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved every export except `Mastra` itself off the `@mastra/core` root entry point onto subpaths (see the `npx @mastra/codemod@latest v1/mastra-core-imports` codemod). This example's `@mastra/core` pin (`^1.50.1`) already uses the new layout.
+
+- **`@mastra/core` 0.x:** `import { Agent, Workflow, createTool } from "@mastra/core";`
+- **`@mastra/core` ≥ 1.0 (current):** `import { createTool } from "@mastra/core/tools";` (similarly `Agent` from `@mastra/core/agent`, `Workflow` from `@mastra/core/workflows`)
+:::
 
 </TabItem>
 </Tabs>
