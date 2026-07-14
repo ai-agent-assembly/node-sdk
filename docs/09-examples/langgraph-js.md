@@ -21,7 +21,7 @@ originates — including from inside a graph node.
 ## The framework / library
 
 A hand-rolled [LangGraph.js](https://langchain-ai.github.io/langgraphjs/)-style graph.
-The example depends only on `@agent-assembly/sdk` (version `0.0.1-rc.4`).
+The example depends only on `@agent-assembly/sdk` (version `0.0.1-rc.5`).
 
 :::note[Why a hand-rolled graph instead of `@langchain/langgraph`]
 The real `@langchain/langgraph` package transitively installs `@langchain/core`. These
