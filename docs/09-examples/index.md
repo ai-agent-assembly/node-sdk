@@ -5,7 +5,7 @@ sidebar_position: 1
 # Examples
 
 This section walks through the runnable Node examples that ship in the central
-[`agent-assembly-examples`](https://github.com/ai-agent-assembly/examples)
+[`examples`](https://github.com/ai-agent-assembly/examples)
 repository, under its
 [`node/`](https://github.com/ai-agent-assembly/examples/tree/master/node)
 directory. Each example is a self-contained TypeScript project with its own `README`;
