@@ -27,7 +27,8 @@
       "import": "./dist/esm/hooks/index.js",
       "require": "./dist/cjs/hooks/index.js",
       "types": "./dist/types/hooks/index.d.ts"
-    }
+    },
+    "./native/aa-ffi-node/index.cjs": "./native/aa-ffi-node/index.cjs"
   },
   "scripts": {
     "build": "pnpm run build:esm && pnpm run build:cjs",

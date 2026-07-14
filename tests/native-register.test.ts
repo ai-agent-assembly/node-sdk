@@ -132,13 +132,15 @@ describe("initAssembly registers the agent (AAASM-3403)", () => {
     await ctx.shutdown();
 
     expect(binding.register).toHaveBeenCalledOnce();
+    // AAASM-4468: `gatewayEndpoint` is intentionally omitted so aa-sdk-client
+    // applies its default gRPC endpoint (127.0.0.1:50051); the HTTP gatewayUrl
+    // must not be passed as the register endpoint.
     expect(binding.register).toHaveBeenCalledWith(
       { id: "handle" },
       {
         agentId: "agent-9",
         name: "Ninth Agent",
-        framework: "none",
-        gatewayEndpoint: "/tmp/aa.sock"
+        framework: "none"
       }
     );
   });
