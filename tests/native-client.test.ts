@@ -86,13 +86,17 @@ describe("createNativeClient", () => {
     }
   });
 
-  it("returns grpc-sidecar noop client by default", async () => {
-    const mod = await loadNativeClientWithBinding(() => ({
-      connect: vi.fn(async () => ({})),
+  // AAASM-4468: the default (`grpc-sidecar`) mode now loads the native binding
+  // and builds the same connect+register path as napi-inprocess, so it is
+  // registration-capable — not a hardcoded no-op stub.
+  it("default (grpc-sidecar) mode loads the binding and is registration-capable", async () => {
+    const binding = {
+      connect: vi.fn(async () => ({ id: "sidecar-handle" })),
       sendEvent: vi.fn(() => undefined),
       queryPolicy: vi.fn(() => ({ decision: "allow", reason: "" })),
       disconnect: vi.fn(async () => undefined)
-    }));
+    } satisfies MockBinding;
+    const mod = await loadNativeClientWithBinding(() => binding);
 
     const client = mod.createNativeClient({
       gateway: "https://gateway.example.com",
@@ -100,7 +104,36 @@ describe("createNativeClient", () => {
     });
 
     expect(client.mode).toBe("grpc-sidecar");
-    client.sendEvent({ action: "tool_call" });
+    expect(client.canRegister).toBe(true);
+    await expect(client.queryPolicy({ action: "check" })).resolves.toEqual({
+      denied: false,
+      pending: false
+    });
+    // The verdict came from the native binding, not a hardcoded stub.
+    expect(binding.connect).toHaveBeenCalled();
+    expect(binding.queryPolicy).toHaveBeenCalled();
+    await expect(client.close()).resolves.toBeUndefined();
+  });
+
+  // AAASM-4468: when the binding cannot be loaded (unsupported platform / missing
+  // native binary) the default mode falls back to the no-op stub whose
+  // canRegister:false lets initAssembly fail loud, rather than throwing like
+  // napi-inprocess does.
+  it("default (grpc-sidecar) mode falls back to a non-registering stub when the binding cannot load", async () => {
+    const mod = await loadNativeClientWithRequire(() => () => {
+      throw new Error("module not found");
+    });
+
+    const client = mod.createNativeClient({
+      gateway: "https://gateway.example.com",
+      apiKey: "test-key"
+    });
+
+    expect(client.mode).toBe("grpc-sidecar");
+    expect(client.canRegister).toBe(false);
+    await expect(client.register({ agentId: "a", name: "a", framework: "none" })).resolves.toBe(
+      ""
+    );
     await expect(client.queryPolicy({ action: "check" })).resolves.toEqual({
       denied: false,
       pending: false

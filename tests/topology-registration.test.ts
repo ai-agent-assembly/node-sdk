@@ -74,7 +74,7 @@ describe("topology registration on initAssembly", () => {
     expect(event).toEqual({ event_type: "register" });
   });
 
-  it("sends registration event in grpc-sidecar mode (noop path)", async () => {
+  it("registers and sends the registration event in grpc-sidecar mode via the binding", async () => {
     const binding = makeMockBinding();
     const { initAssembly } = await loadInitAssemblyWithBinding(binding);
 
@@ -87,9 +87,17 @@ describe("topology registration on initAssembly", () => {
 
     await ctx.shutdown();
 
-    // grpc-sidecar is a noop NativeClient — sendEvent is ignored, binding never called
-    expect(binding.connect).not.toHaveBeenCalled();
-    expect(binding.sendEvent).not.toHaveBeenCalled();
+    // AAASM-4468: grpc-sidecar now routes through the native aa-sdk-client
+    // binding — it opens a session (connect) and ships the lineage registration
+    // event, rather than the old no-op stub that touched nothing.
+    expect(binding.connect).toHaveBeenCalled();
+    expect(binding.sendEvent).toHaveBeenCalledWith(
+      expect.any(Object),
+      {
+        event_type: "register",
+        parent_agent_id: "parent-sidecar-001",
+      }
+    );
   });
 
   it("does not send registration event in sdk-only mode", async () => {

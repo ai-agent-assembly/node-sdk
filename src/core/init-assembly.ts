@@ -60,11 +60,16 @@ function buildRegistrationEvent(config: AssemblyConfig): Record<string, string> 
  * Build the {@link RegisterOptions} for the native `register` gRPC call
  * (AAASM-3400) from the resolved config and the detected frameworks. `name`
  * falls back to `agentId`; `framework` is the first detected framework (or
- * `"none"` when running without an adapter); `gatewayEndpoint` is set only when
- * a gateway URL was resolved so the native default endpoint resolution is
- * preserved when it was not. `teamId` / `parentAgentId` carry the agent's
- * team-budget scoping and topology lineage to the gateway (AAASM-3415); each is
- * set only when present so an unset field stays absent.
+ * `"none"` when running without an adapter). `teamId` / `parentAgentId` carry
+ * the agent's team-budget scoping and topology lineage to the gateway
+ * (AAASM-3415); each is set only when present so an unset field stays absent.
+ *
+ * `gatewayEndpoint` is deliberately left **unset** so `aa-sdk-client` applies
+ * its default gRPC lifecycle endpoint (`127.0.0.1:50051`). `config.gatewayUrl`
+ * is the SDK's HTTP base (`:7391` / `:8080`), which is *not* a valid gRPC
+ * register endpoint — passing it here pointed registration at the wrong
+ * protocol/port (AAASM-4468). Callers that need a non-default gRPC endpoint set
+ * it out-of-band via `AA_GATEWAY_ENDPOINT`.
  */
 function buildRegisterOptions(
   config: AssemblyConfig,
@@ -75,7 +80,6 @@ function buildRegisterOptions(
     agentId,
     name: config.name ?? agentId,
     framework: frameworks[0] ?? "none",
-    ...(config.gatewayUrl ? { gatewayEndpoint: config.gatewayUrl } : {}),
     ...(config.teamId ? { teamId: config.teamId } : {}),
     ...(config.parentAgentId ? { parentAgentId: config.parentAgentId } : {})
   };
@@ -85,29 +89,29 @@ function buildRegisterOptions(
  * Emit a prominent, unconditional stderr warning that the agent was **not**
  * registered with the gateway by this SDK (AAASM-4468).
  *
- * The default `grpc-sidecar` mode's native `register` is a no-op stub that
- * resolves to `""` — a success-shaped value — so `initAssembly` would otherwise
- * report a clean init for an agent that never registered and will never appear
- * in the dashboard / `/api/v1/agents`. A governance SDK must never emit a false
- * clean-init signal when registration structurally did not happen, so we say so
- * loudly. Written straight to `process.stderr` (not `console`/a swappable
- * logger) so it cannot be silenced by log configuration, and once per
- * `initAssembly` call — at init, not per policy query.
+ * Fires only when the native `aa-sdk-client` binding could not be loaded and the
+ * transport fell back to the no-op stub (unsupported platform such as Windows,
+ * or a missing native binary). That stub's `register` resolves to `""` — a
+ * success-shaped value — so `initAssembly` would otherwise report a clean init
+ * for an agent that never registered and will never appear in the dashboard /
+ * `/api/v1/agents`. A governance SDK must never emit a false clean-init signal
+ * when registration structurally did not happen, so we say so loudly. Written
+ * straight to `process.stderr` (not `console`/a swappable logger) so it cannot
+ * be silenced by log configuration, and once per `initAssembly` call — at init,
+ * not per policy query.
  *
- * This does not fail init: `grpc-sidecar` may legitimately delegate
- * registration to an external sidecar process, so the honest posture is "warn +
- * surface, don't break". The real in-SDK registration (direct `:50051` via the
- * `aa-sdk-client` binding) is gated on AAASM-4467.
+ * This does not fail init: an external sidecar may still register the agent
+ * out-of-band, so the honest posture is "warn + surface, don't break".
  */
 function warnAgentUnregistered(mode: AssemblyMode | "auto"): void {
   process.stderr.write(
     `[agent-assembly] WARNING: the agent is NOT registered with the governance ` +
-      `gateway in "${mode}" mode. This SDK build cannot perform gateway ` +
-      `registration on this path, so the agent will NOT appear in the dashboard ` +
+      `gateway in "${mode}" mode: the native aa-sdk-client binding could not be ` +
+      `loaded (unsupported platform or missing native binary), so this SDK cannot ` +
+      `perform gateway registration. The agent will NOT appear in the dashboard ` +
       `or GET /api/v1/agents unless an external sidecar registers it out-of-band. ` +
-      `In-SDK registration is pending the native binding (AAASM-4467). Inspect ` +
-      `the "registered" flag on the returned assembly context to detect this ` +
-      `programmatically.\n`
+      `Inspect the "registered" flag on the returned assembly context to detect ` +
+      `this programmatically.\n`
   );
 }
 
@@ -478,10 +482,11 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
         );
       }
     } else {
-      // AAASM-4468: the default `grpc-sidecar` transport's `register` is a no-op
-      // stub that resolves to a success-shaped `""`, so the try/catch above would
-      // never fire and init would falsely report success. Fail loud instead:
-      // emit the unregistered warning and leave `registered` false.
+      // AAASM-4468: the binding could not be loaded, so the transport is the
+      // no-op stub whose `register` resolves to a success-shaped `""`. The
+      // try/catch above would never fire and init would falsely report success.
+      // Fail loud instead: emit the unregistered warning and leave `registered`
+      // false.
       warnAgentUnregistered(resolvedConfig.mode ?? "auto");
     }
     // Topology lineage metadata still flows as an audit event (parent / team /

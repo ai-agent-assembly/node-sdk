@@ -62,7 +62,7 @@ async function captureRegisterOptions(
 }
 
 describe("buildRegisterOptions config -> RegisterOptions mapping (AAASM-3415)", () => {
-  it("maps agentId / name / framework / gatewayEndpoint plus both lineage fields", async () => {
+  it("maps agentId / name / framework plus both lineage fields (no gatewayEndpoint)", async () => {
     const options = await captureRegisterOptions({
       agentId: "agent-7",
       name: "Lucky Seven",
@@ -71,11 +71,13 @@ describe("buildRegisterOptions config -> RegisterOptions mapping (AAASM-3415)", 
     });
 
     // Exact, complete shape — every SDK-config-derived field accounted for.
+    // AAASM-4468: `gatewayEndpoint` is deliberately absent so aa-sdk-client's
+    // default gRPC endpoint (127.0.0.1:50051) applies; the HTTP gatewayUrl is
+    // not a valid gRPC register endpoint.
     expect(options).toEqual({
       agentId: "agent-7",
       name: "Lucky Seven",
       framework: "none",
-      gatewayEndpoint: "/tmp/aa.sock",
       teamId: "team-payments",
       parentAgentId: "parent-42"
     });

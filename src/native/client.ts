@@ -102,16 +102,16 @@ export interface NativeClient {
   readonly mode: "grpc-sidecar" | "napi-inprocess";
   /**
    * Whether {@link register} on this transport actually attempts an SDK-side
-   * registration against the gateway. `true` only for the in-process
-   * (`napi-inprocess`) path, which dials the native binding. The default
-   * `grpc-sidecar` transport is a hardcoded no-op stub whose `register` resolves
-   * to `""` without contacting anything (see {@link createNativeClient}), so it
-   * is `false` there — callers must treat a `false` here as "this SDK did not
-   * register the agent" rather than trusting `register`'s empty-string success.
-   * Surfaced so `initAssembly` can fail loud instead of reporting a clean init
-   * for a registration that structurally never happened (AAASM-4468). The real
-   * `grpc-sidecar` registration (direct `:50051` via the `aa-sdk-client`
-   * binding) is gated on AAASM-4467.
+   * registration against the gateway. `true` whenever the native `aa-sdk-client`
+   * binding was loaded — both the in-process (`napi-inprocess`) path and the
+   * default (`grpc-sidecar`) path build the same connect+register path over it
+   * (AAASM-4468). It is `false` only on the fallback no-op stub returned when the
+   * binding could not be loaded (unsupported platform / missing native binary),
+   * whose `register` resolves to `""` without contacting anything (see
+   * {@link createNativeClient}). Callers must treat a `false` here as "this SDK
+   * did not register the agent" rather than trusting `register`'s empty-string
+   * success, so `initAssembly` can fail loud instead of reporting a clean init
+   * for a registration that structurally never happened (AAASM-4468).
    */
   readonly canRegister: boolean;
   close: () => Promise<void>;
@@ -225,7 +225,19 @@ function loadNativeBinding(): NativeBinding {
   }
 
   const requireFromHere = createRequire(path.resolve(process.cwd(), "package.json"));
+  // Resolve the binding as a package-internal subpath exported by package.json,
+  // so it anchors to the INSTALLED `@agent-assembly/sdk` location regardless of
+  // the consumer's `process.cwd()` depth. The former `../../native/...`
+  // candidates were resolved relative to `<cwd>/package.json` — i.e. relative to
+  // the *consumer's* project root, not this module — so they threw
+  // MODULE_NOT_FOUND in every real install and only resolved when cwd happened to
+  // be the SDK repo root (AAASM-4468). The relative entries are kept as a
+  // best-effort fallback for non-standard layouts and do no harm when the
+  // package-subpath resolves first. `import.meta.url` / `__dirname` module-anchor
+  // resolution is deliberately avoided: it does not compile under both the ESM
+  // and CJS build targets (see `src/runtime.ts`).
   const candidates = [
+    "@agent-assembly/sdk/native/aa-ffi-node/index.cjs",
     "../../native/aa-ffi-node/index.cjs",
     "../../../native/aa-ffi-node/index.cjs"
   ];
@@ -256,37 +268,40 @@ function loadNativeBinding(): NativeBinding {
   );
 }
 
-export function createNativeClient(options: InitAssemblyOptions): NativeClient {
-  const mode = options.mode ?? "grpc-sidecar";
-  // Fail-closed posture (AAASM-4013): deny on a non-authoritative verdict only
-  // under enforce. Defaults to fail-open so observe / disabled / unset are
-  // unchanged.
-  const failClosed = options.failClosed ?? false;
+/**
+ * The fallback no-op {@link NativeClient} returned when the native
+ * `aa-sdk-client` binding cannot be loaded (unsupported platform / missing
+ * native binary). `canRegister: false` is what lets `initAssembly` fail loud
+ * about the unregistered agent instead of trusting the stub's empty-string
+ * `register` "success" (AAASM-4468).
+ */
+function buildStubClient(mode: NativeClient["mode"]): NativeClient {
+  return {
+    mode,
+    canRegister: false,
+    close: async () => undefined,
+    sendEvent: () => undefined,
+    queryPolicy: async () => ({ denied: false, pending: false }),
+    // No native session to register against; resolve neutrally so init never
+    // blocks on a transport that does not own a handle.
+    register: async () => ""
+  };
+}
 
-  if (mode !== "napi-inprocess") {
-    return {
-      mode,
-      // This transport cannot register the agent itself: it has no native
-      // session to register against, so `register` below is a no-op stub. The
-      // gRPC sidecar mode assumes a separate sidecar process performs the real
-      // gateway registration. `canRegister: false` is what lets `initAssembly`
-      // fail loud about the unregistered agent instead of trusting the stub's
-      // empty-string "success" (AAASM-4468). Real in-SDK grpc-sidecar
-      // registration is gated on AAASM-4467.
-      canRegister: false,
-      close: async () => undefined,
-      sendEvent: () => undefined,
-      queryPolicy: async () => ({ denied: false, pending: false }),
-      // No native session to register against off the in-process path; the
-      // gRPC sidecar registers the agent in its own process. Resolve neutrally
-      // so init never blocks on a transport that does not own a handle.
-      register: async () => ""
-    };
-  }
-
-  const binding = loadNativeBinding();
-  const socketPath = options.gateway;
-
+/**
+ * Build a registration-capable {@link NativeClient} backed by the native
+ * `aa-sdk-client` binding. Shared by the in-process (`napi-inprocess`) path and
+ * the default (`grpc-sidecar`) path: both connect a session over `socketPath`,
+ * register the agent via the direct SDK→gateway gRPC call (ADR 0004), and route
+ * `queryPolicy` through the runtime. `failClosed` denies on a non-authoritative
+ * verdict under enforce (AAASM-4013).
+ */
+function buildConnectedClient(
+  binding: NativeBinding,
+  mode: NativeClient["mode"],
+  socketPath: string,
+  failClosed: boolean
+): NativeClient {
   let handlePromise: Promise<object> | undefined;
   let activeHandle: object | undefined;
   let pendingSendError: Error | undefined;
@@ -384,4 +399,39 @@ export function createNativeClient(options: InitAssemblyOptions): NativeClient {
       });
     }
   };
+}
+
+/**
+ * Construct the native transport for a mode.
+ *
+ * Both `napi-inprocess` and the default `grpc-sidecar` route registration and
+ * policy checks through the shared `aa-sdk-client` napi binding — the SDK never
+ * reimplements the gateway handshake in JS (ADR 0002 / 0004). They differ only
+ * in failure posture:
+ *  - `napi-inprocess` requires the binding: a load failure throws
+ *    {@link NativeConnectError} (the caller explicitly opted into in-process
+ *    enforcement, so a missing binding is a hard error).
+ *  - the default `grpc-sidecar` path *attempts* the binding and falls back to a
+ *    no-op stub on load failure (unsupported platform such as Windows, or a
+ *    missing native binary), so `initAssembly` can fail loud about the
+ *    unregistered agent rather than crashing (AAASM-4468).
+ *
+ * Fail-closed posture (AAASM-4013) defaults to fail-open so observe / disabled /
+ * unset modes are unchanged.
+ */
+export function createNativeClient(options: InitAssemblyOptions): NativeClient {
+  const mode = options.mode ?? "grpc-sidecar";
+  const failClosed = options.failClosed ?? false;
+
+  if (mode === "napi-inprocess") {
+    return buildConnectedClient(loadNativeBinding(), "napi-inprocess", options.gateway, failClosed);
+  }
+
+  let binding: NativeBinding;
+  try {
+    binding = loadNativeBinding();
+  } catch {
+    return buildStubClient("grpc-sidecar");
+  }
+  return buildConnectedClient(binding, "grpc-sidecar", options.gateway, failClosed);
 }

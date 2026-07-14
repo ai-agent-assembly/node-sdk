@@ -1,20 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
- * AAASM-4468 — the default `grpc-sidecar` mode's native `register` is a no-op
- * stub that resolves to a success-shaped `""`, so `initAssembly` used to report
- * a clean init for an agent that was never registered (and would never appear
- * in the dashboard / `GET /api/v1/agents`). The interim fix (N-C) makes that
- * no-op *visible* rather than silent: a prominent, unconditional stderr warning
- * at init time plus a `registered: boolean` flag on the returned context.
+ * AAASM-4468 — default-mode (`grpc-sidecar` / `auto`) registration now routes
+ * through the native `aa-sdk-client` binding, the same connect+register path as
+ * `napi-inprocess` (ADR 0002 / 0004 — never a JS reimplementation of the
+ * handshake). Two surfaces are pinned here:
  *
- * These tests pin both surfaces:
- *  - the stub (default) path warns and reports `registered === false`;
- *  - a real register path (`napi-inprocess` against a mocked binding) does NOT
- *    warn and reports `registered === true`.
- *
- * The real in-SDK `grpc-sidecar` registration (direct `:50051` via the
- * `aa-sdk-client` binding, N-A) is gated on AAASM-4467 and out of scope here.
+ *  - **binding present:** default mode registers the agent and reports
+ *    `registered === true` with no unregistered warning.
+ *  - **binding absent** (unsupported platform / missing native binary): the
+ *    transport falls back to the no-op stub, so init must fail *loud* — a
+ *    prominent, unconditional stderr warning plus `registered === false` — never
+ *    a silent clean init for an agent that structurally never registered.
  */
 
 interface MockBinding {
@@ -45,20 +42,52 @@ async function loadWithBinding(binding: MockBinding) {
   return import("../src/index.js");
 }
 
+/** Load the SDK with the native binding load forced to fail (no binary). */
+async function loadWithUnloadableBinding() {
+  vi.resetModules();
+  vi.doMock("node:module", () => ({
+    createRequire: () => () => {
+      throw new Error("Cannot find module (no native binary on this platform)");
+    }
+  }));
+  return import("../src/index.js");
+}
+
 function collectStderr(spy: ReturnType<typeof vi.spyOn>): string {
   return spy.mock.calls.map((call: unknown[]) => String(call[0])).join("");
 }
 
-describe("initAssembly fail-loud on unregistered no-op path (AAASM-4468)", () => {
+describe("initAssembly fail-loud when the native binding is unavailable (AAASM-4468)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.doUnmock("node:module");
     vi.resetModules();
   });
 
-  it("default (grpc-sidecar) mode: reports registered=false and writes a prominent stderr warning", async () => {
+  it("default (grpc-sidecar) mode with the binding present: registers and emits no unregistered warning", async () => {
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const { initAssembly } = await import("../src/index.js");
+    const binding = makeBinding();
+    const { initAssembly } = await loadWithBinding(binding);
+
+    const ctx = await initAssembly({
+      gatewayUrl: "https://gateway.example.com",
+      apiKey: "test-key",
+      agentId: "agent-x"
+    });
+
+    // The default path now performs the real SDK-side registration through the
+    // aa-sdk-client binding.
+    expect(ctx.registered).toBe(true);
+    expect(binding.connect).toHaveBeenCalled();
+    expect(binding.register).toHaveBeenCalledOnce();
+    expect(collectStderr(stderr)).not.toContain("NOT registered");
+
+    await ctx.shutdown();
+  });
+
+  it("default mode with no loadable binding: reports registered=false and writes a prominent stderr warning", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const { initAssembly } = await loadWithUnloadableBinding();
 
     const ctx = await initAssembly({
       gatewayUrl: "https://gateway.example.com",
@@ -69,12 +98,12 @@ describe("initAssembly fail-loud on unregistered no-op path (AAASM-4468)", () =>
     // Programmatic surface: the unregistered state is detectable, not silent.
     expect(ctx.registered).toBe(false);
 
-    // Warning surface: unconditional stderr, naming the concrete consequence
-    // and the ticket the real registration is gated on.
+    // Warning surface: unconditional stderr naming the concrete consequence and
+    // why registration did not happen.
     const warning = collectStderr(stderr);
     expect(warning).toContain("NOT registered");
     expect(warning).toContain("/api/v1/agents");
-    expect(warning).toContain("AAASM-4467");
+    expect(warning).toContain("could not be loaded");
 
     await ctx.shutdown();
   });
