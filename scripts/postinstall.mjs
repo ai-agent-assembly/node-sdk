@@ -20,11 +20,17 @@ import { pathToFileURL } from "node:url";
  * fails at install time rather than only at first `initAssembly`.
  */
 
+// napi triple per supported `<platform>-<arch>`. Windows is deliberately absent:
+// the governance core (`aa-sdk-client` + its Unix-domain-socket transport) is
+// Unix-only and the release napi matrix builds no win32 `.node`, so promising a
+// `win32-x64-msvc` triple that is never shipped made the loader resolve a
+// "supported" key with no binary and throw a misleading phantom-triple error
+// instead of an honest "Windows not supported yet" (AAASM-4467). win32 is handled
+// explicitly in `selectBinaryForCurrentPlatform` before this map is consulted.
 const SUPPORTED_PLATFORM_KEYS = {
   "darwin-arm64": "darwin-arm64",
   "darwin-x64": "darwin-x64",
-  "linux-x64": "linux-x64-gnu",
-  "win32-x64": "win32-x64-msvc"
+  "linux-x64": "linux-x64-gnu"
 };
 
 const NATIVE_BINDING_DIR = "native/aa-ffi-node";
@@ -67,6 +73,21 @@ export function selectBinaryForCurrentPlatform(options = {}) {
     nativeDir = path.resolve(cwd, NATIVE_BINDING_DIR),
     logger = console
   } = options;
+
+  // Windows is not supported yet: no win32 `.node` is built (see
+  // SUPPORTED_PLATFORM_KEYS), so there is no bundled binding to verify. Emit an
+  // honest, non-error notice and return cleanly BEFORE the generic
+  // unsupported/no-binary paths — install must still succeed and the JS API stays
+  // usable; the agent just runs unregistered until Windows support lands. Falling
+  // through would surface the phantom `win32-x64-msvc` triple error (AAASM-4467).
+  if (platform === "win32") {
+    logger.info(
+      "[agent-assembly] Windows is not supported yet (the governance core is " +
+        "Unix-only); the SDK will install and its JS API will work, but your " +
+        "agent will run UNREGISTERED / ungoverned until Windows support lands."
+    );
+    return null;
+  }
 
   const platformKey = detectPlatformKey(platform, arch);
 
