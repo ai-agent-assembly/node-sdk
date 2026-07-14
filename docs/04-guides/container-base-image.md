@@ -27,7 +27,7 @@ Because both are baked in, a containerized agent built `FROM` this image is
 governed the moment it starts — you do not `npm install` the SDK or fetch the CLI
 yourself.
 
-:::note The SDK layer is not a security boundary on its own
+:::note[The SDK layer is not a security boundary on its own]
 The in-process SDK layer is the fastest, lowest-latency interception path, but it
 relies on SDK adoption and is **not** the authoritative enforcement point. For
 real enforcement, pair the image with the `aa-runtime` sidecar (see

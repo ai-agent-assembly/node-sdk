@@ -93,12 +93,12 @@ try {
 
 ## Notes & caveats
 
-:::note Offline by design
+:::note[Offline by design]
 The example uses only mock/offline mode. No provider keys or gateway URL are needed,
 and all tests run offline.
 :::
 
-:::tip Default-deny
+:::tip[Default-deny]
 The policy's `evaluate()` returns a deny rule for any unlisted tool — unknown tools
 are denied by default.
 :::

@@ -91,12 +91,12 @@ try {
 
 ## Notes & caveats
 
-:::note Uses the real `@mastra/core` package
+:::note[Uses the real `@mastra/core` package]
 This example installs `@mastra/core` and `zod`. It still runs offline because the
 tools return mock output — no provider key or live LLM is involved.
 :::
 
-:::tip withAssembly instead of a framework hook
+:::tip[withAssembly instead of a framework hook]
 The published `@agent-assembly/sdk` alpha exposes governance through the public
 `withAssembly(tools, { gatewayClient })` API, so the example governs each Mastra tool's
 `execute` directly rather than using a framework-specific hook.
