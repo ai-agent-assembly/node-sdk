@@ -1,6 +1,9 @@
 export function detectPlatformKey(platform?: string, arch?: string): string | null;
 
-export function findBundledNativeBinary(nativeDir: string): string | null;
+export function findBundledNativeBinary(
+  nativeDir: string,
+  platformKey: string
+): string | null;
 
 export function selectBinaryForCurrentPlatform(options?: {
   platform?: string;
