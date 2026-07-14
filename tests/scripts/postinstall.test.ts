@@ -49,20 +49,68 @@ describe("postinstall script", () => {
     const cwd = createTempDir();
     const nativeDir = seedBundledBinary(cwd, "index.node");
 
-    // Exact index.node is preferred.
-    expect(findBundledNativeBinary(nativeDir)).toBe(path.join(nativeDir, "index.node"));
+    // Exact index.node is preferred (platformKey is irrelevant when present).
+    expect(findBundledNativeBinary(nativeDir, "linux-x64-gnu")).toBe(
+      path.join(nativeDir, "index.node")
+    );
 
-    // Falls back to a platform-suffixed index.<triple>.node.
+    // Falls back to this platform's index.<triple>.node.
     fs.rmSync(path.join(nativeDir, "index.node"));
     fs.writeFileSync(path.join(nativeDir, "index.linux-x64-gnu.node"), "fake");
-    expect(findBundledNativeBinary(nativeDir)).toBe(
+    expect(findBundledNativeBinary(nativeDir, "linux-x64-gnu")).toBe(
       path.join(nativeDir, "index.linux-x64-gnu.node")
     );
 
-    // Returns null when no binding is present.
+    // Returns null when this platform's triple is not present.
     fs.rmSync(path.join(nativeDir, "index.linux-x64-gnu.node"));
-    expect(findBundledNativeBinary(nativeDir)).toBeNull();
-    expect(findBundledNativeBinary(path.join(cwd, "does-not-exist"))).toBeNull();
+    expect(findBundledNativeBinary(nativeDir, "linux-x64-gnu")).toBeNull();
+    expect(findBundledNativeBinary(path.join(cwd, "does-not-exist"), "linux-x64-gnu")).toBeNull();
+  });
+
+  // AAASM-4467: with all three per-platform binaries bundled together, the
+  // resolver must pick THIS platform's triple — never the first one a directory
+  // scan returns. A first-match resolver would load a wrong-arch binary and
+  // crash at `require`.
+  it("selects the current platform's triple, not the first bundled .node", () => {
+    const cwd = createTempDir();
+    const nativeDir = seedBundledBinary(cwd, "index.darwin-arm64.node");
+    // Stage all three published triples side by side (no plain index.node).
+    fs.writeFileSync(path.join(nativeDir, "index.darwin-x64.node"), "fake");
+    fs.writeFileSync(path.join(nativeDir, "index.linux-x64-gnu.node"), "fake");
+
+    // Each platform key resolves to its own triple regardless of readdir order.
+    expect(findBundledNativeBinary(nativeDir, "linux-x64-gnu")).toBe(
+      path.join(nativeDir, "index.linux-x64-gnu.node")
+    );
+    expect(findBundledNativeBinary(nativeDir, "darwin-x64")).toBe(
+      path.join(nativeDir, "index.darwin-x64.node")
+    );
+    expect(findBundledNativeBinary(nativeDir, "darwin-arm64")).toBe(
+      path.join(nativeDir, "index.darwin-arm64.node")
+    );
+
+    // A platform whose triple is absent from the bundle resolves to null rather
+    // than silently loading a sibling triple.
+    expect(findBundledNativeBinary(nativeDir, "win32-x64-msvc")).toBeNull();
+  });
+
+  it("selectBinaryForCurrentPlatform picks the triple matching the platform key", () => {
+    const cwd = createTempDir();
+    const nativeDir = seedBundledBinary(cwd, "index.linux-x64-gnu.node");
+    fs.writeFileSync(path.join(nativeDir, "index.darwin-arm64.node"), "fake");
+
+    const logger = { info: vi.fn(), warn: vi.fn() };
+
+    const result = selectBinaryForCurrentPlatform({
+      platform: "linux",
+      arch: "x64",
+      cwd,
+      logger
+    });
+
+    expect(result?.platformKey).toBe("linux-x64-gnu");
+    expect(result?.binaryPath).toBe(path.join(nativeDir, "index.linux-x64-gnu.node"));
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("confirms the bundled binding present for the current platform", () => {
