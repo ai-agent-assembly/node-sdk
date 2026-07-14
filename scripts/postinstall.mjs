@@ -36,10 +36,16 @@ export function detectPlatformKey(platform = process.platform, arch = process.ar
 /**
  * Locate the bundled native binding inside `native/aa-ffi-node/`, mirroring the
  * runtime loader in `native/aa-ffi-node/index.cjs`: prefer the exact
- * `index.node`, otherwise the first platform-suffixed `index.<triple>.node`.
- * Returns the absolute path, or `null` when no binding is present.
+ * `index.node`, otherwise **this platform's** `index.<platformKey>.node`.
+ * Returns the absolute path, or `null` when no matching binding is present.
+ *
+ * `platformKey` is the napi triple for the current platform (e.g.
+ * `linux-x64-gnu`). Selecting by triple — not the first `index.*.node` a
+ * directory scan happens to return — is what keeps a multi-platform bundle (all
+ * three `index.<triple>.node` shipped together) from loading a wrong-arch
+ * binary (AAASM-4467).
  */
-export function findBundledNativeBinary(nativeDir) {
+export function findBundledNativeBinary(nativeDir, platformKey) {
   const directPath = path.join(nativeDir, "index.node");
   if (fs.existsSync(directPath)) {
     return directPath;
@@ -49,11 +55,8 @@ export function findBundledNativeBinary(nativeDir) {
     return null;
   }
 
-  const platformAddon = fs
-    .readdirSync(nativeDir)
-    .find((name) => /^index\..+\.node$/.test(name));
-
-  return platformAddon ? path.join(nativeDir, platformAddon) : null;
+  const triplePath = path.join(nativeDir, `index.${platformKey}.node`);
+  return fs.existsSync(triplePath) ? triplePath : null;
 }
 
 export function selectBinaryForCurrentPlatform(options = {}) {
@@ -74,7 +77,7 @@ export function selectBinaryForCurrentPlatform(options = {}) {
     return null;
   }
 
-  const binaryPath = findBundledNativeBinary(nativeDir);
+  const binaryPath = findBundledNativeBinary(nativeDir, platformKey);
 
   if (!binaryPath) {
     throw new Error(
