@@ -102,8 +102,27 @@ function buildRegisterOptions(
  *
  * This does not fail init: an external sidecar may still register the agent
  * out-of-band, so the honest posture is "warn + surface, don't break".
+ *
+ * On Windows the binding is *never* present (the governance core is Unix-only
+ * and no win32 `.node` is built), so the generic "could not be loaded" wording
+ * reads as a transient/missing-binary fault the user might try to fix. We give
+ * win32 an honest platform-specific message instead — Windows is not supported
+ * yet — while keeping the same "unregistered / not in the dashboard" consequence
+ * and the `registered`-flag pointer.
  */
 function warnAgentUnregistered(mode: AssemblyMode | "auto"): void {
+  if (process.platform === "win32") {
+    process.stderr.write(
+      `[agent-assembly] WARNING: Windows is not supported yet — the governance ` +
+        `core is Unix-only, so no native aa-sdk-client binding is built for ` +
+        `Windows. The SDK's JS API still works, but the agent is NOT registered ` +
+        `with the governance gateway in "${mode}" mode and will NOT appear in the ` +
+        `dashboard or GET /api/v1/agents unless an external sidecar registers it ` +
+        `out-of-band. Inspect the "registered" flag on the returned assembly ` +
+        `context to detect this programmatically.\n`
+    );
+    return;
+  }
   process.stderr.write(
     `[agent-assembly] WARNING: the agent is NOT registered with the governance ` +
       `gateway in "${mode}" mode: the native aa-sdk-client binding could not be ` +
