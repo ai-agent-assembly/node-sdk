@@ -103,7 +103,7 @@ The excerpts are ESM / TypeScript; under CommonJS, swap the import for
 <TabItem value="langchain-js-basic-agent" label="LangChain.js" default>
 
 ```ts
-import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { withAssembly } from "@agent-assembly/sdk";
 import { createPolicyGatewayClient } from "./policy.js";
 import { TOOLS } from "./tools.js";
 
@@ -131,7 +131,7 @@ Base tool abstractions like `Tool` moved out of the `langchain` monolith into `@
 <TabItem value="custom-tool-policy" label="Custom (no framework)">
 
 ```ts
-import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { withAssembly } from "@agent-assembly/sdk";
 import { createPolicyGatewayClient } from "./policy.js";
 import { readFile, writeFile } from "./tools.js";
 
@@ -157,9 +157,9 @@ const tools = withAssembly(
 <TabItem value="openai-node-tool-policy" label="OpenAI (Node) (Experimental)">
 
 ```ts
-import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { withAssembly } from "@agent-assembly/sdk";
 import { createPolicyGatewayClient } from "./policy.js";
-import { TOOL_DEFINITIONS, searchWeb, sendEmail } from "./tools.js";
+import { searchWeb, sendEmail } from "./tools.js";
 
 const tools = withAssembly(
   {
@@ -183,7 +183,7 @@ const tools = withAssembly(
 <TabItem value="vercel-ai" label="Vercel AI SDK (Experimental)">
 
 ```ts
-import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { withAssembly } from "@agent-assembly/sdk";
 import { createPolicyGatewayClient } from "./policy.js";
 import { getWeatherTool, sendEmailTool } from "./tools.js";
 
@@ -209,7 +209,7 @@ The React UI hooks were extracted out of the core `ai` package into a dedicated 
 <TabItem value="langgraph-js" label="LangGraph.js (Experimental)">
 
 ```ts
-import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { withAssembly } from "@agent-assembly/sdk";
 import { createPolicyGatewayClient } from "./policy.js";
 import { TOOLS } from "./tools.js";
 
@@ -236,7 +236,7 @@ function buildGovernedTools() {
 <TabItem value="mastra" label="Mastra (Experimental)">
 
 ```ts
-import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { withAssembly } from "@agent-assembly/sdk";
 import { createPolicyGatewayClient } from "./policy.js";
 import { getStockPriceTool, placeTradeTool } from "./tools.js";
 

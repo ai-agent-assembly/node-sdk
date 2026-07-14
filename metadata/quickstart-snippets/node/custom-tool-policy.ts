@@ -1,4 +1,4 @@
-import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { withAssembly } from "@agent-assembly/sdk";
 import { createPolicyGatewayClient } from "./policy.js";
 import { readFile, writeFile } from "./tools.js";
 
