@@ -57,6 +57,12 @@ Then `pnpm start` connects to the real gateway and real OpenAI API if configured
 The policy allows the read-only lookup and denies the destructive tool:
 
 ```ts title="src/policy.ts"
+export interface PolicyRule {
+  tool: string;
+  action: "allow" | "deny";
+  reason: string;
+}
+
 export const POLICY_RULES: PolicyRule[] = [
   { tool: "get_weather", action: "allow", reason: "Read-only external data lookup — safe to execute." },
   { tool: "delete_file", action: "deny", reason: "Destructive filesystem operations require human approval." },
@@ -66,6 +72,9 @@ export const POLICY_RULES: PolicyRule[] = [
 `index.ts` wraps the tools and handles the denied call:
 
 ```ts title="src/index.ts"
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+
 const tools = withAssembly(
   {
     get_weather: { execute: async (args) => TOOLS.get_weather(args).output },
