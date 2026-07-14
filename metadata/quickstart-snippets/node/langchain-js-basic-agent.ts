@@ -1,3 +1,7 @@
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOLS } from "./tools.js";
+
 const tools = withAssembly(
   {
     get_weather: {

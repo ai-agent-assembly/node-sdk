@@ -1,3 +1,7 @@
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { readFile, writeFile } from "./tools.js";
+
 const tools = withAssembly(
   {
     read_file: {

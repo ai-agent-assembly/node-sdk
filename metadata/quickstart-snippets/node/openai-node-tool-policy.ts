@@ -1,3 +1,7 @@
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOL_DEFINITIONS, searchWeb, sendEmail } from "./tools.js";
+
 const tools = withAssembly(
   {
     search_web: {

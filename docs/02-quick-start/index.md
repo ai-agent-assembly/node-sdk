@@ -103,6 +103,10 @@ The excerpts are ESM / TypeScript; under CommonJS, swap the import for
 <TabItem value="langchain-js-basic-agent" label="LangChain.js" default>
 
 ```ts
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOLS } from "./tools.js";
+
 const tools = withAssembly(
   {
     get_weather: {
@@ -120,6 +124,10 @@ const tools = withAssembly(
 <TabItem value="custom-tool-policy" label="Custom (no framework)">
 
 ```ts
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { readFile, writeFile } from "./tools.js";
+
 const tools = withAssembly(
   {
     read_file: {
@@ -142,6 +150,10 @@ const tools = withAssembly(
 <TabItem value="openai-node-tool-policy" label="OpenAI (Node) (Experimental)">
 
 ```ts
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOL_DEFINITIONS, searchWeb, sendEmail } from "./tools.js";
+
 const tools = withAssembly(
   {
     search_web: {
@@ -164,6 +176,10 @@ const tools = withAssembly(
 <TabItem value="vercel-ai" label="Vercel AI SDK (Experimental)">
 
 ```ts
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { getWeatherTool, sendEmailTool } from "./tools.js";
+
 // withAssembly wraps each tool's `execute`, keying the policy by the map key.
 // The Vercel AI SDK tools run unchanged; only governance is layered on top.
 const tools = withAssembly(
@@ -179,6 +195,10 @@ const tools = withAssembly(
 <TabItem value="langgraph-js" label="LangGraph.js (Experimental)">
 
 ```ts
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { TOOLS } from "./tools.js";
+
 /**
  * Build governed tools once, then call them from inside graph nodes.
  * withAssembly enforces the local policy before each tool runs.
@@ -202,6 +222,10 @@ function buildGovernedTools() {
 <TabItem value="mastra" label="Mastra (Experimental)">
 
 ```ts
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { getStockPriceTool, placeTradeTool } from "./tools.js";
+
 // Wrap the Mastra tools with withAssembly. Each governed entry delegates to the
 // real Mastra tool's execute, so the policy is enforced before the tool runs.
 const tools = withAssembly(

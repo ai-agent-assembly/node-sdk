@@ -1,3 +1,7 @@
+import { PolicyViolationError, withAssembly } from "@agent-assembly/sdk";
+import { createPolicyGatewayClient } from "./policy.js";
+import { getStockPriceTool, placeTradeTool } from "./tools.js";
+
 // Wrap the Mastra tools with withAssembly. Each governed entry delegates to the
 // real Mastra tool's execute, so the policy is enforced before the tool runs.
 const tools = withAssembly(
