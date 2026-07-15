@@ -192,7 +192,7 @@ const config: Config = {
             "api/**",
             "superpowers/**",
           ],
-          editUrl: "https://github.com/ai-agent-assembly/node-sdk/tree/master/",
+          editUrl: "https://github.com/ai-agent-assembly/node-sdk/tree/master/website/",
           // Per-page git "Last updated" date + committer (AAASM-2747).
           // Docusaurus derives both from `git log` for each doc file, so the
           // publish-docs workflow checks out full history (`fetch-depth: 0`).
