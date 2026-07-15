@@ -55,6 +55,8 @@ pnpm add @agent-assembly/sdk
 npm install @agent-assembly/sdk
 # or
 yarn add @agent-assembly/sdk
+# or
+bun add @agent-assembly/sdk
 ```
 <!-- END GENERATED: install-commands -->
 

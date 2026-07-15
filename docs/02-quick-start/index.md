@@ -38,6 +38,13 @@ yarn add @agent-assembly/sdk
 ```
 
 </TabItem>
+<TabItem value="bun" label="bun">
+
+```bash
+bun add @agent-assembly/sdk
+```
+
+</TabItem>
 </Tabs>
 {/* END GENERATED: install-commands */}
 

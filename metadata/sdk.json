@@ -7,17 +7,20 @@
     "latest": {
       "npm": "npm install @agent-assembly/sdk",
       "pnpm": "pnpm add @agent-assembly/sdk",
-      "yarn": "yarn add @agent-assembly/sdk"
+      "yarn": "yarn add @agent-assembly/sdk",
+      "bun": "bun add @agent-assembly/sdk"
     },
     "distTag": {
       "npm": "npm install @agent-assembly/sdk@rc",
       "pnpm": "pnpm add @agent-assembly/sdk@rc",
-      "yarn": "yarn add @agent-assembly/sdk@rc"
+      "yarn": "yarn add @agent-assembly/sdk@rc",
+      "bun": "bun add @agent-assembly/sdk@rc"
     },
     "pinned": {
       "npm": "npm install @agent-assembly/sdk@<VERSION>",
       "pnpm": "pnpm add @agent-assembly/sdk@<VERSION>",
-      "yarn": "yarn add @agent-assembly/sdk@<VERSION>"
+      "yarn": "yarn add @agent-assembly/sdk@<VERSION>",
+      "bun": "bun add @agent-assembly/sdk@<VERSION>"
     }
   }
 }
