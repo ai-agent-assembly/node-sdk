@@ -5,15 +5,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * later as a `shutdown()` rejection.
  *
  * `register` is advisory: a failed register is caught, logged, and init resolves
- * with `registered === false`. But the post-register topology audit event used
- * to be sent *unconditionally*. When the failed register left the native IPC
- * channel closed, that `sendEvent` throws internally, the native client stashes
- * the fault as `pendingSendError`, and `close()` re-throws it — so the README
- * default-mode quickstart's final `await ctx.shutdown()` would REJECT with
+ * with `registered === false`. The post-register topology audit event still
+ * ships unconditionally (lineage is independent of registration success). When
+ * the failed register left the native IPC channel closed, that `sendEvent`
+ * throws internally, the native client stashes the fault as `pendingSendError`,
+ * and `close()` re-throws it — so the README default-mode quickstart's final
+ * `await ctx.shutdown()` would REJECT with
  * `NativeSendEventError: ... IPC channel is closed (AA_ERR_SEND_EVENT)`.
  *
- * The advisory topology event is now gated on `registered`, so a register
- * failure never plants a pending send error that a clean shutdown would hit.
+ * The fix keeps the advisory topology event firing but makes `initAssembly`'s
+ * shutdown path swallow-and-log that stashed send error, so an advisory event
+ * can never reject a clean shutdown. `close()`'s re-throw contract is unchanged
+ * for direct callers.
  */
 
 interface MockBinding {
