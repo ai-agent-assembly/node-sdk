@@ -69,6 +69,16 @@ Pass your LangChain-style tools (`{ name, invoke }`) to `initAssembly` under
 `langchain.tools`. Each tool is wrapped **in place** so every `invoke()` is checked
 against gateway policy before it runs.
 
+The snippets below take the LangChain adapter path, which needs `@langchain/core`.
+It is an **optional** peer dependency, so `pnpm add @agent-assembly/sdk` does not
+install it — add it alongside the SDK for this quickstart:
+
+```bash
+pnpm add @agent-assembly/sdk @langchain/core
+# or
+npm install @agent-assembly/sdk @langchain/core
+```
+
 ### ESM (`import`)
 
 ```ts
