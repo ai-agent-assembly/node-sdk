@@ -75,13 +75,18 @@ options:
   if it requires auth), or pass `gatewayUrl` explicitly.
 
 :::note[Local-mode transports: `:7391` REST + `:50051` gRPC]
-`aasm start --mode local` binds **two** loopback surfaces in one process: the REST API
-on `http://localhost:7391` (what `gatewayUrl` points to, and what the SDK probes and,
-with `AA_AUTO_START=1`, auto-starts) **and** the gRPC `AgentLifecycleService` on
-`127.0.0.1:50051`, which is the endpoint the native `aa-sdk-client` binding dials to
-**register** your agent. You don't configure `:50051` yourself — registration dials it
-automatically — so a no-argument `initAssembly()` both connects and shows the agent in
-the dashboard once a gateway is reachable.
+Starting the local gateway binds **two** loopback surfaces in one process:
+
+```bash
+aasm start --mode local
+```
+
+This exposes the REST API on `http://localhost:7391` (what `gatewayUrl` points to, and
+what the SDK probes and, with `AA_AUTO_START=1`, auto-starts) **and** the gRPC
+`AgentLifecycleService` on `127.0.0.1:50051`, which is the endpoint the native
+`aa-sdk-client` binding dials to **register** your agent. You don't configure `:50051`
+yourself — registration dials it automatically — so a no-argument `initAssembly()` both
+connects and shows the agent in the dashboard once a gateway is reachable.
 :::
 
 See [Configuration](../05-configuration/index.md) for the full resolution order.
