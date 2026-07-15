@@ -25,6 +25,19 @@ name: dependency-audit
 #
 # Triggers mirror test-matrix.yml so the gate runs on the same code-bearing
 # PRs/pushes and the ci-success.yml aggregate gate can wait on it by name.
+#
+# pnpm pin (AAASM-4594)
+# ----------------------
+# This job pins pnpm 11, one major ahead of every other workflow's 10.33.2 pin,
+# because npm retired the legacy audit endpoints `pnpm audit` on 10.x calls
+# (HTTP 410 as of 2026-07-15) — only pnpm 11+ speaks the replacement bulk
+# advisory endpoint. This is intentionally scoped to this job alone, not a
+# repo-wide bump: pnpm 11 requires explicit allowlisting of postinstall/build
+# scripts (this repo has none configured) and silently stops honoring
+# `package.json`'s `pnpm.overrides` field, both of which need a dedicated,
+# separately-tested migration. `--ignore-scripts` below sidesteps the
+# build-script question entirely — this job only inspects the resolved
+# dependency graph for advisories; it never builds or runs anything.
 
 on:
   pull_request:
@@ -57,7 +70,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
-          version: 10.33.2
+          version: 11.13.0
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -66,7 +79,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       # Non-zero exit (an advisory at >= high that is not in the
       # pnpm.auditConfig allowlist) fails the job and blocks the release path.
