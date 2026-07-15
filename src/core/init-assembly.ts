@@ -508,8 +508,13 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
       // false.
       warnAgentUnregistered(resolvedConfig.mode ?? "auto");
     }
-    // Topology lineage metadata still flows as an audit event (parent / team /
-    // delegation), which `register` does not carry.
+    // Topology lineage metadata (parent / team / delegation) flows as an audit
+    // event that `register` does not itself carry, so it ships even when the
+    // agent proceeded unregistered — the lineage graph is independent of
+    // registration success. This send is fire-and-forget/advisory; if it fails
+    // (e.g. a tolerated register failure left the IPC channel closed) the native
+    // client stashes the fault as `pendingSendError`, which the shutdown path
+    // below swallows so an advisory event can't reject `shutdown()` (AAASM-4652).
     nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
   }
 
@@ -535,7 +540,20 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
       for (const adapter of adapters) {
         await adapter.shutdown?.();
       }
-      await nativeClient?.close();
+      // The topology audit event above is advisory and fire-and-forget: if it
+      // failed to enqueue (e.g. a tolerated register failure left the IPC
+      // channel closed) the native client stashed the fault and `close()`
+      // re-throws it. That internal send must never turn a clean teardown into a
+      // `shutdown()` rejection, so swallow-and-log it here (AAASM-4652). The
+      // error is redacted before logging (AAASM-3645) and `close()`'s re-throw
+      // contract is unchanged for direct callers.
+      try {
+        await nativeClient?.close();
+      } catch (error) {
+        console.warn(
+          `[agent-assembly] ignoring advisory event error during shutdown: ${redactErrorMessage(error)}`
+        );
+      }
       await client.close();
     }
   };
