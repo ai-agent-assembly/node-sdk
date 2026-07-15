@@ -509,8 +509,17 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
       warnAgentUnregistered(resolvedConfig.mode ?? "auto");
     }
     // Topology lineage metadata still flows as an audit event (parent / team /
-    // delegation), which `register` does not carry.
-    nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
+    // delegation), which `register` does not carry — but only when registration
+    // actually succeeded. A tolerated register failure (caught above) can leave
+    // the IPC channel closed; sending on a closed channel stashes a
+    // `pendingSendError` that `close()` later re-throws, turning an advisory,
+    // already-handled registration failure into a hard `shutdown()` rejection
+    // (AAASM-4652). This audit event is itself advisory, so skipping it when the
+    // agent is unregistered is the honest posture — consistent with the
+    // "warn + surface, don't break" contract of the register path above.
+    if (registered) {
+      nativeClient.sendEvent(buildRegistrationEvent(resolvedConfig));
+    }
   }
 
   const patches = await applyFrameworkPatches(resolvedConfig, client, frameworks);
