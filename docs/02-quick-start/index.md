@@ -80,6 +80,14 @@ what the SDK probes and, with `AA_AUTO_START=1`, auto-starts) **and** the gRPC
 `aa-sdk-client` binding dials to **register** your agent. You don't configure `:50051`
 yourself — registration dials it automatically — so a no-argument `initAssembly()` both
 connects and shows the agent in the dashboard once a gateway is reachable.
+
+To confirm both surfaces are actually up rather than guessing from the SDK's
+behavior, check them directly:
+
+```bash
+curl http://localhost:7391/healthz   # REST — real JSON: mode, storage, version, uptime_secs
+nc -z localhost 50051 && echo "gRPC port open"   # gRPC has no health endpoint yet; this only confirms the port accepts connections
+```
 :::
 
 See [Configuration](../05-configuration/index.md) for the full resolution order.
