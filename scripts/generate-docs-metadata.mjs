@@ -176,7 +176,8 @@ export function loadQuickstartTabs(repoRoot) {
 const INSTALL_PACKAGE_MANAGERS = [
   { id: "pnpm", label: "pnpm" },
   { id: "npm", label: "npm" },
-  { id: "yarn", label: "yarn" }
+  { id: "yarn", label: "yarn" },
+  { id: "bun", label: "bun" }
 ];
 
 function renderInstallCommands(meta, dialect) {
@@ -184,22 +185,26 @@ function renderInstallCommands(meta, dialect) {
   const fallback = {
     pnpm: `pnpm add ${meta.packageName}`,
     npm: `npm install ${meta.packageName}`,
-    yarn: `yarn add ${meta.packageName}`
+    yarn: `yarn add ${meta.packageName}`,
+    bun: `bun add ${meta.packageName}`
   };
 
   // README.md is rendered by GitHub, which has no Docusaurus `<Tabs>` support,
-  // so it keeps the plain fenced block. Only MDX docs pages (Docusaurus) get
-  // the Tabs/TabItem markup, same restriction as renderQuickstartFrameworkTabs.
+  // so it keeps the plain fenced block — one command per package manager,
+  // joined by `# or`, in the same order as INSTALL_PACKAGE_MANAGERS so it
+  // never drifts from the Tabs list below. Only MDX docs pages (Docusaurus)
+  // get the Tabs/TabItem markup, same restriction as
+  // renderQuickstartFrameworkTabs.
   if (dialect.kind !== "mdx") {
+    const commandLines = INSTALL_PACKAGE_MANAGERS.flatMap(({ id }, i) => [
+      ...(i > 0 ? ["# or"] : []),
+      latest[id] ?? fallback[id]
+    ]);
     return [
       dialect.header("install-commands"),
       "",
       "```bash",
-      latest.pnpm ?? fallback.pnpm,
-      "# or",
-      latest.npm ?? fallback.npm,
-      "# or",
-      latest.yarn ?? fallback.yarn,
+      ...commandLines,
       "```"
     ].join("\n");
   }
