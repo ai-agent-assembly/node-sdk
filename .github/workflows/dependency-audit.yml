@@ -25,6 +25,30 @@ name: dependency-audit
 #
 # Triggers mirror test-matrix.yml so the gate runs on the same code-bearing
 # PRs/pushes and the ci-success.yml aggregate gate can wait on it by name.
+#
+# pnpm pin (AAASM-4594)
+# ----------------------
+# `pnpm audit` needs pnpm 11+ to reach npm's replacement bulk advisory
+# endpoint — npm retired the legacy audit endpoints it called on 10.x (HTTP
+# 410 as of 2026-07-15). This is intentionally scoped to this job alone, not
+# a repo-wide bump (every other workflow keeps the 10.33.2 pin): pnpm 11
+# requires explicit allowlisting of postinstall/build scripts (this repo has
+# none configured) and silently stops honoring `package.json`'s
+# `pnpm.overrides` field, both of which need a dedicated, separately-tested
+# migration.
+#
+# `pnpm audit` only reads the already-resolved versions in pnpm-lock.yaml —
+# it needs no installed node_modules tree — so this job skips `pnpm install`
+# entirely and invokes pnpm 11 ad hoc via corepack, rather than through
+# `pnpm/action-setup` or a real `pnpm install`. That sidesteps two pnpm-11
+# frictions that would otherwise block just this job: (a) `pnpm/action-setup`
+# hard-errors when its `version:` input disagrees with package.json's
+# `packageManager` field (pinned at 10.33.2 for the rest of the repo), and
+# (b) a `--frozen-lockfile install` under pnpm 11 flags the no-longer-read
+# `pnpm.overrides` field as a config mismatch against the lockfile.
+# `--pm-on-fail=ignore` bypasses pnpm's own packageManager version guard for
+# this one ad hoc invocation, without touching package.json or corepack's
+# global activation state.
 
 on:
   pull_request:
@@ -54,21 +78,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-        with:
-          version: 10.33.2
-
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-          cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Enable corepack
+        run: corepack enable
 
       # Non-zero exit (an advisory at >= high that is not in the
       # pnpm.auditConfig allowlist) fails the job and blocks the release path.
       - name: Audit dependencies for known advisories
-        run: pnpm audit --audit-level=high
+        run: corepack pnpm@11.13.0 --pm-on-fail=ignore audit --audit-level=high
