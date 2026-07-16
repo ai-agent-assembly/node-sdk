@@ -554,6 +554,9 @@ describe("createNativeClient", () => {
     client.sendEvent({ action: "tool_call" });
 
     await expect(client.close()).rejects.toBeInstanceOf(mod.NativeSendEventError);
+    // AAASM-4699: a pending send error must not skip teardown — the native
+    // session is still disconnected before that advisory error is re-thrown.
+    expect(binding.disconnect).toHaveBeenCalledTimes(1);
   });
 
   it("tries known native binding paths and succeeds on fallback path", async () => {
