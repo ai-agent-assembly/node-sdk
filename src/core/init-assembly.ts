@@ -11,6 +11,7 @@ import {
 } from "../gateway/client.js";
 import {
   createNativeClient,
+  NativeSendEventError,
   type NativeClient,
   type RegisterOptions
 } from "../native/client.js";
@@ -550,6 +551,16 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
       try {
         await nativeClient?.close();
       } catch (error) {
+        // Only the advisory topology-event send failure is safe to swallow:
+        // `close()` re-throws it as a `NativeSendEventError` when the
+        // fire-and-forget event above could not enqueue (AAASM-4652). Any other
+        // fault — notably a genuine `NativeDisconnectError` from tearing down the
+        // native session — is a real teardown failure that must surface from
+        // `shutdown()`, not be mislabeled as an advisory event error and
+        // swallowed (AAASM-4699).
+        if (!(error instanceof NativeSendEventError)) {
+          throw error;
+        }
         console.warn(
           `[agent-assembly] ignoring advisory event error during shutdown: ${redactErrorMessage(error)}`
         );

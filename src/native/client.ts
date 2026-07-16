@@ -331,22 +331,30 @@ function buildConnectedClient(
     // SDK→gateway registration below, so it is registration-capable.
     canRegister: true,
     close: async () => {
-      if (pendingSendError) {
-        const error = pendingSendError;
-        pendingSendError = undefined;
-        throw error;
+      // A stashed advisory send error must not short-circuit teardown: capture
+      // it, still run `disconnect` so the native session is actually released,
+      // and only re-throw it once the handle is torn down (AAASM-4699).
+      // Previously an early throw here left the session connected and
+      // `activeHandle`/`handlePromise` set, leaking a live session on every
+      // shutdown that followed a failed advisory send.
+      const stashedSendError = pendingSendError;
+      pendingSendError = undefined;
+
+      if (handlePromise) {
+        const handle = await getHandle();
+        try {
+          await binding.disconnect(handle);
+        } catch (error) {
+          throw mapNativeError(error);
+        } finally {
+          handlePromise = undefined;
+          activeHandle = undefined;
+        }
       }
 
-      if (!handlePromise) {
-        return;
+      if (stashedSendError) {
+        throw stashedSendError;
       }
-
-      const handle = await getHandle();
-      await binding.disconnect(handle).catch((error: unknown) => {
-        throw mapNativeError(error);
-      });
-      handlePromise = undefined;
-      activeHandle = undefined;
     },
     sendEvent: (event: unknown) => {
       if (activeHandle) {

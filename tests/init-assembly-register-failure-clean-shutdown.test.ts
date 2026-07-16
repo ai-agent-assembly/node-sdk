@@ -67,7 +67,11 @@ describe("initAssembly clean shutdown after a tolerated register failure (AAASM-
         throw new Error("register failed");
       }),
       sendEvent: vi.fn(() => {
-        throw new Error("failed to enqueue event: IPC channel is closed (AA_ERR_SEND_EVENT)");
+        // Native send failures are emitted in the shim's `AA_ERR_SEND_EVENT: …`
+        // form so `mapNativeError` types them as `NativeSendEventError` — the
+        // exact class the shutdown path discriminates on to swallow only the
+        // advisory event fault (AAASM-4699).
+        throw new Error("AA_ERR_SEND_EVENT: failed to enqueue event: IPC channel is closed");
       })
     });
     const { initAssembly } = await loadWithBinding(binding);
