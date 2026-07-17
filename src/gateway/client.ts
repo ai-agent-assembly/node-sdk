@@ -68,6 +68,66 @@ function toNativeQuery(
 }
 
 /**
+ * A verdict-like object as it arrives at the JS/native boundary: `denied` /
+ * `pending` are typed `unknown` here (rather than `boolean | undefined`)
+ * because {@link resolveVerdict} exists specifically to distrust that
+ * boundary — a version-skewed native binding or a non-conforming
+ * `NativeClient` can hand back a shape the compile-time `PolicyResult` /
+ * `GatewayApprovalResult` types promise but do not runtime-enforce.
+ */
+interface RawVerdict {
+  denied?: unknown;
+  pending?: unknown;
+  reason?: unknown;
+}
+
+/**
+ * Normalize a RESOLVED (non-thrown) verdict or approval result into a
+ * well-formed decision (AAASM-4798).
+ *
+ * `denied: raw.denied ?? false` alone is not a safe default: it treats a
+ * verdict that *resolves* without a recognizable `denied` / `pending` signal
+ * — `{}`, `{ denied: undefined }`, or a version-skewed native response with
+ * the wrong field types — as an authoritative allow. It isn't one; it means
+ * no verdict came back at all. That is a different failure mode than the
+ * catch-block fault below (a thrown error), but it must fail the same way:
+ * under `failClosed` (enforce) it denies; otherwise it stays advisory and
+ * allows, so a degraded or mismatched runtime never blocks the agent. Mirrors
+ * Python's `_normalize_decision(decision, enforce=enforce)`.
+ *
+ * Well-formed verdicts (a real `denied` or `pending` boolean) pass through
+ * exactly as before this fix.
+ *
+ * Exported so both consumption sites this guard covers — the `check()`
+ * verdict and the `waitForApproval()` approval result — can be tested
+ * directly against the same malformed-shape inputs (AAASM-4798).
+ */
+export function resolveVerdict(
+  raw: RawVerdict,
+  failClosed: boolean
+): { denied: boolean; pending: boolean; reason?: string } {
+  const reason = typeof raw.reason === "string" ? raw.reason : undefined;
+  const hasRecognizableSignal = typeof raw.denied === "boolean" || typeof raw.pending === "boolean";
+
+  if (!hasRecognizableSignal) {
+    const malformedReason =
+      reason ??
+      (failClosed ? "malformed policy verdict: no recognizable denied/pending signal" : undefined);
+    return {
+      denied: failClosed,
+      pending: false,
+      ...(malformedReason === undefined ? {} : { reason: malformedReason })
+    };
+  }
+
+  return {
+    denied: raw.denied === true,
+    pending: raw.pending === true,
+    ...(reason === undefined ? {} : { reason })
+  };
+}
+
+/**
  * Gateway client backed by the in-process native runtime (AAASM-3050).
  *
  * `check()` asks a reachable `aa-runtime` for an authoritative verdict via the
@@ -84,6 +144,11 @@ function toNativeQuery(
  * — the fault is swallowed and resolves neutral (`{ denied: false }`) so a
  * missing or degraded runtime never blocks the agent. The proxy / eBPF layers
  * remain authoritative in every posture.
+ *
+ * **Malformed resolved verdicts (AAASM-4798):** the above covers a *thrown*
+ * fault; a verdict that *resolves* without a recognizable `denied` / `pending`
+ * signal goes through {@link resolveVerdict}, which applies the identical
+ * fail-closed-under-enforce posture instead of silently defaulting to allow.
  */
 export function createNativeGatewayClient(
   mode: AssemblyMode,
@@ -106,11 +171,7 @@ export function createNativeGatewayClient(
     check: async (request: GatewayCheckRequest): Promise<GatewayDecision> => {
       try {
         const verdict = await nativeClient.queryPolicy(toNativeQuery(request, agentId));
-        return {
-          denied: verdict.denied ?? false,
-          pending: verdict.pending ?? false,
-          ...(verdict.reason === undefined ? {} : { reason: verdict.reason })
-        };
+        return resolveVerdict(verdict, failClosed);
       } catch {
         // Under enforce a local fault / unreachable runtime must deny rather
         // than downgrade to allow-on-failure (AAASM-3996). Otherwise the SDK
@@ -126,10 +187,22 @@ export function createNativeGatewayClient(
     // `WaitForApproval`, both of which deny when no approval channel is wired.
     // In any advisory posture (observe / disabled / unset) it stays neutral so
     // a missing approval channel never blocks the agent.
-    waitForApproval: async () =>
-      failClosed
+    //
+    // The literal below is itself routed through `resolveVerdict` (AAASM-4798):
+    // it is always well-formed today, but doing so keeps this path guarded by
+    // the exact same malformed-verdict guard as `check()` so a future real
+    // approval channel (AAASM-4129) inherits the fail-closed guarantee instead
+    // of relying on a fresh `?? false`.
+    waitForApproval: async () => {
+      const raw: RawVerdict = failClosed
         ? { denied: true, reason: "approval required but no approval channel is configured" }
-        : { denied: false },
+        : { denied: false };
+      const resolved = resolveVerdict(raw, failClosed);
+      return {
+        denied: resolved.denied,
+        ...(resolved.reason === undefined ? {} : { reason: resolved.reason })
+      };
+    },
     record: async () => undefined,
     recordResult: async () => undefined,
     scanPrompts: async () => undefined
