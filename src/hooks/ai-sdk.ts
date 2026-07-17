@@ -1,9 +1,27 @@
+/**
+ * Vercel AI SDK governance hook.
+ *
+ * Installs a governed `tool` factory over the `ai` package so tool executions
+ * route a pre-execution allow/deny check through the gateway.
+ *
+ * The single supported hook point is the `ai` package's `tool` factory export.
+ * When `ai` is installed but that export is absent — not a function (a future
+ * `ai` major renamed or moved the factory) — the upstream API has moved out from
+ * under us. We must NOT silently no-op (the AAASM-4805 bug, the same class as the
+ * AAASM-4797 OpenAI-Agents fix: `captureOriginalToolFactory` returned `undefined`,
+ * `patchVercelAiSdk` returned false, and emitted zero warning — leaving Vercel AI
+ * tools ungoverned in silence under enforce). Instead we warn loudly on stderr
+ * and, under a fail-closed (enforce) posture, throw a `ConfigurationError` rather
+ * than run ungoverned. `ai` simply not being installed stays a silent no-op (a
+ * bare dependency install must remain zero-config).
+ */
 import type {
   VercelAiToolDefinition,
   VercelAiToolExecutionOptions,
   VercelAiToolFactory
 } from "../types/vercel-ai-adapter.js";
 import type { GatewayClient } from "../gateway/client.js";
+import { ConfigurationError } from "../errors/index.js";
 import { PolicyViolationError } from "../errors/policy-violation-error.js";
 import { runWithAgentId } from "../lineage/agent-context-store.js";
 
@@ -160,6 +178,13 @@ export interface PatchVercelAiSdkOptions {
   approvalTimeoutMs?: number;
   fallbackRunId?: string;
   agentId?: string;
+  /**
+   * When `ai` is installed but its `tool` factory hook point is absent (upstream
+   * API moved), throw a `ConfigurationError` instead of only warning. Set from
+   * the caller's fail-closed (enforce) posture so an enforce agent fails loudly
+   * rather than running ungoverned (AAASM-4805).
+   */
+  failClosed?: boolean;
   loadModule?: () => Promise<VercelAiSdkModule | undefined>;
 }
 
@@ -206,6 +231,22 @@ async function loadVercelAiSdkModule(): Promise<VercelAiSdkModule | undefined> {
   }
 }
 
+/**
+ * Loud, un-silenceable signal that `ai` is installed but its `tool` factory
+ * export has moved past the hook point this SDK knows — the failure mode
+ * AAASM-4805 closes. Written straight to `process.stderr` (not a swappable
+ * logger), mirroring the AAASM-4797 OpenAI-Agents missing-hook warning.
+ */
+function warnVercelAiHookPointMissing(): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: the Vercel AI SDK ("ai") is installed but its ` +
+      `tool factory (the "tool" export) was not found — the installed version's ` +
+      `tool API has moved. Vercel AI SDK tool calls will NOT be governed by this ` +
+      `SDK: a policy DENY will NOT block a tool call. Pin "ai" to a supported ` +
+      `version or upgrade @agent-assembly/sdk (AAASM-4805).\n`
+  );
+}
+
 export async function patchVercelAiSdk(
   options: PatchVercelAiSdkOptions
 ): Promise<boolean> {
@@ -216,11 +257,26 @@ export async function patchVercelAiSdk(
   const loadModule = options.loadModule ?? loadVercelAiSdkModule;
   const module = await loadModule();
   if (!module) {
+    // `ai` is not installed / did not load. A bare dependency install must stay
+    // zero-config (AAASM-1847) — return silently, not loudly.
     return false;
   }
 
   const originalToolFactory = captureOriginalToolFactory(module);
   if (!originalToolFactory) {
+    // `ai` IS installed but its `tool` hook point is gone: the upstream API
+    // moved. Never silently no-op (AAASM-4805) — warn loudly, and under enforce
+    // throw rather than leave tools ungoverned.
+    warnVercelAiHookPointMissing();
+    if (options.failClosed) {
+      throw new ConfigurationError(
+        `The Vercel AI SDK ("ai") is installed but its "tool" factory export was ` +
+          `not found, so this SDK cannot govern Vercel AI SDK tool calls. Refusing ` +
+          `to register under enforce rather than run ungoverned. Pin "ai" to a ` +
+          `supported version, upgrade @agent-assembly/sdk, or set enforcementMode ` +
+          `to "observe"/"disabled" (AAASM-4805).`
+      );
+    }
     return false;
   }
 
