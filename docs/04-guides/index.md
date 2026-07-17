@@ -64,6 +64,16 @@ When the gateway returns a **deny**, the wrapped call throws `PolicyViolationErr
 it returns **pending**, the call waits up to `approvalTimeoutMs` for a decision and then
 either proceeds or throws.
 
+:::note[In-process tool enforcement needs a check-capable mode]
+For a wrapped tool's **deny** to actually block in-process, the SDK must route each
+`check()` through a client that can return an authoritative verdict — that means
+`mode: "napi-inprocess"` (or supplying your own `gatewayClient`). In the default
+`"auto"` / `"grpc-sidecar"` modes the in-process `check()` is the allow-all no-op, so
+under the (default) fail-closed posture `initAssembly` **throws a `ConfigurationError`**
+rather than silently letting a denied tool run. Set `enforcementMode: "observe"` /
+`"disabled"` if you intend advisory (non-blocking) behavior for wrapped tools.
+:::
+
 ## `withAssembly` (validated, low-level)
 
 `withAssembly` is the explicit, lower-level wrapper for advanced cases where you supply the

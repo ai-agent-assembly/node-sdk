@@ -143,6 +143,27 @@ function warnAgentUnregistered(mode: AssemblyMode | "auto"): void {
  */
 const CHECK_CAPABLE_MODE: AssemblyMode = "napi-inprocess";
 
+/**
+ * Whether this `initAssembly` call passes explicit LangChain tools to be wrapped
+ * in place. Each wrapped tool's `invoke()` is gated by the gateway client's
+ * `check()` (see {@link wrapLangChainTools}), so when the resolved mode is not
+ * {@link CHECK_CAPABLE_MODE} — where `check()` is the allow-all no-op
+ * (`createNoopGatewayClient`) — a policy DENY would be silently allowed. This is
+ * the concrete, documented (04-guides LangChain quick-start) vector for the
+ * AAASM-4735 fail-open and the trigger for the guard in {@link initAssembly}.
+ *
+ * Deliberately scoped to explicit `langchain.tools`, NOT to auto-detected
+ * frameworks: a registration-/telemetry-only `initAssembly()` in an app that
+ * merely has `@langchain/core` / `ai` / `@openai/agents` on its dependency tree
+ * must keep its intended allow-all no-op client (AAASM-1847 / 3050 / 3105), and
+ * a bare install of those packages is indistinguishable from real use at init
+ * time.
+ */
+function wrapsToolsThroughGatewayClient(config: AssemblyConfig): boolean {
+  const tools = config.langchain?.tools;
+  return tools !== undefined && Object.keys(tools).length > 0;
+}
+
 export function createClient(
   config: AssemblyConfig,
   nativeClientOverride?: NativeClient
@@ -456,6 +477,35 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
   };
 
   const frameworks = detectFrameworks();
+
+  // AAASM-4735 (fail closed for wrapped tools): explicit LangChain tools are
+  // wrapped so each `invoke()` is gated by the gateway client's `check()`. In a
+  // non-check-capable mode that client is the allow-all no-op, so a tool DENY
+  // would be silently allowed — the fail-open this guard closes. `resolveFailClosed`
+  // treats an OMITTED enforcementMode as enforce (py/go parity, AAASM-4172), so a
+  // caller who wraps tools expecting enforcement without naming a posture must
+  // fail loud rather than register under a no-op check. Explicit `observe` /
+  // `disabled` opt out (advisory by design) and a caller-supplied `gatewayClient`
+  // owns its own `check()`; registration-/telemetry-only inits (no wrapped tools)
+  // keep the intended no-op client, so zero-config `initAssembly()` and sdk-only
+  // stay working (AAASM-1847 / 3050 / 3105).
+  const resolvedMode = resolvedConfig.mode ?? "auto";
+  if (
+    resolveFailClosed(resolvedConfig.enforcementMode) &&
+    resolvedMode !== CHECK_CAPABLE_MODE &&
+    resolvedConfig.gatewayClient === undefined &&
+    wrapsToolsThroughGatewayClient(resolvedConfig)
+  ) {
+    throw new ConfigurationError(
+      `in-process tool enforcement requires a check-capable client, but mode ` +
+        `"${resolvedMode}" routes tool policy checks through the allow-all no-op ` +
+        `gateway client, which cannot block a denied tool call. LangChain tools ` +
+        `are being wrapped under a fail-closed posture (enforcementMode ` +
+        `${resolvedConfig.enforcementMode === undefined ? '"enforce" by default' : `"${resolvedConfig.enforcementMode}"`}). ` +
+        `Use mode "${CHECK_CAPABLE_MODE}", supply your own gatewayClient, or set ` +
+        `enforcementMode to "observe"/"disabled".`
+    );
+  }
 
   // Build the native transport up front (every mode except sdk-only, which has
   // no sidecar) so the same session backs both the gateway client's `check()`
