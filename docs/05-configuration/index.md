@@ -72,7 +72,8 @@ agent:
 When resolution reaches step 4, the SDK probes `http://localhost:7391/healthz`. If
 nothing responds, it attempts to auto-start a local gateway by running
 `aasm start --mode local --foreground` (the `aasm` binary must be on `PATH` — install it
-with `npm install -g @agent-assembly/cli`). A `ConfigurationError` is thrown when `aasm`
+with `brew install ai-agent-assembly/tap/aasm`, or
+`curl -fsSL https://agent-assembly.com/install.sh | sh`). A `ConfigurationError` is thrown when `aasm`
 is missing, and a `GatewayError` when the auto-started gateway does not become healthy in
 time. See [Troubleshooting](../08-troubleshooting/index.md) for the recovery paths.
 

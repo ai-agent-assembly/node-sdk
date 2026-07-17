@@ -5,8 +5,8 @@ import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import { ConfigurationError, GatewayError } from "../errors/index.js";
 import {
-  INSTALL_HINT_NPM_SDK_GLOBAL_CLI,
-  INSTALL_HINT_PNPM_GLOBAL_CLI
+  INSTALL_HINT_BREW_CLI,
+  INSTALL_HINT_CURL_CLI
 } from "../generated/install-hints.js";
 
 /**
@@ -299,7 +299,7 @@ export async function autoStartGateway(
   if (aasmPath === null) {
     throw new ConfigurationError(
       `No gateway found at ${baseUrl} and 'aasm' is not on PATH. ` +
-        `Install it with: ${INSTALL_HINT_NPM_SDK_GLOBAL_CLI} (or ${INSTALL_HINT_PNPM_GLOBAL_CLI})`
+        `Install it with: ${INSTALL_HINT_BREW_CLI} (or ${INSTALL_HINT_CURL_CLI})`
     );
   }
 

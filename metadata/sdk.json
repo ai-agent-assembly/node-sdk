@@ -1,8 +1,11 @@
 {
-  "$comment": "Authoritative shared metadata for Node SDK docs generation (AAASM-4312 / Epic AAASM-4309). package.json remains the source of truth for name, version, homepage, repository, and engines. This file holds the values that do NOT live in package.json but must be kept in sync across README, docs/, and error hints — see CONTRIBUTING.md for the add-a-value workflow.",
+  "$comment": "Authoritative shared metadata for Node SDK docs generation (AAASM-4312 / Epic AAASM-4309). package.json remains the source of truth for name, version, homepage, repository, and engines. This file holds the values that do NOT live in package.json but must be kept in sync across README, docs/, and error hints — see CONTRIBUTING.md for the add-a-value workflow. cliInstall (AAASM-4796) is the real `aasm` CLI distribution mechanism — there is no npm-installable `@agent-assembly/cli` package.",
   "docsUrl": "https://docs.agent-assembly.com/node-sdk/",
   "distTag": "rc",
-  "cliPackageName": "@agent-assembly/cli",
+  "cliInstall": {
+    "brew": "brew install ai-agent-assembly/tap/aasm",
+    "curl": "curl -fsSL https://agent-assembly.com/install.sh | sh"
+  },
   "installCommands": {
     "latest": {
       "npm": "npm install @agent-assembly/sdk",

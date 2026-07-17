@@ -14,7 +14,8 @@ could not find the `aasm` binary.
 
 Fix one of:
 
-- Install the CLI so auto-start works: `npm install -g @agent-assembly/cli`.
+- Install the CLI so auto-start works: `brew install ai-agent-assembly/tap/aasm`, or
+  `curl -fsSL https://agent-assembly.com/install.sh | sh`.
 - Point the SDK at an already-running gateway: set `AAASM_GATEWAY_URL`, or pass
   `gatewayUrl` explicitly, or add an `agent.gateway_url` entry to `~/.aasm/config.yaml`.
 
