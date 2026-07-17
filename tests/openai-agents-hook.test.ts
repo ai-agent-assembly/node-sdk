@@ -89,7 +89,7 @@ describe("openai agents adapter", () => {
       {
         function: {
           name: "send_email",
-          arguments: "{\"to\":\"user@example.com\"}"
+          arguments: '{"to":"user@example.com"}'
         }
       },
       {
@@ -119,7 +119,7 @@ describe("openai agents adapter", () => {
       {
         function: {
           name: "safe_tool",
-          arguments: "{\"count\":1}"
+          arguments: '{"count":1}'
         }
       },
       {
@@ -153,7 +153,7 @@ describe("openai agents adapter", () => {
       {
         function: {
           name: "transfer_funds",
-          arguments: "{\"amount\":100}"
+          arguments: '{"amount":100}'
         }
       },
       {
@@ -162,11 +162,7 @@ describe("openai agents adapter", () => {
     );
 
     expect(result).toEqual({ ok: "approved" });
-    expect(gateway.waitForApproval).toHaveBeenCalledWith(
-      "transfer_funds",
-      "run-2",
-      8_000
-    );
+    expect(gateway.waitForApproval).toHaveBeenCalledWith("transfer_funds", "run-2", 8_000);
     expect(originalRunTool).toHaveBeenCalledTimes(1);
   });
 
@@ -189,7 +185,7 @@ describe("openai agents adapter", () => {
       {
         function: {
           name: "delete_account",
-          arguments: "{\"id\":\"u1\"}"
+          arguments: '{"id":"u1"}'
         }
       },
       {
@@ -260,9 +256,7 @@ describe("openai agents adapter", () => {
     });
     const hooks = await import("../src/hooks/openai-agents.js");
 
-    expect(() =>
-      hooks.recordToolResultNonBlocking(gateway, "run-5", { ok: true })
-    ).not.toThrow();
+    expect(() => hooks.recordToolResultNonBlocking(gateway, "run-5", { ok: true })).not.toThrow();
 
     await Promise.resolve();
     expect(gateway.recordResult).toHaveBeenCalledWith({
@@ -288,7 +282,7 @@ describe("openai agents adapter", () => {
       {
         function: {
           name: "critical_tool",
-          arguments: "{\"x\":1}"
+          arguments: '{"x":1}'
         }
       },
       {
@@ -333,12 +327,18 @@ describe("openai agents adapter", () => {
 
     const hooks = await import("../src/hooks/openai-agents.js");
     expect(
-      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => fakeAgentClass })
+      await hooks.patchOpenAIAgents({
+        gatewayClient: gateway,
+        loadAgentClass: async () => fakeAgentClass
+      })
     ).toBe(true);
     const patchedRunTool = fakeAgentClass.prototype._runTool;
 
     expect(
-      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => fakeAgentClass })
+      await hooks.patchOpenAIAgents({
+        gatewayClient: gateway,
+        loadAgentClass: async () => fakeAgentClass
+      })
     ).toBe(true);
     expect(fakeAgentClass.prototype._runTool).toBe(patchedRunTool);
   });
@@ -347,20 +347,56 @@ describe("openai agents adapter", () => {
     const gateway = createGatewayClientMock();
     const hooks = await import("../src/hooks/openai-agents.js");
     expect(
-      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => undefined })
+      await hooks.patchOpenAIAgents({
+        gatewayClient: gateway,
+        loadAgentClass: async () => undefined
+      })
     ).toBe(false);
     expect(hooks.openAIAgentsPatchState.isPatched).toBe(false);
   });
 
-  it("returns false when the agent class exposes no _runTool method", async () => {
+  it("warns loudly and returns false when no supported hook point exists", async () => {
     const gateway = createGatewayClientMock();
-    // captureOriginalRunTool returns undefined → patch aborts before mutating.
+    // Neither getAllTools nor _runTool → the AAASM-4797 upstream-API-moved case.
     const fakeAgentClass = { prototype: {} } as unknown as FakeAgentClass;
-    const hooks = await import("../src/hooks/openai-agents.js");
-    expect(
-      await hooks.patchOpenAIAgents({ gatewayClient: gateway, loadAgentClass: async () => fakeAgentClass })
-    ).toBe(false);
-    expect(hooks.openAIAgentsPatchState.isPatched).toBe(false);
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/openai-agents.js");
+      expect(
+        await hooks.patchOpenAIAgents({
+          gatewayClient: gateway,
+          loadAgentClass: async () => fakeAgentClass
+        })
+      ).toBe(false);
+      expect(hooks.openAIAgentsPatchState.isPatched).toBe(false);
+      const warning = stderr.mock.calls.map((call) => String(call[0])).join("");
+      expect(warning).toContain("[agent-assembly] WARNING");
+      expect(warning).toContain("Agent.prototype.getAllTools");
+      expect(warning).toContain("AAASM-4797");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("throws ConfigurationError under fail-closed when no hook point exists", async () => {
+    const gateway = createGatewayClientMock();
+    const fakeAgentClass = { prototype: {} } as unknown as FakeAgentClass;
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/openai-agents.js");
+      await expect(
+        hooks.patchOpenAIAgents({
+          gatewayClient: gateway,
+          failClosed: true,
+          loadAgentClass: async () => fakeAgentClass
+        })
+      ).rejects.toThrow(/no supported tool-execution hook point/);
+      expect(hooks.openAIAgentsPatchState.isPatched).toBe(false);
+      // Loud warning still emitted before the throw.
+      expect(stderr).toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it("restores original _runTool when unpatch is called", async () => {
@@ -390,6 +426,8 @@ async function resetPatchState() {
   const hooks = await import("../src/hooks/openai-agents.js");
   hooks.unpatchOpenAIAgents();
   hooks.openAIAgentsPatchState.originalRunTool = undefined;
+  hooks.openAIAgentsPatchState.originalGetAllTools = undefined;
+  hooks.openAIAgentsPatchState.hookPoint = undefined;
   hooks.openAIAgentsPatchState.patchedAgentClass = undefined;
   hooks.openAIAgentsPatchState.isPatched = false;
 }

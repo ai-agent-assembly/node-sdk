@@ -214,7 +214,13 @@ export function createClient(
         // AAASM-4172: an omitted posture defaults to enforce (py/go parity).
         failClosed: resolveFailClosed(config.enforcementMode)
       });
-    return createNativeGatewayClient(mode, nativeClient, config.agentId, httpBaseUrl, config.enforcementMode);
+    return createNativeGatewayClient(
+      mode,
+      nativeClient,
+      config.agentId,
+      httpBaseUrl,
+      config.enforcementMode
+    );
   }
 
   return createNoopGatewayClient(mode, httpBaseUrl);
@@ -371,6 +377,7 @@ async function patchDetectedMastra(
 }
 
 async function patchDetectedOpenAIAgents(
+  config: AssemblyConfig,
   client: GatewayClient,
   frameworks: readonly string[]
 ): Promise<boolean> {
@@ -378,7 +385,13 @@ async function patchDetectedOpenAIAgents(
     return false;
   }
 
-  return patchOpenAIAgents({ gatewayClient: client });
+  // AAASM-4797: when the upstream @openai/agents tool-execution API has moved
+  // past every hook point we know, `patchOpenAIAgents` warns loudly and — under
+  // a fail-closed (enforce) posture — throws rather than register ungoverned.
+  return patchOpenAIAgents({
+    gatewayClient: client,
+    failClosed: resolveFailClosed(config.enforcementMode)
+  });
 }
 
 /**
@@ -474,7 +487,7 @@ async function applyFrameworkPatches(
   const langChainHandler = await registerLangChainHandler(config, client, frameworks);
   const wrappedLangChainTools = await wrapLangChainTools(config, client, frameworks);
   const vercelAiSdkPatched = await patchDetectedVercelAiSdk(client, frameworks, config.agentId);
-  const openAIAgentsPatched = await patchDetectedOpenAIAgents(client, frameworks);
+  const openAIAgentsPatched = await patchDetectedOpenAIAgents(config, client, frameworks);
   const langGraphPatched = await patchDetectedLangGraph(frameworks, config.agentId);
   const mastraPatched = await patchDetectedMastra(frameworks, config.agentId);
 
@@ -503,7 +516,10 @@ async function applyFrameworkPatches(
  * whichever framework patches actually took effect. Extracted from
  * `initAssembly` to keep its cognitive complexity below threshold.
  */
-function buildActiveAdapters(adapters: readonly Adapter[], patches: FrameworkPatchResult): string[] {
+function buildActiveAdapters(
+  adapters: readonly Adapter[],
+  patches: FrameworkPatchResult
+): string[] {
   return [
     ...new Set([
       ...adapters.map((adapter) => adapter.id),
