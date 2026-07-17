@@ -559,17 +559,33 @@ jobs:
         # extends OIDC to dist-tag (npm/cli#8547).
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # AAASM-4730: the version this run just published, taken from the
+          # workflow's own resolved output rather than read back from the
+          # registry — see the seed rationale below.
+          PUBLISHED_VERSION: ${{ steps.tag.outputs.npm_version }}
         run: |
           set -euo pipefail
           PKG="@agent-assembly/sdk"
-          # All versions on npm (the just-published one included). `npm view
-          # versions --json` returns an array, or a bare string if exactly one
-          # version exists — normalize both to newline-delimited output.
+          # All versions on npm. `npm view versions --json` returns an array,
+          # or a bare string if exactly one version exists — normalize both to
+          # newline-delimited output.
           mapfile -t VERSIONS < <(npm view "$PKG" versions --json | node -e '
             const raw = require("fs").readFileSync(0, "utf8").trim();
             const data = JSON.parse(raw);
             for (const v of Array.isArray(data) ? data : [data]) console.log(v);
           ')
+          # AAASM-4730: seed the candidate set with the version we just
+          # published. `npm view` is NOT read-your-writes consistent: for a few
+          # seconds after `npm publish`, the registry read replica can return a
+          # version list that still omits the just-published version. On the
+          # rc.6 release this step read back a list whose max was rc.5 ~8s after
+          # publishing rc.6, computed newest=rc.5==current, and no-op'd — leaving
+          # `latest` frozen at rc.5 (the bug this fixes). Including the locally
+          # known published version makes the newest-version computation
+          # independent of registry propagation lag, while the semver-max below
+          # still defers to SemVer precedence — so an out-of-band hotfix to an
+          # older channel published later never regresses `latest`.
+          VERSIONS+=("$PUBLISHED_VERSION")
           if [[ ${#VERSIONS[@]} -eq 0 ]]; then
             echo "::error::no published versions found for $PKG"
             exit 1
