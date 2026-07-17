@@ -120,6 +120,12 @@ preserving the pre-feature wire shape.
 | `"observe"`  | Dry-run. Every action proceeds; would-be violations are recorded as shadow audit events (`aa audit list --dry-run-only`). |
 | `"disabled"` | Policy evaluation skipped entirely. Hermetic tests only.                                                                  |
 
+> **Redaction is applied by the runtime/proxy, not the in-process SDK.** Under `"enforce"`
+> a `redact` verdict is treated as allow by this SDK layer — the event is emitted, but no
+> client-side redaction happens here. Secret-stripping is performed by the authoritative
+> `aa-runtime` / `aa-proxy` layers, which see the full tool I/O this advisory SDK seam does
+> not. (Parallels the Go SDK, AAASM-4788.)
+
 Unknown values throw a `RangeError` so a typo can never silently downgrade an agent into
 live enforcement when the operator meant `observe`.
 
