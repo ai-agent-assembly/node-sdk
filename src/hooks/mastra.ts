@@ -1,4 +1,5 @@
 import { runWithAgentId } from "../lineage/agent-context-store.js";
+import { redactErrorMessage } from "../core/redact.js";
 
 export interface MastraAgentClass {
   prototype: {
@@ -83,7 +84,10 @@ export async function patchMastra(options: PatchMastraOptions): Promise<boolean>
     try {
       return runWithAgentId(agentId, () => originalGenerate.apply(this, args));
     } catch (e) {
-      console.warn("[assembly] Mastra lineage patch error on generate; falling back:", e);
+      console.warn(
+        "[assembly] Mastra lineage patch error on generate; falling back:",
+        redactErrorMessage(e)
+      );
       return originalGenerate.apply(this, args);
     }
   };
@@ -103,7 +107,10 @@ export async function patchMastra(options: PatchMastraOptions): Promise<boolean>
       try {
         return runWithAgentId(agentId, () => originalExecute.apply(this, args));
       } catch (e) {
-        console.warn("[assembly] Mastra lineage patch error on execute; falling back:", e);
+        console.warn(
+          "[assembly] Mastra lineage patch error on execute; falling back:",
+          redactErrorMessage(e)
+        );
         return originalExecute.apply(this, args);
       }
     };

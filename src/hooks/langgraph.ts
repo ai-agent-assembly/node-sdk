@@ -1,4 +1,5 @@
 import { runWithAgentId } from "../lineage/agent-context-store.js";
+import { redactErrorMessage } from "../core/redact.js";
 
 export interface CompiledGraph {
   invoke: (...args: unknown[]) => Promise<unknown>;
@@ -85,7 +86,10 @@ export async function patchLangGraph(options: PatchLangGraphOptions): Promise<bo
     try {
       return wrapCompiledGraph(compiled, agentId);
     } catch (e) {
-      console.warn("[assembly] LangGraph lineage patch error on compile; falling back:", e);
+      console.warn(
+        "[assembly] LangGraph lineage patch error on compile; falling back:",
+        redactErrorMessage(e)
+      );
       return compiled;
     }
   };
