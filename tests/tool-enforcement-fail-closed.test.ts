@@ -73,10 +73,22 @@ describe("AAASM-4735: fail closed when wrapped tools route through the no-op cli
     await ctx.shutdown();
   });
 
-  it("does NOT throw for wrapped tools in the check-capable napi-inprocess mode", async () => {
+  it("does NOT raise the ConfigurationError guard for the check-capable napi-inprocess mode", async () => {
+    // The guard must be bypassed for the check-capable mode. Asserting on the
+    // *absence of a ConfigurationError* rather than a clean resolve keeps this
+    // env-independent: CI's `test` job runs without the compiled native binding
+    // (built in a separate job), so this init throws a NativeConnectError when
+    // the binding is absent and resolves when it is present — but it must NEVER
+    // be the ConfigurationError this guard raises.
     vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const ctx = await initAssembly({ ...BASE, mode: "napi-inprocess", langchain: { tools: TOOLS } });
-    expect(ctx).toBeDefined();
-    await ctx.shutdown();
+    let caught: unknown;
+    let ctx: Awaited<ReturnType<typeof initAssembly>> | undefined;
+    try {
+      ctx = await initAssembly({ ...BASE, mode: "napi-inprocess", langchain: { tools: TOOLS } });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).not.toBeInstanceOf(ConfigurationError);
+    await ctx?.shutdown();
   });
 });
