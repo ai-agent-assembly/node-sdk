@@ -2,10 +2,11 @@ import type { NativeClient } from "../native/client.js";
 
 /**
  * Intentional no-op stub: native-transport LangChain patching is not
- * implemented. LangChain enforcement is performed in the SDK's callback layer
- * (post-execution redaction) and wrapper layer (pre-execution deny) wired by
- * `initAssembly`, not through this native hook — so there is nothing to patch
- * here yet. Returns `false` (nothing patched) for every mode.
+ * implemented. LangChain enforcement is performed in the SDK's wrapper layer
+ * (`wrapToolWithAssembly`, pre-execution deny — the only layer that actually
+ * blocks) plus an audit-only callback layer, both wired by `initAssembly`, not
+ * through this native hook — so there is nothing to patch here yet. Returns
+ * `false` (nothing patched) for every mode.
  *
  * The `client` parameter is retained to keep the adapter-registry hook
  * signature (and the public `patchLangChain` export) uniform with the other

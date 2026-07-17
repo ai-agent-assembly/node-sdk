@@ -223,15 +223,22 @@ const policyClient: GatewayClient = {
 ## How LangChain tools are blocked
 
 LangChain's `handleToolStart` callback cannot stop a tool from running by its return
-value, so the SDK governs LangChain tools with two cooperating layers:
+value, and `@langchain/core` discards a callback handler's `handleToolEnd` return
+value too — so a callback can never substitute or redact a tool's output. The SDK
+governs LangChain tools with two cooperating layers instead:
 
-- **Callback layer** (`AssemblyCallbackHandler`) — tracks deferred denials and redacts
-  output at `handleToolEnd`.
-- **Wrapper layer** (`wrapToolWithAssembly`) — enforces the real pre-execution
-  allow / deny / pending check.
+- **Callback layer** (`AssemblyCallbackHandler`) — records denials and results for
+  the audit trail (including a `policy_post_block` event if a tool ran despite an
+  earlier deny signal), but cannot block or redact output.
+- **Wrapper layer** (`wrapToolWithAssembly`) — the actual enforcement point: performs
+  the real pre-execution allow / deny / pending check and throws
+  `PolicyViolationError` before the tool runs.
 
 `initAssembly()` registers the callback handler and wraps your configured LangChain tools
-for you, so you do not wire either layer by hand.
+for you, so you do not wire either layer by hand. If you attach `AssemblyCallbackHandler`
+without wrapping the tool (e.g. a tool from a library you don't construct yourself),
+denies are still recorded but **not enforced** — wrap the tool with `wrapToolWithAssembly`
+(or pass it through `initAssembly`'s `langchain.tools`) to actually block it.
 
 ## Matching policies to tools
 

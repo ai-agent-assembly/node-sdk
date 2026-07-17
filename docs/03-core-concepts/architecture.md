@@ -72,10 +72,13 @@ sequenceDiagram
 ```
 
 LangChain requires a **two-layer enforcement model** because its `handleToolStart`
-callback cannot preempt execution by return value. The adapter therefore registers a
-callback handler (post-execution redaction at `handleToolEnd`) **and** auto-wraps tools
-with `wrapToolWithAssembly` (true pre-execution deny / pending checks). Both layers
-must be kept consistent — changes to one require corresponding changes to the other.
+callback cannot preempt execution by return value, and `@langchain/core` discards a
+callback handler's `handleToolEnd` return value too — a callback can record but never
+block or redact output. The adapter therefore registers a callback handler (audit-only:
+records denials/results, including a `policy_post_block` event when a tool ran despite
+an earlier deny) **and** auto-wraps tools with `wrapToolWithAssembly` (the actual
+enforcement point: true pre-execution deny / pending checks). Both layers must be kept
+consistent — changes to one require corresponding changes to the other.
 
 ## Dual ESM / CJS package structure
 

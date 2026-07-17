@@ -16,7 +16,12 @@ function createGatewayMock(): GatewayClient {
 }
 
 describe("AssemblyCallbackHandler", () => {
-  it("tracks denied tool runs and redacts output on handleToolEnd", async () => {
+  it("tracks denied tool runs and records (but does not redact) output on handleToolEnd", async () => {
+    // AAASM-4799: @langchain/core discards a callback handler's handleToolEnd
+    // return value, so the handler cannot substitute/redact tool output - see
+    // tests/langchain-callback-post-exec-redaction.test.ts for the real
+    // @langchain/core regression test. This handler only records the deny as
+    // an audit signal; the raw output still reaches the caller.
     const gateway = createGatewayMock();
     gateway.check = vi.fn(async () => ({ denied: true, reason: "policy deny" }));
 
@@ -27,7 +32,7 @@ describe("AssemblyCallbackHandler", () => {
     expect(handler.getPendingDenialCount()).toBe(1);
 
     const output = await handler.handleToolEnd("raw output", "run-1");
-    expect(output).toBe("[BLOCKED] This action was flagged as a policy violation.");
+    expect(output).toBe("raw output");
     expect(handler.getPendingDenialCount()).toBe(0);
 
     expect(gateway.record).toHaveBeenCalledWith({

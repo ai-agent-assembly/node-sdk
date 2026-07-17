@@ -83,9 +83,12 @@ pnpm native:build:release     # napi-rs release build (per-platform artifact)
   rebuilding the native binding; the advisory (non-authoritative) preflight arrives
   transitively via that crate's default `preflight` feature.
 - **LangChain two-layer enforcement:** `handleToolStart` cannot preempt by return value,
-  so the SDK enforces in a callback layer (post-execution redaction) **and** a wrapper
-  layer (true pre-execution deny). Changes to one require corresponding changes to the
-  other — see the root `CLAUDE.md` and README for the full adapter footguns.
+  and `@langchain/core` discards a callback handler's `handleToolEnd` return value too
+  (confirmed in `@langchain/core/dist/tools/index.cjs`), so the callback layer is
+  audit-only (records denials/results, never blocks or redacts output) and the wrapper
+  layer (`wrapToolWithAssembly`, true pre-execution deny) is the only actual enforcement
+  point. Changes to one require corresponding changes to the other — see the root
+  `CLAUDE.md` and README for the full adapter footguns. (AAASM-4799)
 - **Hooks:** pre-commit runs eslint/prettier/test-smoke; pre-push runs full test +
   typecheck. **Never `--no-verify`; never force-push.** If a hook fails in a fresh
   worktree because `node_modules` is missing (lint-staged/tsc ENOENT), fix it by
@@ -109,7 +112,7 @@ says is noise that rots out of sync — avoid it.
 
 - **Module headers (top-of-file TSDoc/`//` block):** yes — the module's role, key
   invariants, and where it sits in the three-layer model (e.g. why a wrapper enforces
-  pre-execution while a callback only redacts post-execution).
+  pre-execution while a callback can only observe/audit post-execution).
 - **Exported / public API (TSDoc `/** */` on `export`ed fn/class/interface/type):**
   yes — the contract: behavior, thrown errors, units, side effects, and any
   async/ordering/`@throws` constraints. Especially the surprising ones (e.g. "matches
