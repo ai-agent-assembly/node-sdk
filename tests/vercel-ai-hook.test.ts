@@ -313,14 +313,68 @@ describe("vercel ai sdk adapter", () => {
     );
   });
 
-  it("returns false when the loaded module has no usable tool factory", async () => {
+  it("warns loudly and returns false when ai is installed but the tool factory is missing", async () => {
     const gateway = createGatewayClientMock();
-    // module.tool is not a function → captureOriginalToolFactory returns undefined.
+    // `ai` loaded but module.tool is not a function → the AAASM-4805
+    // upstream-API-moved case (captureOriginalToolFactory returns undefined).
     const fakeModule = { tool: undefined } as unknown as VercelAiSdkModule;
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/ai-sdk.js");
+      // No failClosed (observe/disabled posture): warn, do not throw.
+      expect(
+        await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => fakeModule })
+      ).toBe(false);
+      expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+      const warning = stderr.mock.calls.map((call) => String(call[0])).join("");
+      expect(warning).toContain("[agent-assembly] WARNING");
+      expect(warning).toContain('"tool"');
+      expect(warning).toContain("AAASM-4805");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
 
-    const hooks = await import("../src/hooks/ai-sdk.js");
-    expect(await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => fakeModule })).toBe(false);
-    expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+  it("throws ConfigurationError under fail-closed when ai is installed but the tool factory is missing", async () => {
+    const gateway = createGatewayClientMock();
+    const fakeModule = { tool: undefined } as unknown as VercelAiSdkModule;
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/ai-sdk.js");
+      await expect(
+        hooks.patchVercelAiSdk({
+          gatewayClient: gateway,
+          failClosed: true,
+          loadModule: async () => fakeModule
+        })
+      ).rejects.toThrow(/cannot govern Vercel AI SDK tool calls/);
+      expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+      // Loud warning still emitted before the throw.
+      expect(stderr).toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("stays a silent no-op (no warn, no throw) when ai is not installed even under fail-closed", async () => {
+    const gateway = createGatewayClientMock();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/ai-sdk.js");
+      // loadModule yields undefined → `ai` absent → zero-config silent no-op,
+      // even with failClosed set: absence is not a moved hook point (AAASM-4805).
+      expect(
+        await hooks.patchVercelAiSdk({
+          gatewayClient: gateway,
+          failClosed: true,
+          loadModule: async () => undefined
+        })
+      ).toBe(false);
+      expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it("unpatch returns false when nothing is patched", async () => {
