@@ -15,7 +15,8 @@
  *     (S1–S5) runs the tool; a real deny (S6/S7) still blocks (a deny is
  *     authoritative, not a fault); a real allow (S8) runs.
  */
-import { readdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { PolicyViolationError } from "../../src/errors/policy-violation-error.js";
@@ -41,28 +42,54 @@ import {
 const SRC_ROOT = path.resolve(process.cwd(), "src");
 
 /**
- * Enumerate the integration source modules on disk. A module counts as an
- * integration surface if it is a framework hook, a LangChain adapter, a tool
- * wrapper, or the shared gateway client. Detection helpers, barrels, and the
- * adapter registry are excluded — they route to integrations but do not gate a
- * tool call themselves.
+ * A source file is a candidate enforcement surface unless it is infrastructure
+ * that only *routes* to integrations rather than gating a tool call itself:
+ * barrels (`index.ts`), detection helpers (`*-detection.ts`), and the adapter
+ * base interface + registry (`adapter.ts` / `adapter-registry.ts`). Applied by
+ * file name regardless of directory depth so the rule holds under recursion.
  */
-function enumerateIntegrationModules(): string[] {
+function isEnforcementSurfaceFile(file: string): boolean {
+  return (
+    file.endsWith(".ts") &&
+    file !== "index.ts" &&
+    file !== "adapter.ts" &&
+    file !== "adapter-registry.ts" &&
+    !file.endsWith("-detection.ts")
+  );
+}
+
+/**
+ * Enumerate the integration source modules on disk. A module counts as an
+ * integration surface if it is a framework hook, a framework adapter, a tool
+ * wrapper, or the shared gateway client (see {@link isEnforcementSurfaceFile}
+ * for the exclusions).
+ *
+ * The scan **recurses** through `hooks/` and `adapters/` (AAASM-4810): the
+ * earlier flat scan only looked at the fixed dirs `hooks/`, `adapters/langchain/`
+ * and `wrappers/`, so a new integration nested one directory deeper — e.g.
+ * `adapters/<framework>/wrap.ts` or `hooks/<framework>/…` — escaped the
+ * completeness / anti-whack-a-mole guard entirely. Recursing means any new
+ * enforcement module is discovered and must be classified (a driver, or a
+ * documented non-enforcing module) no matter how deeply it is nested.
+ *
+ * `root` is parameterized so the recursion itself can be exercised against a
+ * fixture tree; it defaults to the real `src/`.
+ */
+function enumerateIntegrationModules(root: string = SRC_ROOT): string[] {
   const modules: string[] = [];
-  const collect = (dir: string, keep: (file: string) => boolean): void => {
-    for (const file of readdirSync(path.join(SRC_ROOT, dir))) {
-      if (file.endsWith(".ts") && keep(file)) {
-        modules.push(`${dir}/${file}`);
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(rel);
+      } else if (isEnforcementSurfaceFile(entry.name)) {
+        modules.push(rel);
       }
     }
   };
-  collect(
-    "hooks",
-    (file) =>
-      !file.endsWith("-detection.ts") && file !== "index.ts" && file !== "adapter-registry.ts"
-  );
-  collect("adapters/langchain", (file) => file !== "index.ts");
-  collect("wrappers", (file) => file !== "index.ts");
+  walk("hooks");
+  walk("adapters");
+  walk("wrappers");
   modules.push("gateway/client.ts");
   return modules.sort();
 }
@@ -125,6 +152,34 @@ describe("driver-registry completeness — anti-whack-a-mole (AAASM-4801)", () =
     const onDisk = new Set(enumerateIntegrationModules());
     const stale = Object.keys(NON_ENFORCING_MODULES).filter((file) => !onDisk.has(file));
     expect(stale).toEqual([]);
+  });
+
+  it("recurses into a nested adapters/<framework>/ integration (AAASM-4810)", () => {
+    // A fixture src/ tree the enumerator walks. The pre-4810 flat scan only
+    // looked at `adapters/langchain/`, so an integration under a *different*
+    // nested adapter dir escaped classification. Assert the recursion now
+    // discovers it — and still excludes barrels / detection helpers at depth.
+    const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "aaasm-4810-"));
+    try {
+      for (const dir of ["hooks", "wrappers", "gateway", "adapters/newframework"]) {
+        mkdirSync(path.join(fixtureRoot, dir), { recursive: true });
+      }
+      writeFileSync(path.join(fixtureRoot, "adapters/newframework/wrap-tool.ts"), "export {};");
+      writeFileSync(path.join(fixtureRoot, "adapters/newframework/index.ts"), "export {};");
+      writeFileSync(
+        path.join(fixtureRoot, "adapters/newframework/tool-detection.ts"),
+        "export {};"
+      );
+      writeFileSync(path.join(fixtureRoot, "gateway/client.ts"), "export {};");
+
+      const discovered = enumerateIntegrationModules(fixtureRoot);
+
+      expect(discovered).toContain("adapters/newframework/wrap-tool.ts");
+      expect(discovered).not.toContain("adapters/newframework/index.ts");
+      expect(discovered).not.toContain("adapters/newframework/tool-detection.ts");
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
   });
 
   it("covers the enforcement integrations named in the ticket", () => {
