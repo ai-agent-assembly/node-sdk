@@ -108,7 +108,11 @@ describe("native gateway enforcement (AAASM-3050)", () => {
     );
 
     // The gateway decision itself denies on fault under enforce.
-    const decision = await gateway.check({ action: "tool_call", toolName: "delete_all", runId: "run-1" });
+    const decision = await gateway.check({
+      action: "tool_call",
+      toolName: "delete_all",
+      runId: "run-1"
+    });
     expect(decision).toEqual({ denied: true, pending: false });
 
     // End-to-end: the wrapper blocks the tool and never runs its body.
@@ -133,20 +137,31 @@ describe("native gateway enforcement (AAASM-3050)", () => {
       "observe"
     );
 
-    const decision = await gateway.check({ action: "tool_call", toolName: "search", runId: "run-2" });
+    const decision = await gateway.check({
+      action: "tool_call",
+      toolName: "search",
+      runId: "run-2"
+    });
     expect(decision).toEqual({ denied: false, pending: false });
   });
 
-  it("defaults denied/pending to false and omits reason when the verdict is bare", async () => {
-    // A verdict object with no denied/pending/reason exercises the `?? false`
-    // fallbacks and the reason-omission branch.
+  it("ADVISORY: a bare verdict (no denied/pending/reason) stays allow under observe", async () => {
+    // A verdict object with no denied/pending/reason signal is malformed —
+    // there is no authoritative verdict at all. Under an explicit
+    // non-enforcing posture it must still stay allow (AAASM-4798).
     const gateway = createNativeGatewayClient(
       "napi-inprocess",
       fakeNativeClient(async () => ({}) as Awaited<ReturnType<NativeClient["queryPolicy"]>>),
-      "agent-bare"
+      "agent-bare",
+      undefined,
+      "observe"
     );
 
-    const decision = await gateway.check({ action: "tool_call", toolName: "noop", runId: "run-bare" });
+    const decision = await gateway.check({
+      action: "tool_call",
+      toolName: "noop",
+      runId: "run-bare"
+    });
 
     expect(decision).toEqual({ denied: false, pending: false });
     expect(decision).not.toHaveProperty("reason");
