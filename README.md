@@ -30,7 +30,7 @@ TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 
 ```bash
 pnpm add @agent-assembly/sdk@rc                # latest rc (tracks @rc dist-tag)
-pnpm add @agent-assembly/sdk@0.0.1-rc.5      # pin exact — replace the version with the
+pnpm add @agent-assembly/sdk@0.0.1-rc.6      # pin exact — replace the version with the
                                                # desired release from npmjs.com/package/%40agent-assembly%2Fsdk
 ```
 <!-- END GENERATED: install-dist-tag -->
