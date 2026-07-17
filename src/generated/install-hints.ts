@@ -2,11 +2,10 @@
 // AAASM-4327 / Epic AAASM-4309.
 //
 // Source-of-truth: package.json (name) + metadata/sdk.json
-// (cliPackageName, installCommands). Regenerate with:
+// (cliInstall, installCommands). Regenerate with:
 //   pnpm run generate:docs-metadata
 
 export const SDK_PACKAGE_NAME = "@agent-assembly/sdk";
-export const CLI_PACKAGE_NAME = "@agent-assembly/cli";
 export const INSTALL_HINT_PNPM_SDK = "pnpm add @agent-assembly/sdk";
-export const INSTALL_HINT_NPM_SDK_GLOBAL_CLI = "npm install -g @agent-assembly/cli";
-export const INSTALL_HINT_PNPM_GLOBAL_CLI = "pnpm add -g @agent-assembly/cli";
+export const INSTALL_HINT_BREW_CLI = "brew install ai-agent-assembly/tap/aasm";
+export const INSTALL_HINT_CURL_CLI = "curl -fsSL https://agent-assembly.com/install.sh | sh";

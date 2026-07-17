@@ -13,7 +13,7 @@ export interface GeneratedMetadata {
   repositoryUrl: string;
   docsUrl: string;
   distTag: string;
-  cliPackageName: string;
+  cliInstall: { brew?: string; curl?: string };
   installCommands: {
     latest?: { pnpm?: string; npm?: string; yarn?: string };
     distTag?: { pnpm?: string; npm?: string; yarn?: string };
