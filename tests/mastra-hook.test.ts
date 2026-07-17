@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MastraAgentClass, MastraModule, MastraWorkflowClass } from "../src/hooks/mastra.js";
+import { REDACTED } from "../src/core/redact.js";
 
 afterEach(() => {
   return resetPatchState().finally(() => {
@@ -150,6 +151,34 @@ describe("mastra hook", () => {
       expect.stringContaining("[assembly] Mastra lineage patch error on generate"),
       expect.anything()
     );
+    warnSpy.mockRestore();
+  });
+
+  it("redacts a secret-looking token from the warn output when the lineage patch throws (AAASM-4741)", async () => {
+    const hooks = await import("../src/hooks/mastra.js");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const originalGenerate = vi.fn(async () => ({ text: "fallback" }));
+    const fakeAgentClass: MastraAgentClass = { prototype: { generate: originalGenerate } };
+    const fakeModule: MastraModule = { Agent: fakeAgentClass };
+
+    const secretToken = "sk-SENTINELsupersecret1234567890";
+    const lineage = await import("../src/lineage/agent-context-store.js");
+    vi.spyOn(lineage.agentContextStore, "run").mockImplementationOnce(() => {
+      throw new Error(`context store exploded: ${secretToken}`);
+    });
+
+    await hooks.patchMastra({ agentId: "agent-secret", loadModule: async () => fakeModule });
+
+    const instance = Object.create(fakeAgentClass.prototype);
+    await fakeAgentClass.prototype.generate!.call(instance, "prompt");
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[assembly] Mastra lineage patch error on generate"),
+      expect.stringContaining(REDACTED)
+    );
+    const loggedArgs = warnSpy.mock.calls[0] ?? [];
+    expect(loggedArgs.join(" ")).not.toContain(secretToken);
     warnSpy.mockRestore();
   });
 

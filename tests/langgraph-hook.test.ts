@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LangGraphModule, StateGraphClass } from "../src/hooks/langgraph.js";
+import { REDACTED } from "../src/core/redact.js";
 
 afterEach(() => {
   return resetPatchState().finally(() => {
@@ -195,6 +196,41 @@ describe("langgraph hook", () => {
       expect.stringContaining("[assembly] LangGraph lineage patch error"),
       expect.anything()
     );
+    warnSpy.mockRestore();
+  });
+
+  it("redacts a secret-looking token from the warn output when wrapCompiledGraph throws (AAASM-4741)", async () => {
+    const hooks = await import("../src/hooks/langgraph.js");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const secretToken = "sk-SENTINELsupersecret1234567890";
+    const badCompiled = {
+      get invoke(): never {
+        throw new Error(`no invoke: ${secretToken}`);
+      },
+      get stream(): never {
+        throw new Error(`no stream: ${secretToken}`);
+      }
+    };
+
+    const fakeModule: LangGraphModule = {
+      StateGraph: {
+        prototype: {
+          compile: vi.fn(() => badCompiled as unknown as ReturnType<NonNullable<StateGraphClass["prototype"]["compile"]>>)
+        }
+      }
+    };
+
+    await hooks.patchLangGraph({ agentId: "agent-secret", loadModule: async () => fakeModule });
+
+    fakeModule.StateGraph.prototype.compile!();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[assembly] LangGraph lineage patch error"),
+      expect.stringContaining(REDACTED)
+    );
+    const loggedArgs = warnSpy.mock.calls[0] ?? [];
+    expect(loggedArgs.join(" ")).not.toContain(secretToken);
     warnSpy.mockRestore();
   });
 
