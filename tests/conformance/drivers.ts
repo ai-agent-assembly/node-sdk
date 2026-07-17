@@ -256,10 +256,43 @@ export function resetVercelState(): void {
   vercelAiSdkPatchState.mutatedOriginal = false;
 }
 
+async function runVercelMissingHook(mode: Mode, state: RanFlag): Promise<ScenarioOutcome> {
+  // Upstream API moved: `ai` IS installed but its `tool` factory export is gone —
+  // the exact AAASM-4805 shape (captureOriginalToolFactory returns undefined).
+  // Under enforce the patch must throw loudly; under observe/disabled it warns and
+  // returns unpatched (the app's tool then runs ungoverned).
+  resetVercelState();
+  const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  let threw: unknown;
+  try {
+    await patchVercelAiSdk({
+      gatewayClient: buildRealGateway("S4", mode),
+      failClosed: mode.failClosed,
+      // A module with no `tool` function: installed-but-hook-missing.
+      loadModule: async () => ({}) as never
+    });
+  } catch (error) {
+    threw = error;
+  } finally {
+    stderrSpy.mockRestore();
+    resetVercelState();
+  }
+  if (threw !== undefined) {
+    return { ran: false, blocked: true, threw };
+  }
+  // Fail-open path: the patch declined to attach, so the tool is ungoverned and
+  // would execute unimpeded.
+  state.ran = true;
+  return { ran: state.ran, blocked: false };
+}
+
 async function runVercel(scenario: Scenario, mode: Mode): Promise<ScenarioOutcome> {
   resetVercelState();
-  const gateway = buildRealGateway(scenario.id, mode);
   const state: RanFlag = { ran: false };
+  if (scenario.id === "S4") {
+    return runVercelMissingHook(mode, state);
+  }
+  const gateway = buildRealGateway(scenario.id, mode);
   // Identity factory standing in for `ai.tool` — the wrapper wraps whatever
   // `execute` the produced tool exposes. A `loadModule` fake keeps the driver
   // decoupled from the real (frozen) `ai` namespace; the real module is covered
@@ -419,7 +452,7 @@ export const DRIVERS: readonly Driver[] = [
   {
     name: "vercel-ai (patchVercelAiSdk)",
     file: "hooks/ai-sdk.ts",
-    supports: notS4,
+    supports: allScenarios,
     run: runVercel
   },
   {

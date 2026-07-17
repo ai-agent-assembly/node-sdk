@@ -340,6 +340,7 @@ async function wrapLangChainTools(
 }
 
 async function patchDetectedVercelAiSdk(
+  config: AssemblyConfig,
   client: GatewayClient,
   frameworks: readonly string[],
   agentId?: string
@@ -348,8 +349,13 @@ async function patchDetectedVercelAiSdk(
     return false;
   }
 
+  // AAASM-4805: when the upstream `ai` `tool` factory has moved past the hook
+  // point we know, `patchVercelAiSdk` warns loudly and — under a fail-closed
+  // (enforce) posture — throws rather than register ungoverned (the AAASM-4797
+  // class, now closed for Vercel AI too).
   return patchVercelAiSdk({
     gatewayClient: client,
+    failClosed: resolveFailClosed(config.enforcementMode),
     ...(agentId === undefined ? {} : { agentId })
   });
 }
@@ -486,7 +492,7 @@ async function applyFrameworkPatches(
 ): Promise<FrameworkPatchResult> {
   const langChainHandler = await registerLangChainHandler(config, client, frameworks);
   const wrappedLangChainTools = await wrapLangChainTools(config, client, frameworks);
-  const vercelAiSdkPatched = await patchDetectedVercelAiSdk(client, frameworks, config.agentId);
+  const vercelAiSdkPatched = await patchDetectedVercelAiSdk(config, client, frameworks, config.agentId);
   const openAIAgentsPatched = await patchDetectedOpenAIAgents(config, client, frameworks);
   const langGraphPatched = await patchDetectedLangGraph(frameworks, config.agentId);
   const mastraPatched = await patchDetectedMastra(frameworks, config.agentId);
