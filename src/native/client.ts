@@ -173,6 +173,14 @@ function mapDecisionToPolicyResult(
       }
       return { denied: false, pending: false };
     case "redact":
+      // Deliberately folded onto allow, NOT silently dropped. The in-process
+      // SDK does not honor `redact` client-side: redaction is a response-body
+      // transform owned by the authoritative runtime / proxy layer (aa-runtime,
+      // aa-proxy), which sees the full tool I/O this advisory SDK seam does not.
+      // No client-side wrapper acts on a redact verdict, so surfacing it as a
+      // distinct SDK state would be a no-op that misleads callers into thinking
+      // in-process redaction happened. This mirrors the Go SDK's redact handling
+      // (AAASM-4788) and keeps the SDK layer's non-authoritative posture honest.
       return { denied: false, pending: false };
     default:
       // Empty / unrecognized decision: the runtime produced no authoritative
