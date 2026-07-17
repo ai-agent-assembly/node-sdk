@@ -131,6 +131,18 @@ console.log(ctx.activeAdapters);
 > field, so governance policies must match by tool description content (or the tool-map
 > key), not by a framework-level tool name.
 
+:::note[Auto-detected tool patches also need a check-capable mode]
+Like the LangChain wrapper above, the Vercel AI SDK and OpenAI Agents auto-detect patches
+gate each tool call on the gateway client's `check()`. But because a bare dependency
+install must stay zero-config (auto-detection alone can't tell "installed" apart from
+"actually used"), `initAssembly` cannot hard-fail at init the way it does for explicit
+`langchain.tools`. In the default `"auto"` / `"grpc-sidecar"` modes without your own
+`gatewayClient`, `check()` is the allow-all no-op, so under a fail-closed posture a
+patched tool call is **not actually blocked** by a policy deny — `initAssembly` logs a
+one-time stderr warning instead of throwing. Use `mode: "napi-inprocess"` (or supply your
+own `gatewayClient`) if you need real in-process enforcement for these frameworks.
+:::
+
 For the full list of configuration fields used above, see
 [Configuration](../05-configuration/index.md).
 

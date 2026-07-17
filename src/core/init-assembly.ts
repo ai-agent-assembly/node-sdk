@@ -382,6 +382,55 @@ async function patchDetectedOpenAIAgents(
 }
 
 /**
+ * Whether an auto-detected-framework patch (Vercel AI SDK, OpenAI Agents) is
+ * about to route its `check()` calls through the allow-all no-op gateway
+ * client under a fail-closed posture — the residual AAASM-4735 gap
+ * (AAASM-4769). Mirrors the boolean logic of the explicit-tools guard above,
+ * minus `wrapsToolsThroughGatewayClient`: auto-detected frameworks have no
+ * init-time throw (a bare dependency install must stay zero-config,
+ * AAASM-1847), so this only gates whether to warn, never whether to fail.
+ */
+function autoDetectedToolsRouteThroughNoop(config: AssemblyConfig): boolean {
+  const mode = config.mode ?? "auto";
+  return (
+    mode !== CHECK_CAPABLE_MODE &&
+    config.gatewayClient === undefined &&
+    resolveFailClosed(config.enforcementMode)
+  );
+}
+
+/**
+ * One-time (per `initAssembly` call) advisory warning for the gap
+ * {@link autoDetectedToolsRouteThroughNoop} detects: unlike explicit
+ * `langchain.tools`, auto-detected frameworks are patched without a guard
+ * that can hard-fail at init, so a fail-closed posture routed through the
+ * no-op client would otherwise silently let a policy DENY through with no
+ * signal at all. Written straight to `process.stderr` (not a swappable
+ * logger) so it can't be silenced by log configuration. Called once from
+ * {@link applyFrameworkPatches} after every auto-detect patch has run, so
+ * installing multiple auto-detected frameworks in the same `initAssembly`
+ * call still emits exactly one warning, not one per framework.
+ */
+function warnAutoDetectedToolsRouteThroughNoop(
+  patchedFrameworks: readonly string[],
+  mode: AssemblyMode | "auto"
+): void {
+  if (patchedFrameworks.length === 0) {
+    return;
+  }
+  process.stderr.write(
+    `[agent-assembly] WARNING: auto-detected framework(s) ${patchedFrameworks.join(", ")} ` +
+      `were patched for in-process tool governance, but mode "${mode}" routes tool policy ` +
+      `checks through the allow-all no-op gateway client — a policy DENY will NOT block a ` +
+      `tool call. In-process tool governance for an auto-detected framework requires mode ` +
+      `"${CHECK_CAPABLE_MODE}" (or supplying your own gatewayClient); otherwise tool checks ` +
+      `route through the allow-all no-op client. This is advisory only: unlike explicit ` +
+      `langchain.tools, auto-detected frameworks cannot hard-fail at init without breaking ` +
+      `zero-config for a bare dependency install (AAASM-1847).\n`
+  );
+}
+
+/**
  * Validate caller-supplied `initAssembly` config, throwing `RangeError` on the
  * two fields that can arrive malformed from non-TS callers (plain JS, JSON
  * config, dynamic input). Extracted to keep `initAssembly` below the cognitive
@@ -412,9 +461,10 @@ interface FrameworkPatchResult {
 }
 
 /**
- * Run every framework detect-and-patch path for the resolved config. Extracted
- * from `initAssembly` to keep its cognitive complexity below threshold;
- * behaviour-preserving (same calls, same order).
+ * Run every framework detect-and-patch path for the resolved config, then emit
+ * the AAASM-4769 no-op-enforcement warning (see
+ * {@link warnAutoDetectedToolsRouteThroughNoop}) if applicable. Extracted from
+ * `initAssembly` to keep its cognitive complexity below threshold.
  */
 async function applyFrameworkPatches(
   config: AssemblyConfig,
@@ -427,6 +477,16 @@ async function applyFrameworkPatches(
   const openAIAgentsPatched = await patchDetectedOpenAIAgents(client, frameworks);
   const langGraphPatched = await patchDetectedLangGraph(frameworks, config.agentId);
   const mastraPatched = await patchDetectedMastra(frameworks, config.agentId);
+
+  if (autoDetectedToolsRouteThroughNoop(config)) {
+    warnAutoDetectedToolsRouteThroughNoop(
+      [
+        ...(vercelAiSdkPatched ? ["vercel-ai-sdk"] : []),
+        ...(openAIAgentsPatched ? ["openai-agents"] : [])
+      ],
+      config.mode ?? "auto"
+    );
+  }
 
   return {
     langChainHandler,
