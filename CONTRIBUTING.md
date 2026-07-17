@@ -165,8 +165,8 @@ to prevent silent drift when the package is bumped or renamed.
 
 - `package.json` — package name, version, homepage, repository URL.
 - `metadata/sdk.json` — docs URL, npm dist-tag, install-command templates,
-  CLI package name. These are the values that do not naturally live in
-  `package.json` but must stay in sync across documentation.
+  `aasm` CLI distribution commands. These are the values that do not naturally
+  live in `package.json` but must stay in sync across documentation.
 
 **Generator**
 
