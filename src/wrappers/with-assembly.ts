@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isSeamWritable } from "../core/tool-seam-guard.js";
 import { OpTerminatedError } from "../errors/op-terminated-error.js";
 import { PolicyViolationError } from "../errors/policy-violation-error.js";
 import type { GatewayClient } from "../gateway/client.js";
@@ -174,6 +175,22 @@ async function enforceGovernance(
   }
 }
 
+/**
+ * Loud, un-silenceable signal that a tool's call seam (`execute`/`invoke`) is
+ * non-writable/frozen so `withAssembly` could not wrap it. Written straight to
+ * `process.stderr` (not a swappable logger) so an operator can't be left
+ * believing an unwrappable tool is governed — a policy DENY will NOT block its
+ * calls (AAASM-4852).
+ */
+function warnToolSeamNotWritable(name: string, seam: "execute" | "invoke"): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: tool "${name}" has a non-writable/frozen ` +
+      `\`${seam}\` — withAssembly could not wrap it, so this tool will NOT be ` +
+      `governed: a policy DENY will NOT block its calls. Avoid freezing tool ` +
+      `objects passed to withAssembly (AAASM-4852).\n`
+  );
+}
+
 function wrapSingleTool(
   name: string,
   tool: Record<string, unknown>,
@@ -184,12 +201,26 @@ function wrapSingleTool(
   const opControl = options.opControl;
 
   if (hasExecute(tool)) {
+    // A frozen / read-only tool object makes the seam assignment below throw in
+    // strict mode. Because `withAssembly` iterates the tool map, an unguarded
+    // throw would abort mid-map after already mutating earlier tools, leaving a
+    // partial governed/ungoverned state. Skip + warn so the rest of the map
+    // stays governed and no tool is half-applied (AAASM-4852, mirroring
+    // AAASM-4847).
+    if (!isSeamWritable(tool, "execute")) {
+      warnToolSeamNotWritable(name, "execute");
+      return;
+    }
     const originalExecute = tool.execute;
     tool.execute = async (...args: unknown[]) => {
       await enforceGovernance(name, args, gateway, opControl, approvalTimeoutMs);
       return originalExecute(...args);
     };
   } else if (hasInvoke(tool)) {
+    if (!isSeamWritable(tool, "invoke")) {
+      warnToolSeamNotWritable(name, "invoke");
+      return;
+    }
     const originalInvoke = tool.invoke;
     tool.invoke = async (...args: unknown[]) => {
       await enforceGovernance(name, args, gateway, opControl, approvalTimeoutMs);
