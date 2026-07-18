@@ -201,6 +201,73 @@ describe("withAssembly governance", () => {
     }
   });
 
+  it("frozen tool: skips with a warning without throwing or half-applying the map", async () => {
+    // AAASM-4852: a frozen tool makes the in-place seam assignment throw. Without
+    // the guard, that throw aborts withAssembly mid-map after already mutating
+    // earlier tools — a partial governed/ungoverned state. The guard must skip +
+    // warn on the frozen tool while still governing its writable siblings.
+    const gateway = createMockGateway({
+      check: vi.fn(async () => ({ denied: true, pending: false, reason: "policy X" }))
+    });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const frozenExecute = vi.fn(async () => "frozen-ran");
+    const writableExecute = vi.fn(async () => "should not run");
+    const tools = {
+      frozen: Object.freeze({ description: "Frozen tool", execute: frozenExecute }),
+      writable: { description: "Writable tool", execute: writableExecute }
+    };
+
+    try {
+      expect(() => withAssembly(tools, { gatewayClient: gateway })).not.toThrow();
+
+      // The frozen tool was skipped (not half-wrapped): its execute is unchanged
+      // and runs ungoverned, and a warning naming it was emitted.
+      await expect(tools.frozen.execute()).resolves.toBe("frozen-ran");
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some((line) => line.includes('tool "frozen"') && line.includes("AAASM-4852"));
+      expect(warned).toBe(true);
+
+      // The writable sibling is still governed despite the frozen one preceding it.
+      await expect(tools.writable.execute()).rejects.toThrow("Tool 'writable' blocked: policy X");
+      expect(writableExecute).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("non-writable invoke slot: skips with a warning without throwing", async () => {
+    // AAASM-4852: extensible object whose `invoke` is a non-writable data
+    // property — the assignment still throws. Exercises the descriptor branch of
+    // the writability guard that a fully frozen object short-circuits before.
+    const gateway = createMockGateway();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const invokeFn = vi.fn(async () => "ran-ungoverned");
+    const lcTool: { name: string; invoke: () => Promise<string> } = {
+      name: "lcTool",
+      invoke: invokeFn
+    };
+    Object.defineProperty(lcTool, "invoke", {
+      value: lcTool.invoke,
+      writable: false,
+      configurable: true,
+      enumerable: true
+    });
+    const tools = { lcTool };
+
+    try {
+      expect(() => withAssembly(tools, { gatewayClient: gateway })).not.toThrow();
+      await expect(tools.lcTool.invoke()).resolves.toBe("ran-ungoverned");
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some((line) => line.includes('tool "lcTool"') && line.includes("AAASM-4852"));
+      expect(warned).toBe(true);
+      expect(gateway.check).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it("mixed tool map: handles execute, invoke, and plain tools together", async () => {
     const gateway = createMockGateway();
     const executeFn = vi.fn(async () => "execute-result");
