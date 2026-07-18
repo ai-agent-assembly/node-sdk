@@ -356,6 +356,105 @@ describe("vercel ai sdk adapter", () => {
     }
   });
 
+  it("warns loudly and returns false when ai is a frozen ESM namespace (governed factory not written back)", async () => {
+    const gateway = createGatewayClientMock();
+    const originalTool = vi.fn((def: VercelAiToolDefinition) => def) as unknown as VercelAiToolFactory;
+    // Object.freeze reproduces a real `ai` ES module namespace: its `tool` export
+    // is non-writable, so applyGovernedToolFactory cannot write the governed
+    // factory back (AAASM-4842) — the shim it lands in is inert.
+    const frozenModule: VercelAiSdkModule = Object.freeze({ tool: originalTool });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/ai-sdk.js");
+      // No failClosed (observe/disabled posture): warn, do not throw, do not report success.
+      expect(
+        await hooks.patchVercelAiSdk({ gatewayClient: gateway, loadModule: async () => frozenModule })
+      ).toBe(false);
+      expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+      // The frozen namespace is left untouched — the app's `tool` stays the original.
+      expect(frozenModule.tool).toBe(originalTool);
+      const warning = stderr.mock.calls.map((call) => String(call[0])).join("");
+      expect(warning).toContain("[agent-assembly] WARNING");
+      expect(warning).toContain("frozen");
+      expect(warning).toContain("AAASM-4842");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("throws ConfigurationError on a frozen ESM namespace only when throwOnFrozenInert is set", async () => {
+    const gateway = createGatewayClientMock();
+    const originalTool = vi.fn((def: VercelAiToolDefinition) => def) as unknown as VercelAiToolFactory;
+    const frozenModule: VercelAiSdkModule = Object.freeze({ tool: originalTool });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/ai-sdk.js");
+      // throwOnFrozenInert is the direct/explicit hard-enforcement opt-in.
+      await expect(
+        hooks.patchVercelAiSdk({
+          gatewayClient: gateway,
+          throwOnFrozenInert: true,
+          loadModule: async () => frozenModule
+        })
+      ).rejects.toThrow(/frozen ES module/);
+      expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+      expect(frozenModule.tool).toBe(originalTool);
+      // Loud warning still emitted before the throw.
+      expect(stderr).toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("does NOT throw on a frozen ESM namespace under failClosed alone (AAASM-1847 / 4769: auto-detect stays zero-config)", async () => {
+    const gateway = createGatewayClientMock();
+    const originalTool = vi.fn((def: VercelAiToolDefinition) => def) as unknown as VercelAiToolFactory;
+    const frozenModule: VercelAiSdkModule = Object.freeze({ tool: originalTool });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/ai-sdk.js");
+      // `failClosed` gates the AAASM-4805 moved-hook throw ONLY; the frozen path
+      // (the shape of every real `ai`) must warn, not hard-fail init — otherwise
+      // any enforce user with `ai` installed would break zero-config.
+      expect(
+        await hooks.patchVercelAiSdk({
+          gatewayClient: gateway,
+          failClosed: true,
+          loadModule: async () => frozenModule
+        })
+      ).toBe(false);
+      expect(hooks.vercelAiSdkPatchState.isPatched).toBe(false);
+      const warning = stderr.mock.calls.map((call) => String(call[0])).join("");
+      expect(warning).toContain("AAASM-4842");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("patches a WRITABLE module silently-successfully (no warning, no throw)", async () => {
+    const gateway = createGatewayClientMock();
+    const originalTool = vi.fn((def: VercelAiToolDefinition) => def) as unknown as VercelAiToolFactory;
+    // A writable plain object (dev/test shape) is mutated in place, so governance
+    // is genuinely installed — this path must stay quiet and report success.
+    const writableModule: VercelAiSdkModule = { tool: originalTool };
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const hooks = await import("../src/hooks/ai-sdk.js");
+      expect(
+        await hooks.patchVercelAiSdk({
+          gatewayClient: gateway,
+          failClosed: true,
+          loadModule: async () => writableModule
+        })
+      ).toBe(true);
+      expect(hooks.vercelAiSdkPatchState.isPatched).toBe(true);
+      expect(writableModule.tool).not.toBe(originalTool);
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it("stays a silent no-op (no warn, no throw) when ai is not installed even under fail-closed", async () => {
     const gateway = createGatewayClientMock();
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
