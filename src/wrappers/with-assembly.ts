@@ -195,6 +195,17 @@ function wrapSingleTool(
       await enforceGovernance(name, args, gateway, opControl, approvalTimeoutMs);
       return originalInvoke(...args);
     };
+  } else {
+    // A tool exposing neither `execute` nor `invoke` has no call seam to wrap,
+    // so it would pass through withAssembly ungoverned. Silently skipping it
+    // (the prior behavior) hides that gap: the caller believes every tool in
+    // the map is governed. Warn loudly on stderr so an ungoverned tool is an
+    // explicit, visible outcome rather than a silent one (AAASM-4847).
+    process.stderr.write(
+      `[agent-assembly] WARNING: tool "${name}" exposes neither \`execute\` nor ` +
+        `\`invoke\` — withAssembly has no call seam to wrap, so this tool will ` +
+        `NOT be governed: a policy DENY will NOT block its calls (AAASM-4847).\n`
+    );
   }
 }
 
