@@ -203,8 +203,45 @@ export function createNativeGatewayClient(
         ...(resolved.reason === undefined ? {} : { reason: resolved.reason })
       };
     },
-    record: async () => undefined,
-    recordResult: async () => undefined,
-    scanPrompts: async () => undefined
+    // Audit/telemetry sinks are intentional no-ops in napi-inprocess mode
+    // (AAASM-4847). The native `aa-sdk-client` runtime this client wraps records
+    // its own policy-decision events in-process against the embedded runtime;
+    // there is no separate gateway wire for the SDK to POST audit events to, so
+    // hook-layer `record` / `recordResult` / `scanPrompts` calls have nowhere to
+    // go here and are dropped. This is a deliberate, accepted telemetry gap — NOT
+    // an enforcement gap: allow/deny still flows through `check` /
+    // `waitForApproval` above, consistent with this SDK's non-authoritative
+    // posture (`aa-runtime` in the monorepo is the authoritative point). If the
+    // hook layer's audit events ever need to reach a central sink from this mode,
+    // that is a new wiring task, not a bug to patch here. Emit a one-time,
+    // opt-in debug note so the drop is discoverable rather than silent.
+    record: async () => {
+      noteNativeAuditNoop();
+    },
+    recordResult: async () => {
+      noteNativeAuditNoop();
+    },
+    scanPrompts: async () => {
+      noteNativeAuditNoop();
+    }
   };
+}
+
+/**
+ * One-time, opt-in (`AA_DEBUG=1`) note that hook-layer audit events are being
+ * dropped in napi-inprocess mode. Kept behind a debug flag and fired at most
+ * once so it documents the accepted telemetry gap (AAASM-4847) for anyone
+ * debugging "where did my audit events go" without adding steady-state noise.
+ */
+let nativeAuditNoopNoted = false;
+function noteNativeAuditNoop(): void {
+  if (nativeAuditNoopNoted || process.env.AA_DEBUG !== "1") {
+    return;
+  }
+  nativeAuditNoopNoted = true;
+  process.stderr.write(
+    `[agent-assembly] DEBUG: napi-inprocess gateway client drops hook-layer ` +
+      `audit events (record/recordResult/scanPrompts) — enforcement is ` +
+      `unaffected; this is an accepted telemetry gap (AAASM-4847).\n`
+  );
 }

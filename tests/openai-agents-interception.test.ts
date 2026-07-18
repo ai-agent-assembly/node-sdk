@@ -122,4 +122,92 @@ describe("openai agents interception via getAllTools", () => {
     expect(output).toBe("SENT");
     expect(executed.called).toBe(true);
   });
+
+  it("guards a frozen tool: warns without rejecting getAllTools or breaking siblings", async () => {
+    // AAASM-4847: a frozen function-tool object makes the `invoke` assignment
+    // throw in strict mode. Because the wrap runs inside patchedGetAllTools on
+    // every turn, an unguarded throw would reject getAllTools and break the
+    // whole agent. The guard must skip+warn on the frozen tool while still
+    // governing the writable siblings.
+    const gateway = createGatewayClientMock();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    await patchOpenAIAgents({
+      gatewayClient: gateway,
+      loadAgentClass: async () => Agent as never
+    });
+
+    const frozenExecuted = { called: false };
+    const writableExecuted = { called: false };
+    const frozenTool = Object.freeze(buildTool(frozenExecuted));
+    const writableTool = tool({
+      name: "list_files",
+      description: "List files",
+      parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
+      execute: async () => {
+        writableExecuted.called = true;
+        return "LISTED";
+      }
+    });
+    const agent = new Agent({ name: "A", instructions: "x", tools: [frozenTool, writableTool] });
+
+    // The whole point: getAllTools must resolve, not reject, despite the frozen tool.
+    const tools = await agent.getAllTools(runContext as never);
+
+    try {
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some((line) => line.includes("send_email") && line.includes("AAASM-4847"));
+      expect(warned).toBe(true);
+    } finally {
+      stderr.mockRestore();
+    }
+
+    // The writable sibling is still governed (its invoke was wrapped).
+    const writable = tools.find((t) => (t as { name?: string }).name === "list_files") as {
+      invoke: (rc: unknown, input: string) => Promise<unknown>;
+    };
+    await writable.invoke(runContext, JSON.stringify({}));
+    expect(gateway.check).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: "list_files" })
+    );
+  });
+
+  it("guards an extensible tool whose invoke is non-writable: warns without rejecting", async () => {
+    // AAASM-4847: the object is extensible but its `invoke` slot is a
+    // non-writable data property, so the assignment still throws. This
+    // exercises the descriptor branch of the writability guard that a fully
+    // frozen object short-circuits before reaching.
+    const gateway = createGatewayClientMock();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    await patchOpenAIAgents({
+      gatewayClient: gateway,
+      loadAgentClass: async () => Agent as never
+    });
+
+    const executed = { called: false };
+    const nonWritableTool = buildTool(executed) as { invoke: unknown; name?: string };
+    Object.defineProperty(nonWritableTool, "invoke", {
+      value: nonWritableTool.invoke,
+      writable: false,
+      configurable: true,
+      enumerable: true
+    });
+    expect(Object.isExtensible(nonWritableTool)).toBe(true);
+    const agent = new Agent({ name: "A", instructions: "x", tools: [nonWritableTool as never] });
+
+    const tools = await agent.getAllTools(runContext as never);
+
+    try {
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some((line) => line.includes("send_email") && line.includes("AAASM-4847"));
+      expect(warned).toBe(true);
+    } finally {
+      stderr.mockRestore();
+    }
+    // getAllTools still resolved despite the non-writable invoke.
+    expect(Array.isArray(tools)).toBe(true);
+  });
 });

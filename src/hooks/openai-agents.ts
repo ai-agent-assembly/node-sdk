@@ -321,8 +321,39 @@ export function wrapFunctionToolInvoke(
   if (governedFunctionTools.has(candidate)) {
     return;
   }
+  // A frozen / read-only function-tool object (e.g. `Object.freeze`d by the
+  // caller) would make this assignment throw in strict mode. Because this runs
+  // inside `patchedGetAllTools` on every agent turn, a thrown error would reject
+  // `getAllTools` and break the whole agent — a worse failure than the one
+  // ungoverned tool it can't wrap. Skip + warn instead so the rest of the tools
+  // stay governed and the operator still gets a loud, un-silenceable signal
+  // (AAASM-4847).
+  const descriptor = Object.getOwnPropertyDescriptor(candidate, "invoke");
+  const isWritable =
+    Object.isExtensible(candidate) &&
+    (descriptor === undefined || descriptor.writable === true || descriptor.set !== undefined);
+  if (!isWritable) {
+    warnOpenAIAgentsToolNotWrappable(candidate.name);
+    return;
+  }
   candidate.invoke = createGovernedInvoke(candidate.invoke, gatewayClient, candidate.name, options);
   governedFunctionTools.add(candidate);
+}
+
+/**
+ * Loud signal that a specific @openai/agents function tool could not be wrapped
+ * because its `invoke` slot is non-writable/frozen. Written straight to
+ * `process.stderr` (not a swappable logger) so an operator can't be left
+ * unaware that this one tool runs ungoverned (AAASM-4847).
+ */
+function warnOpenAIAgentsToolNotWrappable(toolName: string): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: the @openai/agents function tool "${toolName}" ` +
+      `has a non-writable/frozen \`invoke\` and could not be wrapped for ` +
+      `governance — this tool's calls will NOT be governed by this SDK: a ` +
+      `policy DENY will NOT block them. Avoid freezing tool objects passed to a ` +
+      `governed agent (AAASM-4847).\n`
+  );
 }
 
 function createPatchedGetAllTools(
