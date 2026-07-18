@@ -72,6 +72,49 @@ describe("initAssembly LangChain integration", () => {
     await runtime.shutdown();
   });
 
+  it("skips a frozen tool with a warning without aborting wrapping of the rest", async () => {
+    // AAASM-4852: one frozen tool must not abort the init wrapping loop. The
+    // frozen tool is skipped + warned (runs ungoverned, its original invoke
+    // returns), while every subsequent writable tool is still wrapped and
+    // governed. Without the guard, the throw would abort the loop and leave the
+    // later tools ungoverned too.
+    const gateway = createGatewayMock();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const frozenTool = Object.freeze(createTool("frozen_send"));
+    const writableTool = createTool("search_web");
+
+    const { initAssembly } = await loadInitAssemblyWithInstalledPackages(new Set(["@langchain/core"]));
+
+    const runtime = await initAssembly({
+      gatewayUrl: "https://gateway.example.com",
+      apiKey: "test-key",
+      mode: "sdk-only",
+      gatewayClient: gateway,
+      langchain: {
+        tools: {
+          frozenSend: frozenTool,
+          searchWeb: writableTool
+        }
+      }
+    });
+
+    try {
+      // The frozen tool was skipped: it runs ungoverned (original invoke), and a
+      // warning naming it was emitted.
+      await expect(frozenTool.invoke({ to: "user@example.com" })).resolves.toBe("frozen_send-ok");
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some((line) => line.includes("frozen_send") && line.includes("AAASM-4852"));
+      expect(warned).toBe(true);
+
+      // The later writable tool is still governed despite the earlier frozen one.
+      await expect(writableTool.invoke({ q: "query" })).rejects.toThrow("search_web");
+    } finally {
+      stderr.mockRestore();
+      await runtime.shutdown();
+    }
+  });
+
   it("propagates policy violation cleanly from wrapped tool invoke", async () => {
     const gateway = createGatewayMock();
     const blockedTool = createTool("transfer_funds");
