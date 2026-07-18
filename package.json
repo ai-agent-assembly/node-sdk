@@ -19,14 +19,14 @@
   "homepage": "https://github.com/ai-agent-assembly/node-sdk#readme",
   "exports": {
     ".": {
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js",
-      "types": "./dist/types/index.d.ts"
+      "require": "./dist/cjs/index.js"
     },
     "./hooks": {
+      "types": "./dist/types/hooks/index.d.ts",
       "import": "./dist/esm/hooks/index.js",
-      "require": "./dist/cjs/hooks/index.js",
-      "types": "./dist/types/hooks/index.d.ts"
+      "require": "./dist/cjs/hooks/index.js"
     },
     "./native/aa-ffi-node/index.cjs": "./native/aa-ffi-node/index.cjs",
     "./package.json": "./package.json"
