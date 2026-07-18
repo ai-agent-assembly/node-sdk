@@ -14,6 +14,19 @@
  * and, under a fail-closed (enforce) posture, throw a `ConfigurationError` rather
  * than run ungoverned. `ai` simply not being installed stays a silent no-op (a
  * bare dependency install must remain zero-config).
+ *
+ * The SAME silent-fail-open class has a second, frozen sub-case (AAASM-4842): a
+ * real `ai` ES module namespace is a frozen exotic object, so the governed factory
+ * cannot be written back onto it — it lands only in a shim copy the application
+ * never reads (`import { tool } from "ai"` keeps the ORIGINAL, ungoverned factory).
+ * The pre-4842 code still reported that as a successful patch (returned true,
+ * surfaced `vercelAiSdkPatched`/an active adapter, emitted no warning). We now warn
+ * loudly and never report patched-success for that path. Unlike the moved-hook
+ * case, the throw is gated on the separate `throwOnFrozenInert` option, NOT on
+ * `failClosed`: a frozen namespace is the shape of EVERY real `ai`, so the
+ * auto-detected init path only WARNS (hard-failing init on mere presence of `ai`
+ * would regress zero-config, AAASM-1847, and the auto-detected warn-not-throw
+ * invariant, AAASM-4769) — only a direct/explicit caller opts into the throw.
  */
 import type {
   VercelAiToolDefinition,
@@ -33,17 +46,20 @@ export interface VercelAiSdkPatchState {
   isPatched: boolean;
   originalToolFactory: VercelAiToolFactory | undefined;
   /**
-   * The module object whose `tool` factory is governed. When the loaded `ai`
-   * package is a real ES module its namespace is frozen (assignment to a named
-   * export throws), so this is a mutable **shim copy** (`{ ...module, tool:
-   * governed }`) rather than the frozen original — see `applyGovernedToolFactory`.
+   * The writable module object whose `tool` factory was governed in place. Only
+   * ever set when the governed factory was successfully assigned back onto the
+   * loaded module (a writable plain object). A real `ai` ES module is a frozen
+   * namespace whose `tool` export is non-writable, so no governed factory can be
+   * written back; that path warns/throws and records no state rather than store an
+   * inert shim copy the app never reads (AAASM-4842).
    */
   patchedModule: VercelAiSdkModule | undefined;
   /**
-   * True only when `tool` was assigned back onto the loaded module object (a
-   * writable plain object); false when a frozen ESM namespace forced a shim copy.
-   * Governs whether `unpatchVercelAiSdk` writes the original factory back —
-   * there is nothing to restore on the frozen original in the shim case.
+   * Always `true` when `isPatched` — the patch only records state after it assigned
+   * the governed `tool` factory back onto a writable module. The frozen-ESM path,
+   * where that write is impossible, never reaches here (it warns and, under enforce,
+   * throws — AAASM-4842). Retained so `unpatchVercelAiSdk` can write the original
+   * factory back over the one it overwrote.
    */
   mutatedOriginal: boolean;
   /**
@@ -186,27 +202,44 @@ export interface PatchVercelAiSdkOptions {
   fallbackRunId?: string;
   agentId?: string;
   /**
-   * When `ai` is installed but its `tool` factory hook point is absent (upstream
-   * API moved), throw a `ConfigurationError` instead of only warning. Set from
-   * the caller's fail-closed (enforce) posture so an enforce agent fails loudly
-   * rather than running ungoverned (AAASM-4805).
+   * When `ai` is installed but its `tool` factory hook point is absent — the
+   * export is not a function because the upstream API MOVED (AAASM-4805) — throw a
+   * `ConfigurationError` instead of only warning. Set from the caller's fail-closed
+   * (enforce) posture. Scoped to the moved-hook case ONLY: it does NOT gate the
+   * frozen-namespace throw (see `throwOnFrozenInert`), because a moved hook is a
+   * rare broken/pinned-version state, whereas a frozen namespace is the shape of
+   * EVERY real `ai` install — hard-failing init on mere presence of `ai` would
+   * regress zero-config (AAASM-1847) and the auto-detected warn-not-throw invariant
+   * (AAASM-4769).
    */
   failClosed?: boolean;
+  /**
+   * When the governed factory cannot be written back onto a frozen `ai` ES module
+   * namespace (governance is inert — AAASM-4842), throw a `ConfigurationError`
+   * instead of only warning. Deliberately SEPARATE from `failClosed`: the
+   * auto-detected init path (`patchDetectedVercelAiSdk`) leaves this off so a bare
+   * `ai` install stays zero-config and only WARNS (mirroring how AAASM-4769 handles
+   * the analogous inert auto-detected framework), while a direct/explicit caller
+   * that opts into hard enforcement can set it to fail loudly.
+   */
+  throwOnFrozenInert?: boolean;
   loadModule?: () => Promise<VercelAiSdkModule | undefined>;
 }
 
 /**
- * Install `governed` as the module's `tool` factory without ever assigning to a
- * frozen ESM namespace.
+ * Attempt to install `governed` as the module's `tool` factory in place, reporting
+ * via `mutatedOriginal` whether that write actually landed on the loaded module.
  *
- * A real `ai` package loaded via `import()` is an ES module: its namespace is an
- * exotic object whose named exports are non-writable, so `module.tool = …` throws
- * `Cannot assign to read only property 'tool'` (AAASM-3532). We therefore attempt
- * the in-place assignment only as a fast path for writable plain objects (the
- * shape used by the unit suite's `loadModule` fakes) and fall back to a mutable
- * **shim copy** for the frozen-namespace case — the same `{ tool: aiModule.tool }`
- * shim the AAASM-3525 integration driver proved works. The returned module is what
- * downstream consumers read the governed factory from (`patchedModule.tool`).
+ * A writable plain object (the shape used by the unit / conformance `loadModule`
+ * fakes) is mutated in place and reports `mutatedOriginal: true`. A real `ai`
+ * package loaded via `import()` is an ES module whose named exports are
+ * non-writable, so `module.tool = …` throws `Cannot assign to read only property
+ * 'tool'` (AAASM-3532); that case is caught and reported as `mutatedOriginal:
+ * false`. The returned shim copy is a diagnostic byproduct, NOT a working patch —
+ * the caller (`patchVercelAiSdk`) treats `mutatedOriginal: false` as the ungoverned
+ * frozen-namespace path and warns/throws rather than install the inert shim,
+ * because the app's own `import { tool } from "ai"` binding keeps pointing at the
+ * original, ungoverned factory (AAASM-4842).
  */
 function applyGovernedToolFactory(
   module: VercelAiSdkModule,
@@ -251,6 +284,26 @@ function warnVercelAiHookPointMissing(): void {
       `tool API has moved. Vercel AI SDK tool calls will NOT be governed by this ` +
       `SDK: a policy DENY will NOT block a tool call. Pin "ai" to a supported ` +
       `version or upgrade @agent-assembly/sdk (AAASM-4805).\n`
+  );
+}
+
+/**
+ * Loud, un-silenceable signal that `ai` is installed as a frozen ES module, so the
+ * governed `tool` factory could not be written back onto the `ai` namespace and the
+ * app's `import { tool } from "ai"` stays ungoverned — the AAASM-4842 frozen
+ * sub-case of the AAASM-4805/4797 silent-fail-open class. Written straight to
+ * `process.stderr` (not a swappable logger), mirroring
+ * {@link warnVercelAiHookPointMissing}.
+ */
+function warnVercelAiFrozenNamespaceInert(): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: the Vercel AI SDK ("ai") is installed as a frozen ` +
+      `ES module namespace, so @agent-assembly/sdk could not install its governed ` +
+      `"tool" factory onto it. Vercel AI SDK tool calls will NOT be governed by ` +
+      `this SDK: your app's \`import { tool } from "ai"\` keeps the original, ` +
+      `ungoverned factory and a policy DENY will NOT block a tool call. Import a ` +
+      `governed tool factory from "@agent-assembly/sdk" instead of "ai" ` +
+      `(AAASM-4842).\n`
   );
 }
 
@@ -350,6 +403,37 @@ export async function patchVercelAiSdk(
     module,
     governed
   );
+
+  if (!mutatedOriginal) {
+    // AAASM-4842: the governed factory could not be written back onto the loaded
+    // `ai` module — a real `ai` ES module namespace is frozen, so it lands only in
+    // a shim copy the app never reads while `import { tool } from "ai"` keeps the
+    // ORIGINAL, ungoverned factory. This is the AAASM-4805/4797 silent-fail-open
+    // class, frozen sub-case: reporting patched-success here would over-claim a
+    // governance that never reaches the app. Never silently no-op — warn loudly,
+    // and record NO patch state (isPatched stays false) so init does not surface
+    // `vercelAiSdkPatched` or an active adapter for this ungoverned path.
+    //
+    // The throw is gated on `throwOnFrozenInert`, NOT `failClosed`: a frozen
+    // namespace is the shape of every real `ai`, so hard-failing init on mere
+    // presence would regress zero-config (AAASM-1847) and the auto-detected
+    // warn-not-throw invariant (AAASM-4769). The auto-detected init path therefore
+    // only warns here; a direct/explicit caller opting into hard enforcement can
+    // set `throwOnFrozenInert` to fail loudly instead.
+    warnVercelAiFrozenNamespaceInert();
+    if (options.throwOnFrozenInert) {
+      throw new ConfigurationError(
+        `The Vercel AI SDK ("ai") is installed as a frozen ES module, so this SDK ` +
+          `cannot write its governed "tool" factory onto the "ai" namespace — your ` +
+          `app's \`import { tool } from "ai"\` stays ungoverned and a policy DENY ` +
+          `will NOT block a tool call. Refusing to register rather than run ` +
+          `ungoverned. Import a governed tool factory from "@agent-assembly/sdk" ` +
+          `instead of "ai", or set enforcementMode to "observe"/"disabled" ` +
+          `(AAASM-4842).`
+      );
+    }
+    return false;
+  }
 
   vercelAiSdkPatchState.isPatched = true;
   vercelAiSdkPatchState.patchedModule = patchedModule;

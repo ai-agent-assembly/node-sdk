@@ -51,6 +51,7 @@ describe("AAASM-4769: warn when an auto-detected framework's tools route through
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unmock("@openai/agents");
+    vi.unmock("ai");
     vi.unmock("node:module");
     vi.resetModules();
   });
@@ -69,10 +70,12 @@ describe("AAASM-4769: warn when an auto-detected framework's tools route through
     // The real `@openai/agents` devDependency's `Agent.prototype._runTool` shape
     // doesn't line up with `captureOriginalRunTool`'s expectations (see
     // `tests/openai-agents-hook.test.ts`), so patching it for real never
-    // succeeds here. Fake the module (same pattern as that suite) so BOTH
-    // vercel-ai-sdk and openai-agents patch successfully in the same
-    // `initAssembly` call, to prove the warning collapses multiple patched
-    // frameworks into a single message rather than firing once per framework.
+    // succeeds here. Likewise the real `ai` devDependency is a frozen ES module,
+    // so the governed factory can't be written back and it declines to patch
+    // (AAASM-4842). Fake BOTH with WRITABLE/patchable shapes so both actually patch
+    // successfully in the same `initAssembly` call, to prove the warning collapses
+    // multiple patched frameworks into a single message rather than firing once per
+    // framework.
     const fakeAgentClass: FakeAgentClass = {
       prototype: {
         _runTool: vi.fn(async function (this: FakeAgentInstance) {
@@ -82,6 +85,9 @@ describe("AAASM-4769: warn when an auto-detected framework's tools route through
       }
     };
     vi.doMock("@openai/agents", () => ({ Agent: fakeAgentClass }));
+    // A writable plain object (NOT the real frozen `ai`) so applyGovernedToolFactory
+    // mutates it in place and vercel-ai-sdk genuinely patches (AAASM-4842).
+    vi.doMock("ai", () => ({ tool: (definition: unknown) => definition }));
     vi.doMock("node:module", () => ({
       createRequire: () => ({
         resolve: (packageName: string) => {

@@ -335,23 +335,25 @@ async function runVercel(scenario: Scenario, mode: Mode): Promise<ScenarioOutcom
 
 /**
  * The FROZEN-ESM Vercel path a real app actually hits — the honest counterpart to
- * {@link runVercel} (AAASM-4822).
+ * {@link runVercel} (AAASM-4822 / AAASM-4842).
  *
  * A real `ai` package imported via `import()` is an ES module whose namespace is
  * frozen: its named `tool` export is non-writable. `patchVercelAiSdk` therefore
  * cannot write the governed factory back onto it (that would throw the AAASM-3532
- * crash); it lands the governed factory only in an internal **shim copy**
- * (`vercelAiSdkPatchState.patchedModule`) that the application never reads. The
- * app's own `import { tool } from "ai"` binding keeps pointing at the ORIGINAL,
- * ungoverned factory.
+ * crash) — governance can never reach the app's own `import { tool } from "ai"`
+ * binding, which keeps pointing at the ORIGINAL, ungoverned factory.
  *
- * So this driver deliberately resolves the tool factory the way the app does — from
- * the frozen module object, NOT from the SDK's shim copy — which reflects that the
- * frozen-ESM path is **not governed today** (documented as a known limitation in
- * `docs/07-compatibility-versioning/compatibility.md`, AAASM-3532). The scenario's
- * verdict is irrelevant: governance never runs on this path, so the tool executes
- * unconditionally. The conformance test consumes this to assert the true (ungoverned)
- * behavior rather than let the matrix over-claim a Vercel block it cannot deliver.
+ * AAASM-4842 makes that inert path fail LOUD (a loud, un-silenceable stderr warning)
+ * and honest (never reported as a patch / active adapter) rather than silently
+ * over-claim success — but it does NOT hard-fail init on the auto-detected path,
+ * because a frozen namespace is the shape of EVERY real `ai`, and throwing on mere
+ * presence would regress zero-config (AAASM-1847) and the auto-detected
+ * warn-not-throw invariant (AAASM-4769). So this driver models the auto-detected
+ * init call — `failClosed` threaded (the AAASM-4805 moved-hook flag) but NOT
+ * `throwOnFrozenInert` — under which the frozen path warns, declines to patch, and
+ * the app's own `import { tool } from "ai"` factory runs ungoverned in EVERY mode.
+ * The scenario verdict is irrelevant: governance never reaches the frozen namespace.
+ * The loud stderr warning is silenced here (asserted directly in the unit suites).
  */
 export async function runVercelFrozenEsm(
   scenario: Scenario,
@@ -364,20 +366,24 @@ export async function runVercelFrozenEsm(
     definition: VercelAiToolDefinition<TArgs, TResult>
   ): VercelAiToolDefinition<TArgs, TResult> => definition;
   // Object.freeze reproduces the non-writable named exports of a real `ai` ESM
-  // namespace: this is the exact shape applyGovernedToolFactory must shim-copy
-  // rather than mutate in place.
+  // namespace: the exact shape applyGovernedToolFactory cannot mutate in place.
   const frozenAiModule: VercelAiSdkModule = Object.freeze({ tool: originalToolFactory });
-  await patchVercelAiSdk({
-    gatewayClient: gateway,
-    approvalTimeoutMs: FAST_APPROVAL_TIMEOUT_MS,
-    loadModule: async () => frozenAiModule
-  });
-  // The app reads `tool` from its own `import { tool } from "ai"` binding — the
-  // frozen module object, NOT vercelAiSdkPatchState.patchedModule (the shim). On a
-  // frozen namespace the patch could not write the governed factory back, so this
-  // is the ORIGINAL ungoverned factory.
-  const appFactory = frozenAiModule.tool;
-  const appTool = appFactory({
+  const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  try {
+    // Mirrors `patchDetectedVercelAiSdk`: only `failClosed` (moved-hook), never
+    // `throwOnFrozenInert` — so the frozen path warns and declines, it does not throw.
+    await patchVercelAiSdk({
+      gatewayClient: gateway,
+      approvalTimeoutMs: FAST_APPROVAL_TIMEOUT_MS,
+      failClosed: mode.failClosed,
+      loadModule: async () => frozenAiModule
+    });
+  } finally {
+    stderrSpy.mockRestore();
+  }
+  // The app reads `tool` from its own frozen `import { tool } from "ai"` binding —
+  // the ORIGINAL ungoverned factory, since the patch declined to attach.
+  const appTool = frozenAiModule.tool({
     description: "delete_db",
     parameters: {},
     execute: async () => {

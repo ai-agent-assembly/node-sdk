@@ -349,10 +349,17 @@ async function patchDetectedVercelAiSdk(
     return false;
   }
 
-  // AAASM-4805: when the upstream `ai` `tool` factory has moved past the hook
-  // point we know, `patchVercelAiSdk` warns loudly and — under a fail-closed
-  // (enforce) posture — throws rather than register ungoverned (the AAASM-4797
-  // class, now closed for Vercel AI too).
+  // When in-process Vercel governance would be inert, `patchVercelAiSdk` warns
+  // loudly and returns false, so this auto-detected path never surfaces
+  // `vercelAiSdkPatched` / an active adapter for an ungoverned Vercel install. Two
+  // inert shapes, handled differently on purpose:
+  //  - AAASM-4805 (moved hook): `ai` installed but the `tool` export is gone. Rare
+  //    broken/pinned state, so under a fail-closed posture it THROWS (`failClosed`).
+  //  - AAASM-4842 (frozen namespace): a real `ai` ES module can't have the governed
+  //    factory written back. This is the shape of EVERY real `ai`, so we do NOT
+  //    thread `throwOnFrozenInert` here — hard-failing init on mere presence of `ai`
+  //    would regress zero-config (AAASM-1847) and the auto-detected warn-not-throw
+  //    invariant (AAASM-4769). It warns and is excluded from the active adapters.
   return patchVercelAiSdk({
     gatewayClient: client,
     failClosed: resolveFailClosed(config.enforcementMode),
