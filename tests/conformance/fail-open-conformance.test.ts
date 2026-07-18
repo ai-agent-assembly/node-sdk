@@ -35,7 +35,9 @@ import {
   SCENARIOS,
   expectRan,
   resetOpenAIState,
+  runVercelFrozenEsm,
   type Driver,
+  type Mode,
   type Scenario
 } from "./drivers.js";
 
@@ -121,6 +123,52 @@ describe("fail-open conformance matrix (AAASM-4801)", () => {
           );
         }
       );
+    }
+  );
+});
+
+/**
+ * Vercel AI SDK frozen-ESM path — a KNOWN, DOCUMENTED limitation, not part of the
+ * green matrix above (AAASM-4822).
+ *
+ * The `vercel-ai (patchVercelAiSdk)` driver in DRIVERS exercises a WRITABLE plain
+ * object and governs correctly — but that is not the shape a real app hits. A real
+ * `ai` package is an ES module whose namespace is frozen; `patchVercelAiSdk` cannot
+ * write the governed `tool` factory back onto it, so it lands only in an internal
+ * shim copy the app never reads (`import { tool } from "ai"` keeps the ORIGINAL,
+ * ungoverned factory). Documented in
+ * `docs/07-compatibility-versioning/compatibility.md` (AAASM-3532): the Vercel AI
+ * SDK adapter is "not yet usable with real ai 5.x/6.x".
+ *
+ * These cases pin that TRUE behavior so the conformance suite does not over-claim a
+ * Vercel block it cannot deliver on frozen ESM. `runVercelFrozenEsm` resolves the
+ * tool factory exactly as the app does — from the frozen namespace, not the shim —
+ * so it reflects that the path is ungoverned today.
+ */
+describe("Vercel AI SDK frozen-ESM path — KNOWN LIMITATION, not yet governed (AAASM-4822)", () => {
+  const enforce = MODES.find((mode): mode is Mode => mode.id === "enforce")!;
+  const authoritativeDeny = SCENARIOS.find((scenario): scenario is Scenario => scenario.id === "S7")!;
+
+  it("runs the tool UNGOVERNED under enforce + authoritative DENY (must NOT report a false block)", async () => {
+    const outcome = await runVercelFrozenEsm(authoritativeDeny, enforce);
+    // Honest reality: governance never reaches the frozen namespace, so even an
+    // authoritative DENY under enforce does NOT stop the tool. Assert what actually
+    // happens — the conformance suite must never claim `blocked` here.
+    expect(outcome.ran).toBe(true);
+    expect(outcome.blocked).toBe(false);
+  });
+
+  // xfail (vitest `it.fails`): the invariant we WANT — a DENY blocks the frozen-ESM
+  // tool under enforce. It fails today because the governed factory never reaches
+  // the app's frozen `tool` binding. When frozen-ESM governance lands
+  // (AAASM-3532 / AAASM-4822), this `it.fails` will itself start failing — the
+  // signal to delete this xfail and fold the frozen path into DRIVERS.
+  it.fails(
+    "SHOULD block under enforce + DENY once frozen-ESM governance is implemented",
+    async () => {
+      const outcome = await runVercelFrozenEsm(authoritativeDeny, enforce);
+      expect(outcome.ran).toBe(false);
+      expect(outcome.blocked).toBe(true);
     }
   );
 });
