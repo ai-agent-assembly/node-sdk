@@ -180,6 +180,27 @@ describe("withAssembly governance", () => {
     expect(gateway.check).not.toHaveBeenCalled();
   });
 
+  it("warns (does not silently skip) when a tool exposes neither execute nor invoke", () => {
+    // AAASM-4847: an ungoverned tool must be a visible outcome. Silently
+    // leaving it unwrapped lets the caller believe the whole map is governed.
+    const gateway = createMockGateway();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const tools = {
+      config: { description: "Config-only tool", setting: "value" }
+    };
+
+    try {
+      withAssembly(tools, { gatewayClient: gateway });
+      expect(stderr).toHaveBeenCalledOnce();
+      const message = String(stderr.mock.calls[0]?.[0]);
+      expect(message).toContain('tool "config"');
+      expect(message).toContain("neither");
+      expect(message).toContain("AAASM-4847");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it("mixed tool map: handles execute, invoke, and plain tools together", async () => {
     const gateway = createMockGateway();
     const executeFn = vi.fn(async () => "execute-result");
