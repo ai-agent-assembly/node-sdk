@@ -361,6 +361,7 @@ async function patchDetectedVercelAiSdk(
 }
 
 async function patchDetectedLangGraph(
+  config: AssemblyConfig,
   frameworks: readonly string[],
   agentId?: string
 ): Promise<boolean> {
@@ -368,10 +369,14 @@ async function patchDetectedLangGraph(
     return false;
   }
 
-  return patchLangGraph({ agentId });
+  // AAASM-4830: LangGraph is lineage-only (NON_ENFORCING_MODULES) — passing the
+  // resolved posture lets the hook emit a one-time note under enforce so an
+  // operator isn't misled that in-process tool governance is in effect.
+  return patchLangGraph({ agentId, failClosed: resolveFailClosed(config.enforcementMode) });
 }
 
 async function patchDetectedMastra(
+  config: AssemblyConfig,
   frameworks: readonly string[],
   agentId?: string
 ): Promise<boolean> {
@@ -379,7 +384,10 @@ async function patchDetectedMastra(
     return false;
   }
 
-  return patchMastra({ agentId });
+  // AAASM-4830: Mastra is lineage-only (NON_ENFORCING_MODULES) — passing the
+  // resolved posture lets the hook emit a one-time note under enforce so an
+  // operator isn't misled that in-process tool governance is in effect.
+  return patchMastra({ agentId, failClosed: resolveFailClosed(config.enforcementMode) });
 }
 
 async function patchDetectedOpenAIAgents(
@@ -494,8 +502,8 @@ async function applyFrameworkPatches(
   const wrappedLangChainTools = await wrapLangChainTools(config, client, frameworks);
   const vercelAiSdkPatched = await patchDetectedVercelAiSdk(config, client, frameworks, config.agentId);
   const openAIAgentsPatched = await patchDetectedOpenAIAgents(config, client, frameworks);
-  const langGraphPatched = await patchDetectedLangGraph(frameworks, config.agentId);
-  const mastraPatched = await patchDetectedMastra(frameworks, config.agentId);
+  const langGraphPatched = await patchDetectedLangGraph(config, frameworks, config.agentId);
+  const mastraPatched = await patchDetectedMastra(config, frameworks, config.agentId);
 
   if (autoDetectedToolsRouteThroughNoop(config)) {
     warnAutoDetectedToolsRouteThroughNoop(
