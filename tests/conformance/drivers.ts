@@ -25,7 +25,11 @@ import type { EnforcementMode } from "../../src/types/enforcement-mode.js";
 import { wrapToolWithAssembly } from "../../src/adapters/langchain/wrap-tool-with-assembly.js";
 import type { LangChainToolLike } from "../../src/types/langchain-adapter.js";
 import { withAssembly } from "../../src/wrappers/with-assembly.js";
-import { patchVercelAiSdk, vercelAiSdkPatchState } from "../../src/hooks/ai-sdk.js";
+import {
+  patchVercelAiSdk,
+  vercelAiSdkPatchState,
+  type VercelAiSdkModule
+} from "../../src/hooks/ai-sdk.js";
 import type {
   VercelAiToolDefinition,
   VercelAiToolFactory
@@ -294,9 +298,12 @@ async function runVercel(scenario: Scenario, mode: Mode): Promise<ScenarioOutcom
   }
   const gateway = buildRealGateway(scenario.id, mode);
   // Identity factory standing in for `ai.tool` — the wrapper wraps whatever
-  // `execute` the produced tool exposes. A `loadModule` fake keeps the driver
-  // decoupled from the real (frozen) `ai` namespace; the real module is covered
-  // by the hook-point-existence smoke test instead.
+  // `execute` the produced tool exposes. This driver's `loadModule` fake returns a
+  // WRITABLE plain object, so applyGovernedToolFactory mutates it in place and the
+  // governed factory is the one the caller reads back. That is NOT what a real `ai`
+  // ES module looks like — its namespace is frozen — so this driver alone
+  // over-states Vercel governance; the frozen-namespace truth is pinned separately
+  // by `runVercelFrozenEsm` (AAASM-4822).
   const originalToolFactory: VercelAiToolFactory = <TArgs, TResult>(
     definition: VercelAiToolDefinition<TArgs, TResult>
   ): VercelAiToolDefinition<TArgs, TResult> => definition;
@@ -320,6 +327,66 @@ async function runVercel(scenario: Scenario, mode: Mode): Promise<ScenarioOutcom
   } as never) as { execute?: (args: unknown, options: unknown) => Promise<unknown> };
   const outcome = await invokeAndClassify(
     () => governed.execute!({ any: "input" }, { toolCallId: "call-1" }),
+    state
+  );
+  resetVercelState();
+  return outcome;
+}
+
+/**
+ * The FROZEN-ESM Vercel path a real app actually hits — the honest counterpart to
+ * {@link runVercel} (AAASM-4822).
+ *
+ * A real `ai` package imported via `import()` is an ES module whose namespace is
+ * frozen: its named `tool` export is non-writable. `patchVercelAiSdk` therefore
+ * cannot write the governed factory back onto it (that would throw the AAASM-3532
+ * crash); it lands the governed factory only in an internal **shim copy**
+ * (`vercelAiSdkPatchState.patchedModule`) that the application never reads. The
+ * app's own `import { tool } from "ai"` binding keeps pointing at the ORIGINAL,
+ * ungoverned factory.
+ *
+ * So this driver deliberately resolves the tool factory the way the app does — from
+ * the frozen module object, NOT from the SDK's shim copy — which reflects that the
+ * frozen-ESM path is **not governed today** (documented as a known limitation in
+ * `docs/07-compatibility-versioning/compatibility.md`, AAASM-3532). The scenario's
+ * verdict is irrelevant: governance never runs on this path, so the tool executes
+ * unconditionally. The conformance test consumes this to assert the true (ungoverned)
+ * behavior rather than let the matrix over-claim a Vercel block it cannot deliver.
+ */
+export async function runVercelFrozenEsm(
+  scenario: Scenario,
+  mode: Mode
+): Promise<ScenarioOutcome> {
+  resetVercelState();
+  const state: RanFlag = { ran: false };
+  const gateway = buildRealGateway(scenario.id, mode);
+  const originalToolFactory: VercelAiToolFactory = <TArgs, TResult>(
+    definition: VercelAiToolDefinition<TArgs, TResult>
+  ): VercelAiToolDefinition<TArgs, TResult> => definition;
+  // Object.freeze reproduces the non-writable named exports of a real `ai` ESM
+  // namespace: this is the exact shape applyGovernedToolFactory must shim-copy
+  // rather than mutate in place.
+  const frozenAiModule: VercelAiSdkModule = Object.freeze({ tool: originalToolFactory });
+  await patchVercelAiSdk({
+    gatewayClient: gateway,
+    approvalTimeoutMs: FAST_APPROVAL_TIMEOUT_MS,
+    loadModule: async () => frozenAiModule
+  });
+  // The app reads `tool` from its own `import { tool } from "ai"` binding — the
+  // frozen module object, NOT vercelAiSdkPatchState.patchedModule (the shim). On a
+  // frozen namespace the patch could not write the governed factory back, so this
+  // is the ORIGINAL ungoverned factory.
+  const appFactory = frozenAiModule.tool;
+  const appTool = appFactory({
+    description: "delete_db",
+    parameters: {},
+    execute: async () => {
+      state.ran = true;
+      return "did-run";
+    }
+  } as never) as { execute?: (args: unknown, options: unknown) => Promise<unknown> };
+  const outcome = await invokeAndClassify(
+    () => appTool.execute!({ any: "input" }, { toolCallId: "call-1" }),
     state
   );
   resetVercelState();
