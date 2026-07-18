@@ -122,4 +122,54 @@ describe("openai agents interception via getAllTools", () => {
     expect(output).toBe("SENT");
     expect(executed.called).toBe(true);
   });
+
+  it("guards a frozen tool: warns without rejecting getAllTools or breaking siblings", async () => {
+    // AAASM-4847: a frozen function-tool object makes the `invoke` assignment
+    // throw in strict mode. Because the wrap runs inside patchedGetAllTools on
+    // every turn, an unguarded throw would reject getAllTools and break the
+    // whole agent. The guard must skip+warn on the frozen tool while still
+    // governing the writable siblings.
+    const gateway = createGatewayClientMock();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    await patchOpenAIAgents({
+      gatewayClient: gateway,
+      loadAgentClass: async () => Agent as never
+    });
+
+    const frozenExecuted = { called: false };
+    const writableExecuted = { called: false };
+    const frozenTool = Object.freeze(buildTool(frozenExecuted));
+    const writableTool = tool({
+      name: "list_files",
+      description: "List files",
+      parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
+      execute: async () => {
+        writableExecuted.called = true;
+        return "LISTED";
+      }
+    });
+    const agent = new Agent({ name: "A", instructions: "x", tools: [frozenTool, writableTool] });
+
+    // The whole point: getAllTools must resolve, not reject, despite the frozen tool.
+    const tools = await agent.getAllTools(runContext as never);
+
+    try {
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some((line) => line.includes("send_email") && line.includes("AAASM-4847"));
+      expect(warned).toBe(true);
+    } finally {
+      stderr.mockRestore();
+    }
+
+    // The writable sibling is still governed (its invoke was wrapped).
+    const writable = tools.find((t) => (t as { name?: string }).name === "list_files") as {
+      invoke: (rc: unknown, input: string) => Promise<unknown>;
+    };
+    await writable.invoke(runContext, JSON.stringify({}));
+    expect(gateway.check).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: "list_files" })
+    );
+  });
 });
