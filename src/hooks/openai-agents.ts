@@ -50,6 +50,12 @@ export interface OpenAIAgentsPatchState {
   originalRunTool: OpenAIAgentsRunTool | undefined;
   originalGetAllTools: OpenAIAgentsGetAllTools | undefined;
   patchedAgentClass: OpenAIAgentsAgentClass | undefined;
+  /**
+   * Signature of the config the FIRST successful patch ran under, so a later
+   * re-patch attempt (single patch per process) can detect a differing config
+   * and warn rather than silently ignore the new posture (AAASM-4830).
+   */
+  patchConfigSignature: string | undefined;
 }
 
 export const openAIAgentsPatchState: OpenAIAgentsPatchState = {
@@ -57,7 +63,8 @@ export const openAIAgentsPatchState: OpenAIAgentsPatchState = {
   hookPoint: undefined,
   originalRunTool: undefined,
   originalGetAllTools: undefined,
-  patchedAgentClass: undefined
+  patchedAgentClass: undefined,
+  patchConfigSignature: undefined
 };
 
 /**
@@ -409,8 +416,54 @@ function patchViaRunTool(
   openAIAgentsPatchState.patchedAgentClass = agentClass;
 }
 
+/**
+ * A patch mutates the shared `Agent` prototype, so it is a process-global
+ * singleton: only the first config can ever be in effect. This distills the
+ * config fields whose divergence would mislead an operator into believing a
+ * second `initAssembly` changed the tool-governance posture — the enforce/
+ * fail-closed posture and the approval knobs — into a comparable signature.
+ * The `gatewayClient` object identity is deliberately excluded: every
+ * `initAssembly` builds a fresh client, so comparing it would warn on every
+ * double-init even when the posture is unchanged.
+ */
+function openAIAgentsConfigSignature(options: PatchOpenAIAgentsOptions): string {
+  return JSON.stringify({
+    failClosed: options.failClosed === true,
+    approvalTimeoutMs: options.approvalTimeoutMs ?? 30_000,
+    fallbackRunId: options.fallbackRunId ?? "openai-agents"
+  });
+}
+
+/**
+ * Loud, un-silenceable signal that a second `initAssembly` tried to re-patch
+ * @openai/agents with a DIFFERENT config while an earlier patch is installed.
+ * The singleton early return keeps the FIRST patch/gatewayClient in effect, so
+ * the new posture (e.g. observe→enforce) silently does NOT take effect. Written
+ * straight to `process.stderr` (not a swappable logger) so an operator can't be
+ * misled into believing the re-init changed anything (AAASM-4830).
+ */
+function warnOpenAIAgentsRepatchIgnored(): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: @openai/agents is already patched by an earlier ` +
+      `initAssembly with a different configuration. Tool governance is a single ` +
+      `patch per process, so the FIRST configuration stays in effect — this ` +
+      `re-init did NOT change the tool-governance posture (a switched enforcement ` +
+      `posture, or new approval settings, has NO effect). Restart the process to ` +
+      `apply a new configuration (AAASM-4830).\n`
+  );
+}
+
 export async function patchOpenAIAgents(options: PatchOpenAIAgentsOptions): Promise<boolean> {
   if (openAIAgentsPatchState.isPatched) {
+    // Single patch per process (the patch mutates the shared Agent prototype):
+    // the early return keeps the first config. Warn loudly if this re-init
+    // carries a different config so the new posture isn't silently ignored.
+    if (
+      openAIAgentsPatchState.patchConfigSignature !== undefined &&
+      openAIAgentsPatchState.patchConfigSignature !== openAIAgentsConfigSignature(options)
+    ) {
+      warnOpenAIAgentsRepatchIgnored();
+    }
     return true;
   }
 
@@ -431,12 +484,14 @@ export async function patchOpenAIAgents(options: PatchOpenAIAgentsOptions): Prom
   const getAllTools = agentClass.prototype.getAllTools;
   if (typeof getAllTools === "function") {
     patchViaGetAllTools(agentClass, getAllTools, options.gatewayClient, invokeOptions);
+    openAIAgentsPatchState.patchConfigSignature = openAIAgentsConfigSignature(options);
     return true;
   }
 
   const originalRunTool = captureOriginalRunTool(agentClass);
   if (originalRunTool) {
     patchViaRunTool(agentClass, originalRunTool, options.gatewayClient, invokeOptions);
+    openAIAgentsPatchState.patchConfigSignature = openAIAgentsConfigSignature(options);
     return true;
   }
 
@@ -482,5 +537,6 @@ export function unpatchOpenAIAgents(): boolean {
   openAIAgentsPatchState.isPatched = false;
   openAIAgentsPatchState.hookPoint = undefined;
   openAIAgentsPatchState.patchedAgentClass = undefined;
+  openAIAgentsPatchState.patchConfigSignature = undefined;
   return true;
 }
