@@ -46,13 +46,20 @@ export interface VercelAiSdkPatchState {
    * there is nothing to restore on the frozen original in the shim case.
    */
   mutatedOriginal: boolean;
+  /**
+   * Signature of the config the FIRST successful patch ran under, so a later
+   * re-patch attempt (single patch per process) can detect a differing config
+   * and warn rather than silently ignore the new posture (AAASM-4830).
+   */
+  patchConfigSignature: string | undefined;
 }
 
 export const vercelAiSdkPatchState: VercelAiSdkPatchState = {
   isPatched: false,
   originalToolFactory: undefined,
   patchedModule: undefined,
-  mutatedOriginal: false
+  mutatedOriginal: false,
+  patchConfigSignature: undefined
 };
 
 export function captureOriginalToolFactory(
@@ -247,10 +254,59 @@ function warnVercelAiHookPointMissing(): void {
   );
 }
 
+/**
+ * A patch installs a governed `tool` factory as a process-global singleton, so
+ * only the first config can ever be in effect. This distills the config fields
+ * whose divergence would mislead an operator into believing a second
+ * `initAssembly` changed the tool-governance posture — the enforce/fail-closed
+ * posture, the approval knobs, and the lineage `agentId` — into a comparable
+ * signature. The `gatewayClient` object identity is deliberately excluded:
+ * every `initAssembly` builds a fresh client, so comparing it would warn on
+ * every double-init even when the posture is unchanged.
+ */
+function vercelAiConfigSignature(options: PatchVercelAiSdkOptions): string {
+  return JSON.stringify({
+    failClosed: options.failClosed === true,
+    approvalTimeoutMs: options.approvalTimeoutMs ?? 30_000,
+    fallbackRunId: options.fallbackRunId ?? "vercel-ai-sdk",
+    agentId: options.agentId ?? null
+  });
+}
+
+/**
+ * Loud, un-silenceable signal that a second `initAssembly` tried to re-patch
+ * the Vercel AI SDK with a DIFFERENT config while an earlier patch is installed.
+ * The singleton early return keeps the FIRST governed factory/gatewayClient in
+ * effect, so the new posture (e.g. observe→enforce) silently does NOT take
+ * effect. Written straight to `process.stderr` (not a swappable logger) so an
+ * operator can't be misled into believing the re-init changed anything
+ * (AAASM-4830).
+ */
+function warnVercelAiRepatchIgnored(): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: the Vercel AI SDK ("ai") is already patched by an ` +
+      `earlier initAssembly with a different configuration. Tool governance is a ` +
+      `single patch per process, so the FIRST configuration stays in effect — ` +
+      `this re-init did NOT change the tool-governance posture (a switched ` +
+      `enforcement posture, agentId, or approval settings has NO effect). Restart ` +
+      `the process to apply a new configuration (AAASM-4830).\n`
+  );
+}
+
 export async function patchVercelAiSdk(
   options: PatchVercelAiSdkOptions
 ): Promise<boolean> {
   if (vercelAiSdkPatchState.isPatched) {
+    // Single patch per process (the governed factory replaces the module's
+    // `tool` export): the early return keeps the first config. Warn loudly if
+    // this re-init carries a different config so the new posture isn't silently
+    // ignored.
+    if (
+      vercelAiSdkPatchState.patchConfigSignature !== undefined &&
+      vercelAiSdkPatchState.patchConfigSignature !== vercelAiConfigSignature(options)
+    ) {
+      warnVercelAiRepatchIgnored();
+    }
     return true;
   }
 
@@ -298,6 +354,7 @@ export async function patchVercelAiSdk(
   vercelAiSdkPatchState.isPatched = true;
   vercelAiSdkPatchState.patchedModule = patchedModule;
   vercelAiSdkPatchState.mutatedOriginal = mutatedOriginal;
+  vercelAiSdkPatchState.patchConfigSignature = vercelAiConfigSignature(options);
   return true;
 }
 
@@ -322,5 +379,6 @@ export function unpatchVercelAiSdk(): boolean {
   vercelAiSdkPatchState.isPatched = false;
   vercelAiSdkPatchState.patchedModule = undefined;
   vercelAiSdkPatchState.mutatedOriginal = false;
+  vercelAiSdkPatchState.patchConfigSignature = undefined;
   return true;
 }
