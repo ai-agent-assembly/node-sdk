@@ -45,12 +45,12 @@ pnpm start
 ```
 
 All tests run offline — no gateway or API key required. For **real-provider mode**,
-copy `.env.example` to `.env` and set `AAASM_GATEWAY_URL` and optionally
+copy `.env.example` to `.env` and set `AA_GATEWAY_URL` and optionally
 `OPENAI_API_KEY`:
 
 ```bash
 cp .env.example .env
-# Set AAASM_GATEWAY_URL and optionally OPENAI_API_KEY
+# Set AA_GATEWAY_URL and optionally OPENAI_API_KEY
 ```
 
 ## Code walkthrough
@@ -123,7 +123,7 @@ All tests run offline — no gateway or API key required.
 :::
 
 :::caution[Gateway connection refused]
-If real-provider mode fails to connect, remove `AAASM_GATEWAY_URL` from `.env` to fall
+If real-provider mode fails to connect, remove `AA_GATEWAY_URL` from `.env` to fall
 back to offline mode.
 :::
 

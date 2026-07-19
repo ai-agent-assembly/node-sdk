@@ -45,7 +45,7 @@ pnpm start
 ```
 
 This example is mock/offline only — no provider keys or gateway URL are needed. To
-connect to a real gateway, set `AAASM_GATEWAY_URL` in your environment directly. Run
+connect to a real gateway, set `AA_GATEWAY_URL` in your environment directly. Run
 `pnpm test` for the offline smoke test and `pnpm typecheck` for the type check.
 
 ## Code walkthrough

@@ -66,19 +66,23 @@ environment variables in your shell. The examples that ship a `.env.example`
 
 | Variable | Purpose |
 | --- | --- |
-| `AAASM_GATEWAY_URL` | URL of a running gateway, e.g. `http://localhost:7391`. Omit to use offline/noop mode. |
-| `AAASM_API_KEY` | API key — required only when the gateway has auth enabled. |
+| `AA_GATEWAY_URL` | URL of a running gateway, e.g. `http://localhost:7391`. Omit to use offline/noop mode. |
+| `AA_API_KEY` | API key — required only when the gateway has auth enabled. |
 | `OPENAI_API_KEY` | Provider key — only needed to drive a real LLM. Not used by `custom-tool-policy`. |
+
+The legacy `AAASM_GATEWAY_URL` / `AAASM_API_KEY` names still work as deprecated aliases
+(they log a one-time warning and are slated for removal); prefer the canonical `AA_*`
+names above.
 
 For the framework examples, copy the template and edit it:
 
 ```bash
 cp .env.example .env
-# Edit .env: set AAASM_GATEWAY_URL and optionally OPENAI_API_KEY
+# Edit .env: set AA_GATEWAY_URL and optionally OPENAI_API_KEY
 ```
 
 `custom-tool-policy` ships no `.env.example` — it is mock-only. To point it at a
-real gateway, set `AAASM_GATEWAY_URL` in your environment directly.
+real gateway, set `AA_GATEWAY_URL` in your environment directly.
 
 ## Starting or reaching a gateway
 
@@ -86,5 +90,5 @@ Real-provider mode talks to an Agent Assembly **gateway**. As described in the
 [Quick start](../02-quick-start/index.md), you can either let the SDK auto-start a
 local gateway (if the `aasm` binary is on your `PATH`, a zero-config
 `initAssembly()` probes `http://localhost:7391` and starts one for you) or point at
-a gateway you already run by setting `AAASM_GATEWAY_URL`. The examples themselves
+a gateway you already run by setting `AA_GATEWAY_URL`. The examples themselves
 default to offline mode and do not require a gateway to run.

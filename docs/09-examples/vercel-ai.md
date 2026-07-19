@@ -47,7 +47,7 @@ pnpm start
 ```
 
 No gateway or API key required — all tests run offline. To connect to a real gateway,
-set `AAASM_GATEWAY_URL` in your environment directly; to drive a real LLM, set
+set `AA_GATEWAY_URL` in your environment directly; to drive a real LLM, set
 `OPENAI_API_KEY`.
 
 ## Code walkthrough
