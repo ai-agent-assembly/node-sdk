@@ -8,7 +8,7 @@ sidebar_position: 1
 
 `initAssembly()` reached the local-default step of
 [gateway resolution](../05-configuration/index.md): no `gatewayUrl`
-was supplied, no `AAASM_GATEWAY_URL` was set, no `~/.aasm/config.yaml` entry was found, and
+was supplied, no `AA_GATEWAY_URL` was set, no `~/.aasm/config.yaml` entry was found, and
 nothing answered at `http://localhost:7391`. It then tried to auto-start a gateway but
 could not find the `aasm` binary.
 
@@ -16,7 +16,7 @@ Fix one of:
 
 - Install the CLI so auto-start works: `brew install ai-agent-assembly/tap/aasm`, or
   `curl -fsSL https://agent-assembly.com/install.sh | sh`.
-- Point the SDK at an already-running gateway: set `AAASM_GATEWAY_URL`, or pass
+- Point the SDK at an already-running gateway: set `AA_GATEWAY_URL`, or pass
   `gatewayUrl` explicitly, or add an `agent.gateway_url` entry to `~/.aasm/config.yaml`.
 
 ## `Auto-started gateway … did not become ready`

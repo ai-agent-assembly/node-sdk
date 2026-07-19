@@ -72,7 +72,7 @@ options:
   zero-config `initAssembly()` will probe `http://localhost:7391` and start a local
   gateway for you if nothing is running. Auto-start is opt-in — without it, a missing
   gateway throws a `ConfigurationError` instead of spawning anything.
-- **Point at a gateway you already run.** Set `AAASM_GATEWAY_URL` (and `AAASM_API_KEY`
+- **Point at a gateway you already run.** Set `AA_GATEWAY_URL` (and `AA_API_KEY`
   if it requires auth), or pass `gatewayUrl` explicitly.
 
 :::note[Local-mode transports: `:7391` REST + `:50051` gRPC]

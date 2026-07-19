@@ -47,7 +47,7 @@ mode**, copy `.env.example` to `.env` and fill in your values:
 
 ```bash
 cp .env.example .env
-# Edit .env: set AAASM_GATEWAY_URL and optionally OPENAI_API_KEY
+# Edit .env: set AA_GATEWAY_URL and optionally OPENAI_API_KEY
 ```
 
 Then `pnpm start` connects to the real gateway and real OpenAI API if configured.
@@ -102,7 +102,7 @@ it runs offline in CI with no API keys.
 :::
 
 :::caution[Gateway connection refused]
-If a real gateway is unreachable, omit `AAASM_GATEWAY_URL` to use offline mode.
+If a real gateway is unreachable, omit `AA_GATEWAY_URL` to use offline mode.
 :::
 
 ## Expected behavior

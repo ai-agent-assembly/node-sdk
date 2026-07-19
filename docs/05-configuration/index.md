@@ -54,9 +54,16 @@ Both `gatewayUrl` and `apiKey` are resolved with the same four-step precedence
 | Priority | Source                            | URL key                                                  | API-key key                                      |
 | -------- | --------------------------------- | -------------------------------------------------------- | ------------------------------------------------ |
 | 1        | Explicit field on `config`        | `gatewayUrl`                                             | `apiKey`                                         |
-| 2        | Environment variable              | `AAASM_GATEWAY_URL`                                      | `AAASM_API_KEY`                                  |
+| 2        | Environment variable              | `AA_GATEWAY_URL`                                      | `AA_API_KEY`                                  |
 | 3        | Config file `~/.aasm/config.yaml` | `agent.gateway_url`                                      | `agent.api_key`                                  |
 | 4        | Local default                     | `http://localhost:7391` (probed; auto-started if absent) | `""` (local mode accepts unauthenticated agents) |
+
+:::note[Deprecated `AAASM_*` aliases]
+The legacy `AAASM_GATEWAY_URL` / `AAASM_API_KEY` names are still accepted as
+backwards-compatible aliases, used only when the canonical `AA_*` name is unset. Reading
+from a legacy name logs a one-time deprecation warning; the aliases will be removed in a
+future release. Use the canonical `AA_GATEWAY_URL` / `AA_API_KEY` names.
+:::
 
 The config file is optional and parsed only when the `js-yaml` soft dependency is
 present; a missing file, missing `js-yaml`, or malformed contents are treated as
@@ -146,7 +153,7 @@ Explicit, with lineage and a dry-run posture:
 ```ts
 const ctx = await initAssembly({
   gatewayUrl: "https://gateway.internal:7391",
-  apiKey: process.env.AAASM_API_KEY,
+  apiKey: process.env.AA_API_KEY,
   agentId: "research-agent",
   teamId: "growth",
   enforcementMode: "observe",

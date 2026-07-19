@@ -52,7 +52,7 @@ pnpm start
 ```
 
 No gateway or API key required — all tests run offline. To connect to a real gateway,
-set `AAASM_GATEWAY_URL` in your environment directly.
+set `AA_GATEWAY_URL` in your environment directly.
 
 ## Code walkthrough
 
