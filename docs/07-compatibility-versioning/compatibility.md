@@ -44,11 +44,14 @@ releases on the same major line are expected to work. These ranges mirror the
 | Mastra        | `@mastra/core`         | `>=0.20.0`      |
 | OpenAI Agents | `@openai/agents`       | `>=0.1.0`       |
 
-:::caution[Vercel AI SDK status]
-The Vercel AI SDK adapter is **not yet usable** with real `ai` 5.x/6.x releases. It
-currently crashes trying to mutate the frozen ESM `tool` export
-([AAASM-3532](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532)). The range
-above reflects the intended support floor once that bug is fixed.
+:::note[Vercel AI SDK: govern tools with `withAssembly()`]
+The Vercel AI SDK adapter is **usable** with real `ai` 5.x/6.x releases. A real `ai` ES
+module is a frozen namespace, so `initAssembly()` cannot auto-patch its `tool` export —
+rather than crashing (the earlier
+[AAASM-3532](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532) behavior), the
+SDK now logs a one-time warning and declines auto-patching, leaving zero-config init
+intact. Govern Vercel AI SDK tools explicitly by wrapping the tool map with
+`withAssembly()` — see the [Vercel AI SDK example](../09-examples/vercel-ai.md).
 :::
 
 This page is the **authoritative** reference for the Node SDK's framework support. The
