@@ -202,7 +202,10 @@ untouched. The generator picks the sentinel dialect based on the file path:
   ```
 
 Available block ids: `install-commands`, `install-dist-tag`,
-`package-identity`, `current-version-pin`.
+`package-identity`, `current-version-pin`, `release-line`. The `release-line`
+block (AAASM-4919) carries the README "Project status" release-line prose — the
+current release line (e.g. `0.0.1-rc.x`, derived from the `package.json` version)
+and the npm dist-tag — so that prose can no longer drift from the SoT.
 
 **Source-code install hints**
 
@@ -238,9 +241,13 @@ The `publish-docs.yml` workflow's drift check runs the generator and `git diff -
 
 **CI enforcement**
 
-`publish-docs.yml` runs the generator on every PR that touches `docs/` or
-`website/` and fails if `git diff --exit-code` reports drift in `README.md`
-or `docs/`. Do not skip this check — regenerate locally and commit the result.
+`publish-docs.yml` runs the generator on every PR that touches `README.md`,
+`docs/`, `website/`, `metadata/`, `src/generated/`, or the generator script, and
+fails if `git diff --exit-code` reports drift in `README.md`, `docs/`, or
+`src/generated/`. `README.md` is a trigger path in its own right (AAASM-4919) so
+a README-only edit that stales a generated block — including the `release-line`
+version prose — still fails the check. Do not skip this check — regenerate
+locally and commit the result.
 
 **Do not template**
 
