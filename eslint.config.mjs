@@ -10,7 +10,12 @@ export default tseslint.config(
       "native/aa-ffi-node/index.cjs",
       "native/aa-ffi-node/index.d.ts",
       "website/**",
-      "docs/api/**",
+      // Generated TypeDoc output (docusaurus-plugin-typedoc `out`). Relocated
+      // from docs/api to docs/06-api-reference/api (AAASM-4556 / ecf4e74d); the
+      // `docs/**/api/**` glob covers the current path and any stale legacy
+      // docs/api/ a local checkout still has. Gitignored, machine-generated —
+      // linting the emitted typedoc-sidebar.cjs trips no-undef.
+      "docs/**/api/**",
       // Vendored quick-start snippets (AAASM-4514): verbatim excerpts of the
       // examples repo's runnable regions, not compiled by any tsconfig. They are
       // doc fixtures, not source — linting them trips the typed-project parser.
