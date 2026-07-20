@@ -96,8 +96,9 @@ pnpm native:build:release     # napi-rs release build (per-platform artifact)
 
 ## Project policy
 
-- **JIRA:** project AAASM; set **Component** (`customfield_10041`) to
-  `AI-agent-assembly/node-sdk`; Team (`customfield_10001`) = Pioneer. Epic → Story →
+- **JIRA:** project AAASM; set the native **Component** field (not
+  `customfield_10041`, which is null) to `ai-agent-assembly/node-sdk`;
+  Team (`customfield_10001`) = Pioneer. Epic → Story →
   Subtask (one Subtask ≈ one commit) + a `Verify …` subtask per Story.
 - **Self-hosted deployment is out of scope** product-wide — don't propose
   Helm/Terraform/air-gapped/migration work even if the spec mentions it.
