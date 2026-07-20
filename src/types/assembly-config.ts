@@ -6,7 +6,8 @@ import type { EnforcementMode } from "./enforcement-mode.js";
 export interface AssemblyConfig {
   /**
    * Gateway URL. When omitted, ``initAssembly`` resolves it via
-   * AAASM_GATEWAY_URL, ~/.aasm/config.yaml, or the local default
+   * ``AA_GATEWAY_URL`` (with the deprecated ``AAASM_GATEWAY_URL`` alias as a
+   * fallback), ~/.aasm/config.yaml, or the local default
    * (http://localhost:7391, auto-started if absent). See
    * ``agent_assembly/core/gateway-resolver`` for the precedence chain.
    */
@@ -21,7 +22,8 @@ export interface AssemblyConfig {
   controlPlaneUrl?: string;
   /**
    * API key. When omitted, ``initAssembly`` resolves it via
-   * AAASM_API_KEY, the config file, or defaults to an empty string
+   * ``AA_API_KEY`` (with the deprecated ``AAASM_API_KEY`` alias as a
+   * fallback), the config file, or defaults to an empty string
    * (local mode is unauth-accepting).
    */
   apiKey?: string;
