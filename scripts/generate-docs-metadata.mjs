@@ -244,6 +244,31 @@ function renderInstallDistTag(meta, dialect) {
   ].join("\n");
 }
 
+// Collapse an exact version to the release *line* the Project-status prose
+// names — e.g. `0.0.1-rc.6` -> `0.0.1-rc.x`. The line, not the exact pin, is
+// what the prose describes, so the trailing pre-release counter under the
+// dist-tag is replaced with `x`. When the version carries no dist-tagged
+// pre-release segment (a stable release), the exact version is returned
+// unchanged so the prose never invents an `x` line that does not exist.
+function deriveReleaseLine(version, distTag) {
+  const base = version.split("-")[0];
+  const pre = version.slice(base.length + 1);
+  if (pre && distTag && pre.startsWith(distTag)) {
+    return `${base}-${distTag}.x`;
+  }
+  return version;
+}
+
+function renderReleaseLine(meta, dialect) {
+  const releaseLine = deriveReleaseLine(meta.version, meta.distTag);
+  return [
+    dialect.header("release-line"),
+    "",
+    `> **Pre-1.0 / release candidate.** The current release line is \`${releaseLine}\`, published to npm under`,
+    `> the \`${meta.distTag}\` dist-tag and cut as a [GitHub Release](${meta.repositoryUrl.replace(/^git\+/, "").replace(/\.git$/, "")}/releases).`
+  ].join("\n");
+}
+
 function renderPackageIdentity(meta, dialect) {
   return [
     dialect.header("package-identity"),
@@ -320,6 +345,7 @@ export function renderQuickstartFrameworkTabs(meta, dialect) {
 const BLOCKS = {
   "install-commands": renderInstallCommands,
   "install-dist-tag": renderInstallDistTag,
+  "release-line": renderReleaseLine,
   "package-identity": renderPackageIdentity,
   "current-version-pin": renderCurrentVersionPin,
   "quickstart-framework-tabs": renderQuickstartFrameworkTabs
