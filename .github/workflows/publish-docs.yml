@@ -5,6 +5,11 @@ on:
     paths:
       - "docs/**"
       - "website/**"
+      # AAASM-4919: README carries generated version blocks (install snippets,
+      # release-line prose). A README-only edit that stales a generated block
+      # must retrigger the drift check, so it is a trigger path in its own right
+      # — the check already diffs README.md, it just was not firing on it.
+      - "README.md"
       - ".github/workflows/publish-docs.yml"
       # AAASM-4327: shared-metadata drift now also affects runtime source
       # under src/generated/, so any change there must retrigger the drift
