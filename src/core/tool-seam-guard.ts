@@ -20,15 +20,23 @@
 /**
  * Whether assigning to `target[seam]` in place would succeed rather than throw.
  *
- * A seam is writable only when the object is extensible AND its existing slot is
- * either absent, a writable data property, or an accessor with a setter — the
- * three shapes under which `target[seam] = …` does not throw. A frozen object is
- * non-extensible and short-circuits on the first clause.
+ * Two independent shapes let `target[seam] = …` succeed, and extensibility only
+ * governs the second:
+ *  - The slot **already exists** as a writable data property or an accessor with
+ *    a setter — the assignment mutates it in place and succeeds *regardless of
+ *    extensibility*. `Object.seal()` leaves data properties `writable:true` while
+ *    setting `extensible:false`, so a sealed-but-writable seam is still writable;
+ *    gating this case on extensibility was an over-conservative false-negative
+ *    that skipped wrapping (and silently downgraded enforcement) on a seam the
+ *    assignment would in fact have taken (AAASM-4951).
+ *  - The slot is **absent** — assigning *adds* a property, which only succeeds
+ *    when the object is extensible. A frozen object is non-extensible and has a
+ *    non-writable slot, so both branches reject it.
  */
 export function isSeamWritable(target: object, seam: string): boolean {
   const descriptor = Object.getOwnPropertyDescriptor(target, seam);
-  return (
-    Object.isExtensible(target) &&
-    (descriptor === undefined || descriptor.writable === true || descriptor.set !== undefined)
-  );
+  if (descriptor === undefined) {
+    return Object.isExtensible(target);
+  }
+  return descriptor.writable === true || descriptor.set !== undefined;
 }
