@@ -92,9 +92,10 @@ export function redactSecrets(value: unknown): unknown {
  *
  * Beyond the original `Bearer` / `Authorization:` markers this also scrubs bare,
  * self-identifying token shapes that travel without a header prefix: JSON Web
- * Tokens (the `eyJ` base64url header), `sk-`-prefixed API keys, and
- * credential-bearing URL query parameters (`?token=…`, `&api_key=…`). The
- * patterns are deliberately shape-specific to avoid mangling ordinary prose.
+ * Tokens (the `eyJ` base64url header), `sk-`-prefixed API keys,
+ * credential-bearing URL query parameters (`?token=…`, `&api_key=…`), and URL
+ * userinfo credentials (`https://user:pass@host/…`). The patterns are
+ * deliberately shape-specific to avoid mangling ordinary prose.
  */
 export function redactErrorMessage(error: unknown): string {
   const raw = String(error);
@@ -112,5 +113,9 @@ export function redactErrorMessage(error: unknown): string {
         /([?&][\w-]*(?:token|key|secret|password|credential)[\w-]*=)[^&\s"']+/gi,
         `$1${REDACTED}`
       )
+      // URL userinfo credentials: `scheme://user:pass@host` → `scheme://<redacted>@host`.
+      // The `pass` half is the secret; both halves are dropped since the userinfo
+      // as a whole is credential material that must not reach a log.
+      .replace(/(:\/\/)[^/?#\s:@]+:[^/?#\s@]+@/g, `$1${REDACTED}@`)
   );
 }
