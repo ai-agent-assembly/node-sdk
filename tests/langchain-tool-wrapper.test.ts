@@ -98,6 +98,24 @@ describe("wrapToolWithAssembly", () => {
     }
   });
 
+  it("wraps a sealed-but-writable tool: enforcement is applied (AAASM-4951)", async () => {
+    // AAASM-4951: `Object.seal()` sets extensible:false but leaves the existing
+    // `invoke` data property writable:true, so `tool.invoke = wrapper` succeeds.
+    // The guard must not skip on non-extensibility alone — doing so silently
+    // downgraded enforcement on a seam the assignment would have taken.
+    const gateway = createGatewayMock();
+    gateway.check = vi.fn(async () => ({ denied: true, reason: "sealed but governed" }));
+
+    const tool = Object.seal(createTool());
+    const originalInvoke = tool.invoke;
+
+    expect(Object.isExtensible(tool)).toBe(false);
+    expect(() => wrapToolWithAssembly(tool, gateway, { generateRunId: () => "run-sealed" })).not.toThrow();
+    // The seam was actually replaced with the governed wrapper.
+    expect(tool.invoke).not.toBe(originalInvoke);
+    await expect(tool.invoke({ to: "eve@example.com" })).rejects.toBeInstanceOf(PolicyViolationError);
+  });
+
   it("guards a tool whose invoke slot is non-writable: warns without throwing", async () => {
     // AAASM-4852: extensible object, but its `invoke` is a non-writable data
     // property — the assignment still throws. Exercises the descriptor branch of

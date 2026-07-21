@@ -4,7 +4,8 @@ import type { GatewayClient } from "../src/gateway/client.js";
 import {
   openAIAgentsPatchState,
   patchOpenAIAgents,
-  unpatchOpenAIAgents
+  unpatchOpenAIAgents,
+  wrapFunctionToolInvoke
 } from "../src/hooks/openai-agents.js";
 
 /**
@@ -171,6 +172,84 @@ describe("openai agents interception via getAllTools", () => {
     expect(gateway.check).toHaveBeenCalledWith(
       expect.objectContaining({ toolName: "list_files" })
     );
+  });
+
+  it("wraps a sealed-but-writable tool: DENY is enforced (AAASM-4951)", async () => {
+    // AAASM-4951: `Object.seal()` makes the tool non-extensible but leaves its
+    // `invoke` data property writable:true, so `candidate.invoke = wrapper`
+    // succeeds. The guard must not skip on non-extensibility alone — doing so
+    // silently left a sealed tool ungoverned despite a wrappable seam.
+    const gateway = createGatewayClientMock();
+    gateway.check = vi.fn(async () => ({ denied: true, reason: "policy-blocked" }));
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    await patchOpenAIAgents({
+      gatewayClient: gateway,
+      loadAgentClass: async () => Agent as never
+    });
+
+    const executed = { called: false };
+    const sealedTool = Object.seal(buildTool(executed));
+    expect(Object.isExtensible(sealedTool)).toBe(false);
+    const agent = new Agent({ name: "A", instructions: "x", tools: [sealedTool] });
+
+    const tools = await agent.getAllTools(runContext as never);
+    const governed = tools.find((t) => (t as { name?: string }).name === "send_email") as {
+      invoke: (rc: unknown, input: string) => Promise<unknown>;
+    };
+    const output = await governed.invoke(runContext, JSON.stringify({ to: "user@example.com" }));
+
+    try {
+      // Enforcement applied: DENY blocked execution, and no not-wrappable warning fired.
+      expect(output).toBe("Blocked by governance policy: policy-blocked");
+      expect(executed.called).toBe(false);
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some((line) => line.includes("send_email") && line.includes("could not be wrapped"));
+      expect(warned).toBe(false);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("skips a non-extensible tool whose own invoke slot is absent (AAASM-4951)", () => {
+    // AAASM-4951: exercises the absent-own-slot branch of the inline
+    // writability check (`Object.getOwnPropertyDescriptor(candidate, "invoke")
+    // === undefined`), which only the add-property case reaches. Here `invoke`
+    // is inherited from the prototype, so the own descriptor is undefined and
+    // wrapping would have to *add* an own `invoke` — impossible on a
+    // non-extensible object, so the guard must skip + warn (mirrors the
+    // extensible sub-case, where adding the property would instead succeed).
+    const gateway = createGatewayClientMock();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    const proto = { invoke: async () => "PROTO" };
+    const inheritedInvokeTool = Object.create(proto) as { type: string; name: string };
+    inheritedInvokeTool.type = "function";
+    inheritedInvokeTool.name = "inherited_invoke_tool";
+    Object.preventExtensions(inheritedInvokeTool);
+    // Precondition: own `invoke` slot is absent, object is non-extensible.
+    expect(Object.getOwnPropertyDescriptor(inheritedInvokeTool, "invoke")).toBeUndefined();
+    expect(Object.isExtensible(inheritedInvokeTool)).toBe(false);
+
+    try {
+      expect(() =>
+        wrapFunctionToolInvoke(inheritedInvokeTool, gateway, {
+          fallbackRunId: "run-inherited",
+          approvalTimeoutMs: 100
+        })
+      ).not.toThrow();
+      // Not wrapped: no own `invoke` was added, and a not-wrappable warning fired.
+      expect(Object.getOwnPropertyDescriptor(inheritedInvokeTool, "invoke")).toBeUndefined();
+      const warned = stderr.mock.calls
+        .map((call) => String(call[0]))
+        .some(
+          (line) => line.includes("inherited_invoke_tool") && line.includes("could not be wrapped")
+        );
+      expect(warned).toBe(true);
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it("guards an extensible tool whose invoke is non-writable: warns without rejecting", async () => {

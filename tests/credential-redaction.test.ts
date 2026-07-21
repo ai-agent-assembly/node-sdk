@@ -152,6 +152,23 @@ describe("redactErrorMessage (AAASM-3645, AAASM-3925)", () => {
     // Non-credential query params are preserved.
     expect(scrubbed).toContain("page=2");
   });
+
+  it("scrubs URL userinfo credentials (AAASM-4951)", () => {
+    const scrubbed = redactErrorMessage(
+      new Error("connect failed: https://svcuser:SENTINEL-PASS@gw.test:8443/path?page=2")
+    );
+    expect(scrubbed).not.toContain("SENTINEL-PASS");
+    expect(scrubbed).not.toContain("svcuser");
+    expect(scrubbed).toContain(REDACTED);
+    // Host, port, path, and non-credential query survive.
+    expect(scrubbed).toContain("gw.test:8443/path");
+    expect(scrubbed).toContain("page=2");
+  });
+
+  it("leaves a credential-free URL untouched (AAASM-4951)", () => {
+    const scrubbed = redactErrorMessage(new Error("GET https://gw.test:8443/path failed"));
+    expect(scrubbed).toBe("Error: GET https://gw.test:8443/path failed");
+  });
 });
 
 interface MockBinding {

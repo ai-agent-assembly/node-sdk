@@ -328,10 +328,15 @@ export function wrapFunctionToolInvoke(
   // ungoverned tool it can't wrap. Skip + warn instead so the rest of the tools
   // stay governed and the operator still gets a loud, un-silenceable signal
   // (AAASM-4847).
+  // Mirror `isSeamWritable` (src/core/tool-seam-guard.ts): an already-present
+  // writable data property or accessor-with-setter is assignable regardless of
+  // extensibility (`Object.seal` leaves data props `writable:true`); only the
+  // add-property (absent-slot) case needs extensibility (AAASM-4951).
   const descriptor = Object.getOwnPropertyDescriptor(candidate, "invoke");
   const isWritable =
-    Object.isExtensible(candidate) &&
-    (descriptor === undefined || descriptor.writable === true || descriptor.set !== undefined);
+    descriptor === undefined
+      ? Object.isExtensible(candidate)
+      : descriptor.writable === true || descriptor.set !== undefined;
   if (!isWritable) {
     warnOpenAIAgentsToolNotWrappable(candidate.name);
     return;
