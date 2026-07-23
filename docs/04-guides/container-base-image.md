@@ -130,9 +130,9 @@ SDK version. A bare `docker build` of the image without the arg gets the default
 ## See also
 
 - **Canonical core guide —**
-  [container base images](https://github.com/ai-agent-assembly/agent-assembly/blob/master/docs/src/usage-guide/container-base-images.md)
+  [container base images](https://github.com/ai-agent-assembly/agent-assembly/blob/HEAD/docs/src/usage-guide/container-base-images.md)
   (the authoritative reference; the published doc-site page is not live yet).
 - **ADR 0009 —**
-  [versioned base-image tags and SDK pinning](https://github.com/ai-agent-assembly/agent-assembly/blob/master/docs/src/adr/0009-versioned-base-image-tags-and-sdk-pinning.md).
+  [versioned base-image tags and SDK pinning](https://github.com/ai-agent-assembly/agent-assembly/blob/HEAD/docs/src/adr/0009-versioned-base-image-tags-and-sdk-pinning.md).
 - [Quick Start](../02-quick-start/index.md) — install the SDK and govern your first agent.
 - [Configuration](../05-configuration/index.md) — gateway URL and API-key resolution for the running container.

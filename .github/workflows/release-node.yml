@@ -44,7 +44,7 @@ on:
           - all
           - main-only
       dry-run:
-        description: "Skip the npm publish steps and the docs-version snapshot. Builds run normally; nothing reaches the registry or master. Defaults to false so today's dispatch behavior is unchanged."
+        description: "Skip the npm publish steps and the docs-version snapshot. Builds run normally; nothing reaches the registry or main. Defaults to false so today's dispatch behavior is unchanged."
         required: false
         type: boolean
         default: false
@@ -247,7 +247,7 @@ jobs:
       #
       # This step must run BEFORE the pre-flight check (also AAASM-2867)
       # so the pre-flight reads the rewritten version pins rather than
-      # the `workspace:*` marker that lives on master.
+      # the `workspace:*` marker that lives on main.
       - name: Bump main SDK version only (main-only mode)
         if: steps.tag.outputs.publish_mode == 'main-only'
         env:
@@ -286,7 +286,7 @@ jobs:
       #
       # AAASM-2867: this step runs AFTER the main-only Bump step, so the
       # `optionalDependencies` it reads are the post-rewrite real versions
-      # (derived from `binary_source_tag`), not master's `workspace:*` marker.
+      # (derived from `binary_source_tag`), not main's `workspace:*` marker.
       - name: Pre-flight verify runtime sub-packages exist on npm
         if: steps.tag.outputs.publish_mode == 'main-only'
         run: |
@@ -646,8 +646,8 @@ jobs:
   # AAASM-2751: cut the immutable Docusaurus docs snapshot for this release
   # and repoint the channel metadata. This runs ONLY after `publish` succeeds,
   # so a snapshot is only ever frozen for a real, finished release — never on a
-  # raw tag. It opens a docs-update PR against master (the repo's normal flow)
-  # rather than pushing to master directly.
+  # raw tag. It opens a docs-update PR against main (the repo's normal flow)
+  # rather than pushing to main directly.
   version-docs:
     name: Cut docs version snapshot and repoint channels
     needs: publish
@@ -670,7 +670,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v4.2.2
         with:
-          ref: master
+          ref: main
           fetch-depth: 0
 
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
@@ -710,7 +710,7 @@ jobs:
           git commit -m "📸 (docs): Cut docs snapshot for ${NPM_VERSION} and repoint channels"
           git push origin "$branch"
           gh pr create \
-            --base master \
+            --base main \
             --head "$branch" \
             --title "📸 (docs): Cut docs snapshot for ${NPM_VERSION}" \
             --body-file - <<EOF
@@ -720,11 +720,11 @@ jobs:
           EOF
 
       # AAASM-2794: self-approve + enable auto-merge so the snapshot lands on
-      # master without a per-release manual merge. The approve step MUST use a
+      # main without a per-release manual merge. The approve step MUST use a
       # PAT (DOCS_BOT_PAT) because GitHub forbids self-approval from the same
       # actor that opened the PR — the PAT is from the operator account, so the
       # approval comes from a different actor than github-actions[bot]. Auto-
-      # merge waits for any required status checks, then squash-merges. master
+      # merge waits for any required status checks, then squash-merges. main
       # branch protection (1 required review + code-owner) is preserved.
       - name: Self-approve docs-version PR (via PAT)
         env:

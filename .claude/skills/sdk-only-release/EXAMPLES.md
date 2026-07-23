@@ -15,7 +15,7 @@ The `.1` suffix preserves pin-to-exact installs of `0.0.1-alpha.8`.
 ```bash
 gh workflow run release-node.yml \
   --repo ai-agent-assembly/node-sdk \
-  --ref master \
+  --ref main \
   -f npm_version=0.0.1-alpha.8.1 \
   -f binary_source_tag=v0.0.1-alpha.8 \
   -f publish_mode=main-only \
@@ -38,7 +38,7 @@ The dry-run completed green; no artifacts were pushed to the registry.
 ```bash
 gh workflow run release-node.yml \
   --repo ai-agent-assembly/node-sdk \
-  --ref master \
+  --ref main \
   -f npm_version=0.0.1-alpha.8.1 \
   -f binary_source_tag=v0.0.1-alpha.8 \
   -f publish_mode=main-only \
@@ -99,14 +99,14 @@ $ gh pr list --repo ai-agent-assembly/node-sdk --head bot/aa-ffi-pin-v0.0.1-beta
 
 If no PR is listed, the upstream `update-node-sdk-ffi-pin` job (AAASM-2883) hasn't run yet. Wait, then re-probe.
 
-**3. Review + merge the auto-bump PR.** The PR moves `native/aa-ffi-node/Cargo.toml`'s `aa-sdk-client` rev to the new agent-assembly tag commit (and regenerates `Cargo.lock`). After merge, master carries the binary-matching SHA pin.
+**3. Review + merge the auto-bump PR.** The PR moves `native/aa-ffi-node/Cargo.toml`'s `aa-sdk-client` rev to the new agent-assembly tag commit (and regenerates `Cargo.lock`). After merge, main carries the binary-matching SHA pin.
 
 **4. ONLY NOW dispatch `release-node.yml`.** Same mechanics as the alpha-8.1 example above — `dry-run=true` first, then `dry-run=false`. Critically, use `binary_source_tag=v0.0.1-beta.3` (NOT the previous tag) so the runtime sub-packages resolve against the new agent-assembly Release, and `publish_mode=all` because this is a coordinated release with new binaries (the `main-only` mode is the Case B shape).
 
 ```bash
 gh workflow run release-node.yml \
   --repo ai-agent-assembly/node-sdk \
-  --ref master \
+  --ref main \
   -f npm_version=0.0.1-beta.3 \
   -f binary_source_tag=v0.0.1-beta.3 \
   -f publish_mode=all \

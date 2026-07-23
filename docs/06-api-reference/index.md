@@ -55,7 +55,7 @@ inside this **API Reference** section. Navigation, search, and dark mode all wor
 without extra configuration.
 
 You do not need to commit anything under `docs/06-api-reference/api/`; the workflow
-regenerates it on each push to `master`.
+regenerates it on each push to `main`.
 
 ## Manual regeneration
 

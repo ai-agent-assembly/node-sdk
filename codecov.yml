@@ -11,8 +11,8 @@
 # both tools now count the same effective set (`src/` minus generated code).
 codecov:
   token: $CODECOV_TOKEN
-  branch: master
-  strict_yaml_branch: master
+  branch: main
+  strict_yaml_branch: main
 ignore:
   - "native/aa-ffi-node/index.cjs"
   # Generated protoc-gen-ts_proto output; Sonar excludes it too

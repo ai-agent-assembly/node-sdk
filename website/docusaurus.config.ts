@@ -192,7 +192,7 @@ const config: Config = {
             "api/**",
             "superpowers/**",
           ],
-          editUrl: "https://github.com/ai-agent-assembly/node-sdk/tree/master/website/",
+          editUrl: "https://github.com/ai-agent-assembly/node-sdk/tree/main/website/",
           // Per-page git "Last updated" date + committer (AAASM-2747).
           // Docusaurus derives both from `git log` for each doc file, so the
           // publish-docs workflow checks out full history (`fetch-depth: 0`).
@@ -203,8 +203,8 @@ const config: Config = {
           // The docs site models three release "channels" on top of
           // Docusaurus' immutable version snapshots:
           //
-          //   - `current` (the live `../docs`) tracks `master`. It is the
-          //     "latest (master)" channel, served at `/next/` (NOT `/`) so it
+          //   - `current` (the live `../docs`) tracks `main`. It is the
+          //     "latest (main)" channel, served at `/next/` (NOT `/`) so it
           //     never collides at the root with a real cut version, and it
           //     carries the native `unreleased` banner.
           //   - the newest STABLE snapshot (tag `vX.Y.Z`) is the "stable"
@@ -218,7 +218,7 @@ const config: Config = {
           // `current` when no snapshot exists. So today — before any snapshot
           // is cut — `current` is still served at the root even though its
           // own `path` is `/next/`, and the dropdown shows just
-          // "latest (master)".
+          // "latest (main)".
           //
           // Snapshots are cut by the RELEASE workflow
           // (`.github/workflows/release-node.yml`), which runs

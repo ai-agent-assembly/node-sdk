@@ -62,7 +62,7 @@ on:
       - "docs/**"
       - "LICENSE"
     branches:
-      - master
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

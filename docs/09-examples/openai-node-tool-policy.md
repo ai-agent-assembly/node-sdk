@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # OpenAI Node tool policy
 
-Source: [`node/openai-node-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/master/node/openai-node-tool-policy)
+Source: [`node/openai-node-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/openai-node-tool-policy)
 
 ## What this example demonstrates
 
@@ -145,5 +145,5 @@ Tool calls governed by withAssembly + the local policy.
 
 ## Links
 
-- Example directory: [`node/openai-node-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/master/node/openai-node-tool-policy)
-- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/master/node/openai-node-tool-policy/README.md)
+- Example directory: [`node/openai-node-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/openai-node-tool-policy)
+- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/HEAD/node/openai-node-tool-policy/README.md)

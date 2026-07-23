@@ -18,7 +18,7 @@ every SDK-only publish — **the trigger reason is broader than "hotfix"**.
 ```bash
 gh workflow run release-node.yml \
   --repo ai-agent-assembly/node-sdk \
-  --ref master \
+  --ref main \
   -f npm_version=<X> \
   -f binary_source_tag=<Y> \
   -f publish_mode=main-only \
@@ -69,7 +69,7 @@ The SDK release MUST wait. Required order:
 
 1. Cut the `agent-assembly` tag (e.g. `v0.0.1-beta.3`) and wait for its `Release` workflow to complete (build → publish → `notify-downstream`).
 2. Wait for the auto-bump PR (`bot/aa-ffi-pin-<tag>`) to open on this repo (AAASM-2883 for node/python; AAASM-3006 extends the same fan-out to go-sdk).
-3. Review + merge the auto-bump PR. This brings `master` in line with the `aa-sdk-client` SHA carried by the new agent-assembly tag.
+3. Review + merge the auto-bump PR. This brings `main` in line with the `aa-sdk-client` SHA carried by the new agent-assembly tag.
 4. ONLY THEN cut the SDK tag (matching version) — by tag-push OR `workflow_dispatch` — to fire this skill.
 
 Do NOT pre-publish the SDK tag against the previous agent-assembly content. Doing so:
@@ -79,7 +79,7 @@ Do NOT pre-publish the SDK tag against the previous agent-assembly content. Doin
 
 ### Case B — SDK-only release (no agent-assembly cut in this cycle)
 
-This skill may be triggered freely via `workflow_dispatch`. No coordination required, because the existing `aa-sdk-client` SHA pin on `master` is already what we want to ship.
+This skill may be triggered freely via `workflow_dispatch`. No coordination required, because the existing `aa-sdk-client` SHA pin on `main` is already what we want to ship.
 
 ### Why this SOP exists (the 2026-06-15 incident)
 
@@ -91,7 +91,7 @@ The fix is operator discipline (this SOP), not a workflow-code restriction — `
 
 Before the `workflow_dispatch` publish, land a **prep-only PR** advancing every
 checked-in version literal to the new release. The `npm_version` dispatch input is
-what stamps the published packages, but master must not lag it — a stale literal
+what stamps the published packages, but main must not lag it — a stale literal
 drifts the SonarCloud gate and misleads the docs. **Bump ALL of the following in one
 prep PR** (reference: rc.2 PR #205 / AAASM-3834). Missing any of these — especially
 the docs pins — is the most common release-prep defect.
