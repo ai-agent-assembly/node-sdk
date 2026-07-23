@@ -415,6 +415,19 @@ enforcement mode; the **Audit Log** shows the per-action decisions, including de
 
 <figure>
 <ThemedImage
+  alt="Agent Assembly dashboard Topology view: agent cards grouped into two team clusters (support, analytics), each cluster labelled with a per-team budget bar and connected by delegation edges; one card is outlined red for an errored agent."
+  sources={{
+    light: useBaseUrl("/img/dashboard/topology-light.png"),
+    dark: useBaseUrl("/img/dashboard/topology-dark.png"),
+  }}
+/>
+<figcaption><strong>Topology</strong> — the same fleet as a graph, grouped into team
+clusters each carrying a budget bar, so you can see which team an agent belongs to and
+how its spend rolls up. Shown with sample fixture data.</figcaption>
+</figure>
+
+<figure>
+<ThemedImage
   alt="Agent Assembly dashboard Audit Log: the top row is highlighted red — a Policy Violation with a deny decision on gmail/send to an external recipient — above allow rows for an LLM call and a tool call, and a redact decision on a file write."
   sources={{
     light: useBaseUrl("/img/dashboard/audit-light.png"),
