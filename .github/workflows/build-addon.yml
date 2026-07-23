@@ -13,7 +13,7 @@ on:
       - "docs/**"
       - "LICENSE"
     branches:
-      - master
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -33,7 +33,7 @@ jobs:
         # does not build on Windows, and the SDK ships no Windows native runtime
         # (see optionalDependencies); Windows consumers use grpc-sidecar mode.
         # Per-PR builds are ubuntu-only (fast public-minute feedback);
-        # macOS is added on push:master and tags, where the prebuilt
+        # macOS is added on push:main and tags, where the prebuilt
         # release artifacts are actually consumed (AAASM-2664).
         os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest","macos-latest"]') }}
         node-version: [20, 22]
@@ -68,7 +68,7 @@ jobs:
 
       # On PRs, a fast debug build is enough to prove the addon compiles
       # and the napi bindings load. Release builds (optimised, --platform
-      # suffixed prebuilds) run only on push:master / tags (AAASM-2664).
+      # suffixed prebuilds) run only on push:main / tags (AAASM-2664).
       - name: Build napi addon (debug, PR)
         if: github.event_name == 'pull_request'
         run: pnpm native:build

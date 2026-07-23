@@ -8,7 +8,7 @@ on:
     paths:
       - "native/aa-ffi-node/Cargo.toml"
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "native/aa-ffi-node/Cargo.toml"
 
