@@ -310,6 +310,22 @@ Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved ever
 </Tabs>
 {/* END GENERATED: quickstart-framework-tabs */}
 
+Once governance is wired and the agent registers with a running gateway (the real-gateway
+path in §8), it appears in the operator dashboard's **Overview** immediately — the fleet
+count ticks up and its three-layer posture goes live.
+
+<figure>
+<ThemedImage
+  alt="Agent Assembly dashboard Overview: three-layer posture rings (identity, capability, scrub, overall) above a fleet snapshot reading six total agents — four enforcing, two in shadow mode, none flagged — with a pending-approvals count and a 'no critical issues' panel."
+  sources={{
+    light: useBaseUrl("/img/dashboard/overview-light.png"),
+    dark: useBaseUrl("/img/dashboard/overview-dark.png"),
+  }}
+/>
+<figcaption><strong>Overview</strong> — your agent appears the moment it registers: the
+fleet snapshot and posture rings update live. Shown with sample fixture data (see §7).</figcaption>
+</figure>
+
 ## 3a. An allowed call
 
 An allowed tool runs normally and returns its result. Using the LangChain.js example's
