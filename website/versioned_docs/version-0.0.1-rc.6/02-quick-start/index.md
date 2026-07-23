@@ -67,7 +67,7 @@ The SDK enforces policy by talking to an Agent Assembly **gateway**. You have tw
 options:
 
 - **Let the SDK auto-start a local gateway.** If you have the `aasm` binary on your
-  `PATH` (`npm install -g @agent-assembly/cli`) and set `AA_AUTO_START=1`, a
+  `PATH` (`brew install ai-agent-assembly/tap/aasm`) and set `AA_AUTO_START=1`, a
   zero-config `initAssembly()` will probe `http://localhost:7391` and start a local
   gateway for you if nothing is running. Auto-start is opt-in — without it, a missing
   gateway throws a `ConfigurationError` instead of spawning anything.
