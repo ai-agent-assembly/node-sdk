@@ -1,7 +1,7 @@
 # @agent-assembly/sdk
 
-[![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
-[![Docs](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml/badge.svg?branch=master&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml)
+[![CI](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml/badge.svg?branch=main&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/test-matrix.yml)
+[![Docs](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml/badge.svg?branch=main&logo=githubactions)](https://github.com/ai-agent-assembly/node-sdk/actions/workflows/publish-docs.yml)
 [![npm version](https://img.shields.io/npm/v/%40agent-assembly%2Fsdk/rc?logo=npm)](https://www.npmjs.com/package/@agent-assembly/sdk/v/rc)
 [![GitHub release](https://img.shields.io/github/v/release/ai-agent-assembly/node-sdk?include_prereleases&sort=semver&label=release&logo=github)](https://github.com/ai-agent-assembly/node-sdk/releases)
 [![TypeScript types](https://img.shields.io/npm/types/@agent-assembly/sdk?logo=typescript)](https://www.npmjs.com/package/@agent-assembly/sdk)
@@ -10,8 +10,8 @@
 [![Coverage](https://img.shields.io/codecov/c/github/ai-agent-assembly/node-sdk?logo=codecov)](https://codecov.io/gh/ai-agent-assembly/node-sdk)
 [![Quality Gate](https://img.shields.io/sonar/quality_gate/AI-agent-assembly_node-sdk?server=https%3A%2F%2Fsonarcloud.io&logo=sonarcloud)](https://sonarcloud.io/summary/new_code?id=AI-agent-assembly_node-sdk)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?logo=apache)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A518.18-339933?logo=nodedotjs)](https://github.com/ai-agent-assembly/node-sdk/blob/master/package.json)
-[![Code style](https://img.shields.io/badge/style-eslint-4B32C3?logo=eslint)](https://github.com/ai-agent-assembly/node-sdk/blob/master/eslint.config.mjs)
+[![Node](https://img.shields.io/badge/node-%E2%89%A518.18-339933?logo=nodedotjs)](https://github.com/ai-agent-assembly/node-sdk/blob/main/package.json)
+[![Code style](https://img.shields.io/badge/style-eslint-4B32C3?logo=eslint)](https://github.com/ai-agent-assembly/node-sdk/blob/main/eslint.config.mjs)
 
 TypeScript/Node.js SDK for Agent Assembly, licensed under Apache 2.0.
 
@@ -292,7 +292,7 @@ Run the native integration acceptance test (skipped unless the binding is built)
 - `AA_NATIVE_TEST=1 pnpm vitest run tests/native-napi-integration.test.ts`
 
 The `build-addon` GitHub workflow compiles the native addon (Node 20 and 22): an
-ubuntu-only debug build on pull requests, and ubuntu + macOS builds on `master` and release
+ubuntu-only debug build on pull requests, and ubuntu + macOS builds on `main` and release
 tags. The addon embeds a Unix-domain-socket transport and **does not build on Windows** —
 see [Platform support](#platform-support) below.
 
@@ -336,7 +336,7 @@ Full guides, architecture deep-dives, and the complete API reference are publish
 **https://docs.agent-assembly.com/node-sdk/**
 
 The site is built from the `docs/` (content) and `website/` (Docusaurus app) directories
-and is re-published on every push to `master` via the `publish-docs.yml` workflow.
+and is re-published on every push to `main` via the `publish-docs.yml` workflow.
 
 ## Related projects
 

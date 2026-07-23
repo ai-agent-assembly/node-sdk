@@ -34,7 +34,7 @@ contract. To dispatch manually:
 ```bash
 gh workflow run release-node.yml \
   --repo ai-agent-assembly/node-sdk \
-  --ref master \
+  --ref main \
   -f npm_version=0.0.1-alpha.9 \
   -f binary_source_tag=v0.0.1-alpha.9 \
   -f publish_mode=all
@@ -42,7 +42,7 @@ gh workflow run release-node.yml \
 
 What happens:
 
-1. The workflow checks out master and stamps `npm_version` on the root
+1. The workflow checks out main and stamps `npm_version` on the root
    `package.json`'s `version` field and on each `optionalDependencies`
    entry pointing at `@agent-assembly/runtime-*`.
 2. The 4 platform `aasm-*.tar.gz` binaries from the
@@ -74,7 +74,7 @@ publish a new SDK version **without** cutting a new agent-assembly tag.
 ```bash
 gh workflow run release-node.yml \
   --repo ai-agent-assembly/node-sdk \
-  --ref master \
+  --ref main \
   -f npm_version=0.0.1-alpha.8.1 \
   -f binary_source_tag=v0.0.1-alpha.8 \
   -f publish_mode=main-only
@@ -82,7 +82,7 @@ gh workflow run release-node.yml \
 
 What happens:
 
-1. The workflow runs against master.
+1. The workflow runs against main.
 2. `npm_version` (e.g. `0.0.1-alpha.8.1`) is what gets stamped on
    `@agent-assembly/sdk`'s `package.json`.
 3. `binary_source_tag` (e.g. `v0.0.1-alpha.8`) is the agent-assembly

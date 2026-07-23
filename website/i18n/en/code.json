@@ -1,6 +1,6 @@
 {
   "theme.docs.versions.unreleasedVersionLabel": {
-    "message": "This is in-development documentation for {siteTitle} {versionLabel}. It tracks master and is not the latest stable release.",
+    "message": "This is in-development documentation for {siteTitle} {versionLabel}. It tracks main and is not the latest stable release.",
     "description": "The label used to tell the user that he's browsing an unreleased doc version"
   },
   "theme.docs.versions.unmaintainedVersionLabel": {

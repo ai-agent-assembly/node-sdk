@@ -62,7 +62,7 @@ pnpm native:build:release     # napi-rs release build (per-platform artifact)
 - **Branch:** `<release-or-phase>/<ticket>/<type>/<short_summary>`
   (e.g. `v0.0.1/AAASM-42/feat/add_langchain_adapter`).
 - **PR title:** `[<ticket>] <emoji> (<scope>): <summary>`; base branch **always
-  `master`**; body fills out `.github/PULL_REQUEST_TEMPLATE.md`; ≥1 Pioneer-team
+  `main`**; body fills out `.github/PULL_REQUEST_TEMPLATE.md`; ≥1 Pioneer-team
   approval.
 
 ## Repo-specific gotchas
@@ -74,7 +74,7 @@ pnpm native:build:release     # napi-rs release build (per-platform artifact)
   (config/theme/sidebars) lives in `website/`, intentionally split.
 - **Push remote is `remote`** (→ `ai-agent-assembly/node-sdk`, canonical), **not**
   `origin` (a personal fork). Detect it with `git remote -v`; scope changes against
-  `remote/master`, which is often far ahead of a fork checkout. The "repository moved"
+  `remote/main`, which is often far ahead of a fork checkout. The "repository moved"
   redirect notice on push is harmless.
 - **npm security fixes:** pin with a `^` floor or a precise version — **never a bare
   `>=`**. A bare `>=` lets the resolver pull an unwanted major and breaks the build.

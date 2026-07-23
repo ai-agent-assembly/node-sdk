@@ -3,7 +3,7 @@
 // (website/versions.json) using the channel model (AAASM-2751).
 //
 // Channels:
-//   - `current` (the live ../docs)           -> label "latest (master)",
+//   - `current` (the live ../docs)           -> label "latest (main)",
 //                                               path "/next/", banner "unreleased"
 //   - newest STABLE snapshot   (vX.Y.Z)      -> label "stable (<tag>)", base path,
 //                                               no banner, and is `lastVersion`
@@ -133,7 +133,7 @@ export function computeChannels(snapshots) {
       ? newestPrerelease
       : undefined;
 
-  // `current` is always the in-development "latest (master)" channel.
+  // `current` is always the in-development "latest (main)" channel.
   //
   // Path: once any snapshot is cut, `current` is served at `/next/` so it never
   // collides at the site root with a cut version (the root is owned by the
@@ -143,7 +143,7 @@ export function computeChannels(snapshots) {
   const hasSnapshots = snapshots.length > 0;
   const versions = {
     current: {
-      label: "latest (master)",
+      label: "latest (main)",
       ...(hasSnapshots ? {path: "/next/"} : {}),
       banner: "unreleased",
     },
@@ -171,7 +171,7 @@ export function computeChannels(snapshots) {
     versions[tag] = {label, banner};
   }
 
-  // Default landing: newest stable, else newest SHOWN pre-release, else master.
+  // Default landing: newest stable, else newest SHOWN pre-release, else main.
   const lastVersion = newestStable ?? prereleaseShown ?? "current";
 
   return {lastVersion, versions};

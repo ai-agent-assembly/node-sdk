@@ -106,7 +106,7 @@ See [Configuration](../05-configuration/index.md) for the full resolution order.
 runs: an allowed call executes normally, while a denied call throws a
 `PolicyViolationError` and the tool body never runs. Pick your framework below —
 each tab is the governance-wiring excerpt from that framework's runnable
-[example](https://github.com/ai-agent-assembly/examples/tree/master/node), vendored
+[example](https://github.com/ai-agent-assembly/examples/tree/HEAD/node), vendored
 into this repo and kept in lock-step with this page by a CI drift check — the check
 catches this page drifting from the vendored snippet, not the vendored snippet
 drifting from the upstream example. Copy the full, runnable script — imports,

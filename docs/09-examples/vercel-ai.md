@@ -4,7 +4,7 @@ sidebar_position: 6
 
 # Vercel AI SDK
 
-Source: [`node/vercel-ai`](https://github.com/ai-agent-assembly/examples/tree/master/node/vercel-ai)
+Source: [`node/vercel-ai`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/vercel-ai)
 
 ## What this example demonstrates
 
@@ -126,6 +126,6 @@ Done. Vercel AI SDK tool calls governed by withAssembly + the local policy.
 
 ## Links
 
-- Example directory: [`node/vercel-ai`](https://github.com/ai-agent-assembly/examples/tree/master/node/vercel-ai)
-- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/master/node/vercel-ai/README.md)
+- Example directory: [`node/vercel-ai`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/vercel-ai)
+- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/HEAD/node/vercel-ai/README.md)
 - [Vercel AI SDK](https://sdk.vercel.ai)

@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Custom tool policy
 
-Source: [`node/custom-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/master/node/custom-tool-policy)
+Source: [`node/custom-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/custom-tool-policy)
 
 ## What this example demonstrates
 
@@ -131,5 +131,5 @@ All tool calls governed by withAssembly + the local policy.
 
 ## Links
 
-- Example directory: [`node/custom-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/master/node/custom-tool-policy)
-- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/master/node/custom-tool-policy/README.md)
+- Example directory: [`node/custom-tool-policy`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/custom-tool-policy)
+- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/HEAD/node/custom-tool-policy/README.md)

@@ -129,7 +129,7 @@ Before opening a PR, confirm each item:
 - [ ] PR title format: `[<ticket>] <emoji> (<scope>): <summary>`.
 - [ ] PR body fills out `.github/PULL_REQUEST_TEMPLATE.md` (target, ticket links,
       effecting scope, description).
-- [ ] Base branch is `master`. Push remote is `remote` (not `origin`).
+- [ ] Base branch is `main`. Push remote is `remote` (not `origin`).
 - [ ] At least one Pioneer team approval before merge.
 
 ## Building the documentation site
@@ -151,7 +151,7 @@ The API reference under the **API** sidebar section is regenerated automatically
 pages by hand.
 
 When you push your branch, the `publish-docs.yml` workflow builds the site and
-deploys to the `gh-pages` branch on push to `master`. The published site is at
+deploys to the `gh-pages` branch on push to `main`. The published site is at
 **https://docs.agent-assembly.com/node-sdk/**.
 
 ## Shared docs metadata

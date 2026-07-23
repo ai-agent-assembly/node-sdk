@@ -182,7 +182,7 @@ is being / has been cut by that repo's `/release-tag-cut`.
    after `agent-assembly`'s Release object is published:
    `gh release view <core-tag> --repo ai-agent-assembly/agent-assembly`.
 2. **Confirm the `aa-ffi-pin` auto-bump PR merged here.** Per the SOP, the
-   `bot/aa-ffi-pin-<tag>` PR (which aligns `master`'s `aa-sdk-client` SHA with
+   `bot/aa-ffi-pin-<tag>` PR (which aligns `main`'s `aa-sdk-client` SHA with
    the new core tag) must be merged **before** node-sdk publishes, so the SDK
    ships the content users expect from that version label.
 3. **Watch the triggered run.** `gh run list --repo ai-agent-assembly/node-sdk

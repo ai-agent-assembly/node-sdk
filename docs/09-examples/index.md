@@ -7,7 +7,7 @@ sidebar_position: 1
 This section walks through the runnable Node examples that ship in the central
 [`examples`](https://github.com/ai-agent-assembly/examples)
 repository, under its
-[`node/`](https://github.com/ai-agent-assembly/examples/tree/master/node)
+[`node/`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node)
 directory. Each example is a self-contained TypeScript project with its own `README`;
 the pages here explain what each one demonstrates, how the governance flow works, and
 walk through the real source.
@@ -33,12 +33,12 @@ install/run commands, and mock vs. real-provider mode.
 
 | Example | Framework | Page | Source |
 | --- | --- | --- | --- |
-| `custom-tool-policy` | — (none) | [Custom tool policy](./custom-tool-policy.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/master/node/custom-tool-policy) |
-| `openai-node-tool-policy` | OpenAI Node SDK | [OpenAI Node tool policy](./openai-node-tool-policy.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/master/node/openai-node-tool-policy) |
-| `langchain-js-basic-agent` | LangChain.js | [LangChain.js basic agent](./langchain-js-basic-agent.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/master/node/langchain-js-basic-agent) |
-| `vercel-ai` | Vercel AI SDK | [Vercel AI SDK](./vercel-ai.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/master/node/vercel-ai) |
-| `langgraph-js` | LangGraph.js | [LangGraph.js](./langgraph-js.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/master/node/langgraph-js) |
-| `mastra` | Mastra | [Mastra](./mastra.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/master/node/mastra) |
+| `custom-tool-policy` | — (none) | [Custom tool policy](./custom-tool-policy.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/custom-tool-policy) |
+| `openai-node-tool-policy` | OpenAI Node SDK | [OpenAI Node tool policy](./openai-node-tool-policy.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/openai-node-tool-policy) |
+| `langchain-js-basic-agent` | LangChain.js | [LangChain.js basic agent](./langchain-js-basic-agent.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/langchain-js-basic-agent) |
+| `vercel-ai` | Vercel AI SDK | [Vercel AI SDK](./vercel-ai.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/vercel-ai) |
+| `langgraph-js` | LangGraph.js | [LangGraph.js](./langgraph-js.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/langgraph-js) |
+| `mastra` | Mastra | [Mastra](./mastra.md) | [dir](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/mastra) |
 
 For the exact run steps, follow the per-example pages above or the `README` inside
 each example directory.
@@ -46,5 +46,5 @@ each example directory.
 ## Cross-cutting scenarios
 
 Beyond the per-framework examples, the
-[`scenarios/`](https://github.com/ai-agent-assembly/examples/tree/master/scenarios)
+[`scenarios/`](https://github.com/ai-agent-assembly/examples/tree/HEAD/scenarios)
 directory contains cross-cutting demos that exercise governance end to end.

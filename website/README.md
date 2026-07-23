@@ -35,7 +35,7 @@ pnpm serve          # preview the production build locally
 
 ## Deployment
 
-The `publish-docs.yml` GitHub Actions workflow builds the site on every push to `master`
+The `publish-docs.yml` GitHub Actions workflow builds the site on every push to `main`
 and deploys to the `gh-pages` branch. Manual deployment is not necessary; if you need to
 trigger a deploy manually, run the workflow via the **Actions** tab using
 `workflow_dispatch`.

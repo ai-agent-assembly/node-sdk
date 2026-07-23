@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # LangGraph.js
 
-Source: [`node/langgraph-js`](https://github.com/ai-agent-assembly/examples/tree/master/node/langgraph-js)
+Source: [`node/langgraph-js`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/langgraph-js)
 
 ## What this example demonstrates
 
@@ -157,6 +157,6 @@ Done. Graph-node tool calls governed by withAssembly + the local policy.
 
 ## Links
 
-- Example directory: [`node/langgraph-js`](https://github.com/ai-agent-assembly/examples/tree/master/node/langgraph-js)
-- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/master/node/langgraph-js/README.md)
+- Example directory: [`node/langgraph-js`](https://github.com/ai-agent-assembly/examples/tree/HEAD/node/langgraph-js)
+- Example README: [`README.md`](https://github.com/ai-agent-assembly/examples/blob/HEAD/node/langgraph-js/README.md)
 - [LangGraph.js](https://langchain-ai.github.io/langgraphjs/)

@@ -17,7 +17,7 @@ requires **Node.js ≥ 18.18.0**; older lines (≤ 16) are unsupported.
 | 24      | ✅    | ✅    | ✅      |
 
 This matrix is enforced by `.github/workflows/test-matrix.yml`, which runs the full grid on
-pushes to `master` and on release tags, and an ubuntu-only subset on pull requests for fast
+pushes to `main` and on release tags, and an ubuntu-only subset on pull requests for fast
 feedback.
 
 ### Prebuilt native packages

@@ -1,6 +1,6 @@
 # npm dist-tag policy — `@agent-assembly/sdk`
 
-This package publishes to npm via [`.github/workflows/release-node.yml`](https://github.com/ai-agent-assembly/node-sdk/blob/master/.github/workflows/release-node.yml).
+This package publishes to npm via [`.github/workflows/release-node.yml`](https://github.com/ai-agent-assembly/node-sdk/blob/main/.github/workflows/release-node.yml).
 Each release is routed to a **channel** dist-tag derived from its SemVer
 pre-release identifier, and the floating `latest` tag is kept current
 automatically.
