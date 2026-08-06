@@ -199,3 +199,37 @@ describe("quick-start negative control: deny is attributable in audit evidence",
     expect(effect.occurred()).toBe(false);
   });
 });
+
+describe("quick-start negative control: an ungoverned seam cannot look protected", () => {
+  it("a tool with no execute/invoke seam is warned about and still performs its effect", async () => {
+    const effect = fileEffect();
+    const gateway = createPolicyGatewayClient({
+      agentId: AGENT_ID,
+      denyTools: ["run_now"]
+    });
+    // No `execute` / `invoke`: withAssembly has nothing to wrap (AAASM-4847).
+    const tools = { run_now: { call: async () => effect.write("unwrappable") } };
+
+    const warnings: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      warnings.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+
+    // The SDK must say so out loud rather than let the caller believe the tool
+    // is governed (AAASM-5526: a degraded path may not present as protected).
+    expect(warnings.join("")).toContain("will NOT be governed");
+
+    // And the negative control proves the warning is not cosmetic: the effect
+    // really does happen despite the deny policy, because nothing intercepts it.
+    await tools.run_now.call();
+    expect(effect.occurred()).toBe(true);
+    expect(gateway.decisions).toHaveLength(0);
+  });
+});
