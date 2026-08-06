@@ -78,7 +78,7 @@ async function settle(call: Promise<unknown>): Promise<unknown> {
 describe("quick-start negative control: filesystem side effect", () => {
   it("POSITIVE CONTROL: an allowed write_file really creates the file on disk", async () => {
     const effect = fileEffect();
-    const gateway = createPolicyGatewayClient({ agentId: AGENT_ID, denyTools: [] });
+    const gateway = createPolicyGatewayClient({ denyTools: [] });
     const tools = {
       write_file: { execute: async (content: string) => effect.write(content) }
     };
@@ -92,10 +92,7 @@ describe("quick-start negative control: filesystem side effect", () => {
 
   it("NEGATIVE CONTROL: a denied write_file leaves no file on disk", async () => {
     const effect = fileEffect();
-    const gateway = createPolicyGatewayClient({
-      agentId: AGENT_ID,
-      denyTools: ["write_file"]
-    });
+    const gateway = createPolicyGatewayClient({ denyTools: ["write_file"] });
     const tools = {
       write_file: { execute: async (content: string) => effect.write(content) }
     };
@@ -128,7 +125,7 @@ describe("quick-start negative control: filesystem side effect", () => {
 describe("quick-start negative control: network side effect", () => {
   it("POSITIVE CONTROL: an allowed egress tool reaches the listener", async () => {
     const effect = await networkEffect();
-    const gateway = createPolicyGatewayClient({ agentId: AGENT_ID, denyTools: [] });
+    const gateway = createPolicyGatewayClient({ denyTools: [] });
     const tools = {
       post_report: { execute: async (body: string) => effect.call(body) }
     };
@@ -143,10 +140,7 @@ describe("quick-start negative control: network side effect", () => {
 
   it("NEGATIVE CONTROL: a denied egress tool never reaches the listener", async () => {
     const effect = await networkEffect();
-    const gateway = createPolicyGatewayClient({
-      agentId: AGENT_ID,
-      denyTools: ["post_report"]
-    });
+    const gateway = createPolicyGatewayClient({ denyTools: ["post_report"] });
     const tools = {
       post_report: { execute: async (body: string) => effect.call(body) }
     };
@@ -173,13 +167,10 @@ describe("quick-start negative control: network side effect", () => {
   });
 });
 
-describe("quick-start negative control: deny is attributable in audit evidence", () => {
-  it("records the same agent id, tool name and run id the deny was decided against", async () => {
+describe("quick-start negative control: what a deny is and is not attributed to", () => {
+  it("records the tool name and run id the deny was decided against, and no agent id", async () => {
     const effect = fileEffect();
-    const gateway = createPolicyGatewayClient({
-      agentId: AGENT_ID,
-      denyTools: ["write_file"]
-    });
+    const gateway = createPolicyGatewayClient({ denyTools: ["write_file"] });
     const tools = {
       write_file: { execute: async (content: string) => effect.write(content) }
     };
@@ -200,22 +191,45 @@ describe("quick-start negative control: deny is attributable in audit evidence",
     expect(gateway.decisions).toHaveLength(1);
     const decision = gateway.decisions[0];
     expect(decision?.denied).toBe(true);
-    expect(decision?.agentId).toBe(AGENT_ID);
     expect(decision?.toolName).toBe("write_file");
     expect(decision?.action).toBe("tool_call");
     // A run id must be present so the deny can be correlated with the rest of
     // the trace; an anonymous deny is not usable evidence.
     expect(decision?.runId).toMatch(/^run_/);
+
+    // And what the deny is NOT attributed to: an agent.
+    //
+    // This test used to assert `decision.agentId === AGENT_ID`, which could
+    // never fail. The fixture populated that field from its own constructor
+    // argument, so the assertion compared the constant this test passed with
+    // itself; it stayed green even when `withAssembly` was handed a completely
+    // different agent id. The SDK never supplied it and still does not:
+    // `WithAssemblyOptions` declares `agentId` (src/wrappers/with-assembly.ts)
+    // and no code path reads it, and `GatewayCheckRequest`
+    // (src/types/gateway-governance.ts) has no field to carry it. The
+    // documented quick-start passes an `agentId`
+    // (docs/02-quick-start/index.md) and the SDK discards it.
+    //
+    // Pinning the real shape of the outbound request is worth more than
+    // claiming an attribution the SDK does not make: this assertion fails the
+    // moment the gap is closed, which is exactly when someone needs to know.
+    expect(gateway.checkRequests).toHaveLength(1);
+    const requestKeys = Object.keys(gateway.checkRequests[0] ?? {}).sort();
+    expect(
+      requestKeys,
+      "The outbound GatewayCheckRequest shape changed. If an agent identity is " +
+        "now sent on the tool-call check path then this gap is CLOSED, and this " +
+        "test must be REWRITTEN (not deleted) to assert the deny carries the " +
+        "correct agent id — passing withAssembly a different agentId than the " +
+        "fixture expects, so that the new assertion is able to fail."
+    ).toEqual(["action", "args", "runId", "toolName"]);
   });
 });
 
 describe("quick-start negative control: an ungoverned seam cannot look protected", () => {
   it("a tool with no execute/invoke seam is warned about and still performs its effect", async () => {
     const effect = fileEffect();
-    const gateway = createPolicyGatewayClient({
-      agentId: AGENT_ID,
-      denyTools: ["run_now"]
-    });
+    const gateway = createPolicyGatewayClient({ denyTools: ["run_now"] });
     // No `execute` / `invoke`: withAssembly has nothing to wrap (AAASM-4847).
     const tools = { run_now: { call: async () => effect.write("unwrappable") } };
 

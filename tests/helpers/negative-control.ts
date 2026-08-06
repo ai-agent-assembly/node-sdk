@@ -122,13 +122,18 @@ export async function createNetworkSideEffect(): Promise<NetworkSideEffect> {
 }
 
 /**
- * One governance decision as the fixture gateway recorded it, carrying the full
- * identity triple (`agentId` / `toolName` / `runId`) the SDK presented at check
- * time. Asserting over this is how a control shows the deny was attributed to
- * the right agent and tool rather than being an anonymous refusal.
+ * One governance decision as the fixture gateway recorded it, carrying only
+ * values the SDK itself supplied in its {@link GatewayCheckRequest}.
+ *
+ * Nothing here is echoed back from the fixture's own construction. A field the
+ * fixture populated from its own constructor argument would compare equal no
+ * matter what the SDK sent, so an assertion over it could never fail — the
+ * exact shape of vacuous evidence this Epic (AAASM-5526) exists to eliminate.
+ * That is why there is no `agentId`: the SDK does not send one on the check
+ * path, so the fixture cannot observe one. See the pinning test in
+ * `quickstart-negative-control.test.ts`.
  */
 export interface RecordedCheck {
-  readonly agentId: string;
   readonly toolName: string | undefined;
   readonly action: string;
   readonly runId: string;
@@ -138,22 +143,31 @@ export interface RecordedCheck {
 /**
  * Policy-driven {@link GatewayClient} standing in for the quick-start's
  * `createPolicyGatewayClient()` (docs/02-quick-start, `withAssembly(..., {
- * gatewayClient })`). It denies exactly the named tools and records every
- * decision plus every audit event, so a test can assert that the audit evidence
- * carries the same agent/tool identity the decision was made against — the
- * AAASM-5529 acceptance criterion that a deny is attributable, not anonymous.
+ * gatewayClient })`). It denies exactly the named tools and records the
+ * verbatim outbound requests, the resulting decisions, and every audit event,
+ * so a test can assert what a deny was actually attributed to.
+ *
+ * It deliberately accepts no `agentId`: the SDK puts no agent identity on the
+ * check path, so a fixture that took one could only hand it straight back.
  */
 export interface PolicyGatewayClient extends GatewayClient {
   readonly decisions: readonly RecordedCheck[];
+  /**
+   * Every {@link GatewayCheckRequest} the SDK passed to `check`, verbatim and
+   * unmodified. Asserting over this — rather than over anything the fixture
+   * derived — is the only way a control can state what identity the SDK does,
+   * and does not, attribute a policy check to.
+   */
+  readonly checkRequests: readonly GatewayCheckRequest[];
   readonly auditEvents: readonly GatewayRecordEvent[];
   readonly auditResults: readonly GatewayResultRecord[];
 }
 
 export function createPolicyGatewayClient(options: {
-  agentId: string;
   denyTools: readonly string[];
 }): PolicyGatewayClient {
   const decisions: RecordedCheck[] = [];
+  const checkRequests: GatewayCheckRequest[] = [];
   const auditEvents: GatewayRecordEvent[] = [];
   const auditResults: GatewayResultRecord[] = [];
   const denied = new Set(options.denyTools);
@@ -161,14 +175,15 @@ export function createPolicyGatewayClient(options: {
   return {
     mode: "sdk-only",
     decisions,
+    checkRequests,
     auditEvents,
     auditResults,
     start: async () => undefined,
     close: async () => undefined,
     check: async (request: GatewayCheckRequest): Promise<GatewayDecision> => {
       const isDenied = request.toolName !== undefined && denied.has(request.toolName);
+      checkRequests.push(request);
       decisions.push({
-        agentId: options.agentId,
         toolName: request.toolName,
         action: request.action,
         runId: request.runId,
