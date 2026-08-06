@@ -25,7 +25,9 @@
  */
 
 import { afterEach, describe, expect, it } from "vitest";
+import { ConfigurationError } from "../src/errors/configuration-error.js";
 import { PolicyViolationError } from "../src/errors/policy-violation-error.js";
+import { initAssembly } from "../src/core/init-assembly.js";
 import { withAssembly } from "../src/wrappers/with-assembly.js";
 import {
   createFileSideEffect,
@@ -231,5 +233,62 @@ describe("quick-start negative control: an ungoverned seam cannot look protected
     await tools.run_now.call();
     expect(effect.occurred()).toBe(true);
     expect(gateway.decisions).toHaveLength(0);
+  });
+});
+
+describe("quick-start negative control: the zero-config initAssembly path", () => {
+  it("refuses to init when wrapped tools would route through the allow-all no-op client", async () => {
+    // The README quickstart config verbatim: gatewayUrl + agentId + langchain
+    // tools, no `mode`, no `enforcementMode`. An omitted posture resolves
+    // fail-closed, and mode "auto" is not check-capable, so the AAASM-4735
+    // guard refuses rather than register under a check that cannot deny.
+    // Asserting the refusal is the negative control for this path: there is no
+    // configuration here under which a deny could be silently allowed, because
+    // there is no working configuration at all.
+    const effect = fileEffect();
+    const tool = {
+      name: "write_file",
+      invoke: async () => effect.write("should-never-run")
+    };
+
+    const outcome = await settle(
+      initAssembly({
+        gatewayUrl: "http://localhost:7391",
+        agentId: AGENT_ID,
+        langchain: { tools: { write_file: tool } }
+      })
+    );
+
+    expect(effect.occurred()).toBe(false);
+    expect(outcome).toBeInstanceOf(ConfigurationError);
+    expect((outcome as Error).message).toContain("allow-all no-op");
+  });
+
+  it("BOUNDARY: enforcementMode observe inits and lets the tool body run", async () => {
+    // The documented opt-out. It must really pass through, otherwise the
+    // refusal above would be indistinguishable from "this path never works" —
+    // and a reader would have no way to tell an advisory posture from an
+    // enforcing one. This posture is telemetry-only: tool checks route through
+    // the allow-all no-op client, so no policy decision can block a call here.
+    const effect = fileEffect();
+    const tool = {
+      name: "write_file",
+      invoke: async () => effect.write("observe-posture")
+    };
+
+    const context = await initAssembly({
+      gatewayUrl: "http://localhost:7391",
+      agentId: AGENT_ID,
+      enforcementMode: "observe",
+      langchain: { tools: { write_file: tool } }
+    });
+    try {
+      await tool.invoke();
+    } finally {
+      await context.shutdown();
+    }
+
+    expect(effect.occurred()).toBe(true);
+    expect(effect.content()).toBe("observe-posture");
   });
 });
