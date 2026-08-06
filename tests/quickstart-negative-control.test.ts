@@ -29,8 +29,10 @@ import { PolicyViolationError } from "../src/errors/policy-violation-error.js";
 import { withAssembly } from "../src/wrappers/with-assembly.js";
 import {
   createFileSideEffect,
+  createNetworkSideEffect,
   createPolicyGatewayClient,
-  type FileSideEffect
+  type FileSideEffect,
+  type NetworkSideEffect
 } from "./helpers/negative-control.js";
 
 const AGENT_ID = "quickstart-negative-control-agent";
@@ -46,6 +48,12 @@ afterEach(async () => {
 function fileEffect(): FileSideEffect {
   const effect = createFileSideEffect();
   cleanups.push(effect.cleanup);
+  return effect;
+}
+
+async function networkEffect(): Promise<NetworkSideEffect> {
+  const effect = await createNetworkSideEffect();
+  cleanups.push(effect.close);
   return effect;
 }
 
@@ -112,5 +120,53 @@ describe("quick-start negative control: filesystem side effect", () => {
 
     expect(effect.occurred()).toBe(true);
     expect(effect.content()).toBe("ungoverned-content");
+  });
+});
+
+describe("quick-start negative control: network side effect", () => {
+  it("POSITIVE CONTROL: an allowed egress tool reaches the listener", async () => {
+    const effect = await networkEffect();
+    const gateway = createPolicyGatewayClient({ agentId: AGENT_ID, denyTools: [] });
+    const tools = {
+      post_report: { execute: async (body: string) => effect.call(body) }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+    const status = await tools.post_report.execute("allowed-payload");
+
+    expect(status).toBe(204);
+    expect(effect.requests()).toHaveLength(1);
+    expect(effect.requests()[0]?.body).toBe("allowed-payload");
+  });
+
+  it("NEGATIVE CONTROL: a denied egress tool never reaches the listener", async () => {
+    const effect = await networkEffect();
+    const gateway = createPolicyGatewayClient({
+      agentId: AGENT_ID,
+      denyTools: ["post_report"]
+    });
+    const tools = {
+      post_report: { execute: async (body: string) => effect.call(body) }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+    const outcome = await settle(tools.post_report.execute("denied-payload"));
+
+    // The listener is live and was reachable throughout (the positive control
+    // above proves that on the same fixture), so zero received requests is
+    // evidence the egress did not happen — not that it could not have.
+    expect(effect.occurred()).toBe(false);
+    expect(effect.requests()).toHaveLength(0);
+    expect(outcome).toBeInstanceOf(PolicyViolationError);
+  });
+
+  it("FALSIFICATION: the same egress, ungoverned, does reach the listener", async () => {
+    const effect = await networkEffect();
+
+    await effect.call("ungoverned-payload");
+
+    expect(effect.occurred()).toBe(true);
+    expect(effect.requests()[0]?.body).toBe("ungoverned-payload");
   });
 });
