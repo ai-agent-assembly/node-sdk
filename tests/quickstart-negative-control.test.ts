@@ -42,8 +42,21 @@ const AGENT_ID = "quickstart-negative-control-agent";
 const cleanups: (() => void | Promise<void>)[] = [];
 
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) {
-    await cleanup();
+  // Drain the queue first so nothing carries into the next test, then settle
+  // *every* cleanup before rethrowing. Awaiting them in a bare loop meant one
+  // throwing cleanup skipped all the rest, leaking the temp dirs and — worse —
+  // the still-listening HTTP servers, whose open handles hang the vitest worker.
+  const pending = cleanups.splice(0);
+  const failures: unknown[] = [];
+  for (const cleanup of pending) {
+    try {
+      await cleanup();
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length > 0) {
+    throw failures[0];
   }
 });
 
