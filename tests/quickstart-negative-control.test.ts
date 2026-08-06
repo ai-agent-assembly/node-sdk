@@ -187,6 +187,14 @@ describe("quick-start negative control: deny is attributable in audit evidence",
     withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
 
     const outcome = await settle(tools.write_file.execute("denied-content"));
+
+    // The load-bearing assertion, asserted first — the same shape the other
+    // negative controls in this file already use. Asserting the error first
+    // aborts the test before this line is ever reached, so under a mutation
+    // that neuters the deny this control failed on the missing exception and
+    // its absence check was never exercised at all.
+    expect(effect.occurred()).toBe(false);
+    // Secondary: the client also receives the documented error.
     expect(outcome).toBeInstanceOf(PolicyViolationError);
 
     expect(gateway.decisions).toHaveLength(1);
@@ -198,7 +206,6 @@ describe("quick-start negative control: deny is attributable in audit evidence",
     // A run id must be present so the deny can be correlated with the rest of
     // the trace; an anonymous deny is not usable evidence.
     expect(decision?.runId).toMatch(/^run_/);
-    expect(effect.occurred()).toBe(false);
   });
 });
 
