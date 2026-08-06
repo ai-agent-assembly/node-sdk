@@ -170,3 +170,32 @@ describe("quick-start negative control: network side effect", () => {
     expect(effect.requests()[0]?.body).toBe("ungoverned-payload");
   });
 });
+
+describe("quick-start negative control: deny is attributable in audit evidence", () => {
+  it("records the same agent id, tool name and run id the deny was decided against", async () => {
+    const effect = fileEffect();
+    const gateway = createPolicyGatewayClient({
+      agentId: AGENT_ID,
+      denyTools: ["write_file"]
+    });
+    const tools = {
+      write_file: { execute: async (content: string) => effect.write(content) }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+    const outcome = await settle(tools.write_file.execute("denied-content"));
+    expect(outcome).toBeInstanceOf(PolicyViolationError);
+
+    expect(gateway.decisions).toHaveLength(1);
+    const decision = gateway.decisions[0];
+    expect(decision?.denied).toBe(true);
+    expect(decision?.agentId).toBe(AGENT_ID);
+    expect(decision?.toolName).toBe("write_file");
+    expect(decision?.action).toBe("tool_call");
+    // A run id must be present so the deny can be correlated with the rest of
+    // the trace; an anonymous deny is not usable evidence.
+    expect(decision?.runId).toMatch(/^run_/);
+    expect(effect.occurred()).toBe(false);
+  });
+});
