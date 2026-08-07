@@ -168,7 +168,9 @@ export interface PolicyGatewayClient extends GatewayClient {
  * then rejected — the second refusal route through `enforceGovernance`, which
  * emits a different audit action from a straight policy deny.
  */
-export function createPendingThenRejectGatewayClient(): PolicyGatewayClient {
+export function createPendingThenRejectGatewayClient(
+  approvalReason?: string
+): PolicyGatewayClient {
   const decisions: RecordedCheck[] = [];
   const checkRequests: GatewayCheckRequest[] = [];
   const auditEvents: GatewayRecordEvent[] = [];
@@ -192,7 +194,10 @@ export function createPendingThenRejectGatewayClient(): PolicyGatewayClient {
       });
       return { denied: false, pending: true };
     },
-    waitForApproval: async () => ({ denied: true, reason: "approver said no" }),
+    // Omitting the reason is the case that exercises the wrapper's `?? "Rejected"`
+    // fallback — a gateway is not obliged to explain itself.
+    waitForApproval: async () =>
+      approvalReason === undefined ? { denied: true } : { denied: true, reason: approvalReason },
     record: async (event: GatewayRecordEvent) => {
       auditEvents.push(event);
     },

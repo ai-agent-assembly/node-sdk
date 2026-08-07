@@ -287,27 +287,33 @@ describe("quick-start negative control: a deny is handed to the gateway's record
     // five tests and asserted by none: deleting it left the suite bit-identical,
     // while deleting its policy-deny sibling failed a test. Execution is not
     // pinning, so the action string gets its own control.
-    const effect = fileEffect();
-    const gateway = createPendingThenRejectGatewayClient();
-    const tools = {
-      write_file: { execute: async (content: string) => effect.write(content) }
-    };
+    // Run with and without an approver reason. A gateway is not obliged to
+    // explain a rejection, and attribution must survive that: the tool name
+    // comes from the wrapper's own message, not from the gateway's text.
+    for (const approvalReason of ["approver said no", undefined]) {
+      const effect = fileEffect();
+      const gateway = createPendingThenRejectGatewayClient(approvalReason);
+      const tools = {
+        write_file: { execute: async (content: string) => effect.write(content) }
+      };
+      const label = approvalReason === undefined ? "no reason" : "with reason";
 
-    withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+      withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
 
-    const outcome = await settle(tools.write_file.execute("denied-content"));
+      const outcome = await settle(tools.write_file.execute("denied-content"));
 
-    expect(effect.occurred()).toBe(false);
-    expect(outcome).toBeInstanceOf(PolicyViolationError);
+      expect(effect.occurred(), `[${label}] the rejected tool body ran`).toBe(false);
+      expect(outcome, `[${label}]`).toBeInstanceOf(PolicyViolationError);
 
-    expect(gateway.auditEvents).toHaveLength(1);
-    const event = gateway.auditEvents[0];
-    // Distinct from the policy-deny action, so the two routes stay
-    // distinguishable in whatever sink eventually retains them.
-    expect(event?.action).toBe("tool_call_approval_rejected");
-    expect(event?.runId).toBe(gateway.decisions[0]?.runId);
-    expect(event?.reason).toContain("write_file");
-    expect(gateway.auditResults).toHaveLength(0);
+      expect(gateway.auditEvents, `[${label}]`).toHaveLength(1);
+      const event = gateway.auditEvents[0];
+      // Distinct from the policy-deny action, so the two routes stay
+      // distinguishable in whatever sink eventually retains them.
+      expect(event?.action, `[${label}]`).toBe("tool_call_approval_rejected");
+      expect(event?.runId, `[${label}]`).toBe(gateway.decisions[0]?.runId);
+      expect(event?.reason, `[${label}]`).toContain("write_file");
+      expect(gateway.auditResults, `[${label}]`).toHaveLength(0);
+    }
   });
 
   it("still throws the policy violation when the record call itself fails", async () => {
