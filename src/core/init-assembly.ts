@@ -532,26 +532,70 @@ async function applyFrameworkPatches(
   };
 }
 
+/** The three distinct adapter states `initAssembly` can observe for a run. */
+interface AdapterStates {
+  /** Frameworks found installed in the environment, patched or not. */
+  detected: string[];
+  /** Frameworks whose patch actually took effect — governance is in force. */
+  active: string[];
+  /** Detected frameworks whose patch did not take effect (failed, inert, or skipped). */
+  unpatched: string[];
+}
+
 /**
- * Build the deduped list of active adapter ids from the registered adapters plus
- * whichever framework patches actually took effect. Extracted from
- * `initAssembly` to keep its cognitive complexity below threshold.
+ * Ids of the frameworks whose patch actually took effect this run.
+ *
+ * Deliberately derived from the patch *results* alone. The previous
+ * implementation unioned these with the detection list, and since every
+ * non-LangChain patch here is itself gated on detection, the union could only
+ * ever reproduce the detection list — a framework found on disk was reported
+ * active even when its patch had just warned that it was inert (AAASM-5664).
+ *
+ * LangChain is the one id that can be active without being detected: an
+ * explicit `config.langchain` wraps callbacks/tools through the gateway client
+ * whether or not `@langchain/core` resolves, so its two flags are the only
+ * genuinely load-bearing half of the old union and are preserved here.
  */
-function buildActiveAdapters(
+function patchedAdapterIds(patches: FrameworkPatchResult): Set<string> {
+  return new Set([
+    ...(patches.langChainHandler ? ["langchain-js"] : []),
+    ...(patches.wrappedLangChainTools.length > 0 ? ["langchain-js"] : []),
+    ...(patches.vercelAiSdkPatched ? ["vercel-ai-sdk"] : []),
+    ...(patches.openAIAgentsPatched ? ["openai-agents"] : []),
+    ...(patches.langGraphPatched ? ["langgraph-js"] : []),
+    ...(patches.mastraPatched ? ["mastra"] : [])
+  ]);
+}
+
+/**
+ * Split the run's frameworks into detected / active / unpatched.
+ *
+ * Kept as three explicit lists rather than one filtered array because callers
+ * genuinely need to tell them apart: "the framework is not installed" and "the
+ * framework is installed but this SDK is not governing it" are different facts
+ * with different remedies, and collapsing them into a single `activeAdapters`
+ * omission would trade one misleading signal for another.
+ */
+function buildAdapterStates(
   adapters: readonly Adapter[],
   patches: FrameworkPatchResult
-): string[] {
-  return [
-    ...new Set([
-      ...adapters.map((adapter) => adapter.id),
-      ...(patches.langChainHandler ? ["langchain-js"] : []),
-      ...(patches.wrappedLangChainTools.length > 0 ? ["langchain-js"] : []),
-      ...(patches.vercelAiSdkPatched ? ["vercel-ai-sdk"] : []),
-      ...(patches.openAIAgentsPatched ? ["openai-agents"] : []),
-      ...(patches.langGraphPatched ? ["langgraph-js"] : []),
-      ...(patches.mastraPatched ? ["mastra"] : [])
-    ])
+): AdapterStates {
+  const detected = [...new Set(adapters.map((adapter) => adapter.id))];
+  const patched = patchedAdapterIds(patches);
+
+  // Detection order first so the common case keeps a stable, predictable
+  // ordering, then any patched id that was never detected (the explicit
+  // `config.langchain` path).
+  const active = [
+    ...detected.filter((id) => patched.has(id)),
+    ...[...patched].filter((id) => !detected.includes(id))
   ];
+
+  return {
+    detected,
+    active,
+    unpatched: detected.filter((id) => !patched.has(id))
+  };
 }
 
 export async function initAssembly(config: AssemblyConfig = {}): Promise<AssemblyContext> {
@@ -667,9 +711,12 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
   }
 
   const patches = await applyFrameworkPatches(resolvedConfig, client, frameworks);
+  const adapterStates = buildAdapterStates(adapters, patches);
 
   return {
-    activeAdapters: buildActiveAdapters(adapters, patches),
+    activeAdapters: adapterStates.active,
+    detectedAdapters: adapterStates.detected,
+    unpatchedAdapters: adapterStates.unpatched,
     registered,
     ...(resolvedConfig.parentAgentId !== undefined && {
       parentAgentId: resolvedConfig.parentAgentId
