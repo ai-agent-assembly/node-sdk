@@ -163,6 +163,88 @@ export interface PolicyGatewayClient extends GatewayClient {
   readonly auditResults: readonly GatewayResultRecord[];
 }
 
+/**
+ * A {@link GatewayClient} whose `check` returns `pending` and whose approval is
+ * then rejected — the second refusal route through `enforceGovernance`, which
+ * emits a different audit action from a straight policy deny.
+ */
+export function createPendingThenRejectGatewayClient(): PolicyGatewayClient {
+  const decisions: RecordedCheck[] = [];
+  const checkRequests: GatewayCheckRequest[] = [];
+  const auditEvents: GatewayRecordEvent[] = [];
+  const auditResults: GatewayResultRecord[] = [];
+
+  return {
+    mode: "sdk-only",
+    decisions,
+    checkRequests,
+    auditEvents,
+    auditResults,
+    start: async () => undefined,
+    close: async () => undefined,
+    check: async (request: GatewayCheckRequest): Promise<GatewayDecision> => {
+      checkRequests.push(request);
+      decisions.push({
+        toolName: request.toolName,
+        action: request.action,
+        runId: request.runId,
+        denied: false
+      });
+      return { denied: false, pending: true };
+    },
+    waitForApproval: async () => ({ denied: true, reason: "approver said no" }),
+    record: async (event: GatewayRecordEvent) => {
+      auditEvents.push(event);
+    },
+    recordResult: async (record: GatewayResultRecord) => {
+      auditResults.push(record);
+    },
+    scanPrompts: async () => undefined
+  };
+}
+
+/** A denying {@link GatewayClient} whose audit `record` always fails. */
+export interface FailingRecordGatewayClient extends GatewayClient {
+  /** How many times `record` was entered, so a test can tell "failed" from "never called". */
+  readonly recordAttempts: number;
+}
+
+/**
+ * A denying client whose `record` fails in one of two shapes.
+ *
+ * `sync-throw` is the load-bearing one: it throws *before* returning a promise,
+ * so a trailing `.catch()` on the return value never sees it. Only a
+ * `try`/`catch` around the call contains it.
+ */
+export function createFailingRecordGatewayClient(
+  mode: "async-reject" | "sync-throw"
+): FailingRecordGatewayClient {
+  let attempts = 0;
+  return {
+    mode: "sdk-only",
+    get recordAttempts() {
+      return attempts;
+    },
+    start: async () => undefined,
+    close: async () => undefined,
+    check: async (request: GatewayCheckRequest): Promise<GatewayDecision> => ({
+      denied: true,
+      pending: false,
+      reason: `tool '${request.toolName}' is denied by policy`
+    }),
+    waitForApproval: async () => ({ denied: true }),
+    record: (() => {
+      attempts += 1;
+      if (mode === "sync-throw") {
+        throw new Error("audit sink down (sync)");
+      }
+      return Promise.reject(new Error("audit sink down (async)"));
+    }) as GatewayClient["record"],
+    recordResult: async () => undefined,
+    scanPrompts: async () => undefined
+  };
+}
+
 export function createPolicyGatewayClient(options: {
   denyTools: readonly string[];
 }): PolicyGatewayClient {
