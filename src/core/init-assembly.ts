@@ -283,6 +283,21 @@ export async function startNetworkLayerIfNeeded(
   await client.start();
 }
 
+/**
+ * ⚠️ Both `ensure*` helpers below run against the SHALLOW COPY `initAssembly` makes of
+ * the caller's config, so the `??=` is a footgun: when the caller supplied `langchain`
+ * that nested object is shared by reference and a mutation is visible to them, but when
+ * they did not, `??=` mints a fresh object on the copy and everything written into it is
+ * discarded the moment `initAssembly` returns. Crediting such a write as a successful
+ * patch is what made `activeAdapters` report `langchain-js` for a run governing nothing
+ * (AAASM-5664).
+ *
+ * Their two callers therefore check `config.langchain !== undefined` FIRST and bail —
+ * see the reachability guards in {@link registerLangChainHandler} and
+ * {@link wrapLangChainTools}. Do not call these helpers from a new site without the
+ * same guard, and do not "simplify" the guards away: nothing in the type system stops
+ * the `??=` from silently re-arming this.
+ */
 function ensureLangChainCallbacks(config: AssemblyConfig): LangChainCallbackHandlerLike[] {
   config.langchain ??= {};
   config.langchain.callbacks ??= [];
@@ -290,6 +305,7 @@ function ensureLangChainCallbacks(config: AssemblyConfig): LangChainCallbackHand
   return config.langchain.callbacks;
 }
 
+/** See the reachability warning on {@link ensureLangChainCallbacks}. */
 function ensureLangChainTools(config: AssemblyConfig): Record<string, LangChainToolLike> {
   config.langchain ??= {};
   config.langchain.tools ??= {};
