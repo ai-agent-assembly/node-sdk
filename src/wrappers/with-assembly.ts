@@ -206,21 +206,33 @@ async function enforceGovernance(
     runId
   });
 
-  if (decision.denied) {
-    const error = new PolicyViolationError(`Tool '${name}' blocked: ${decision.reason ?? "Denied"}`);
-    await recordDeny(gateway, "tool_call_denied", runId, error.message);
-    throw error;
-  }
+  // Both refusal routes converge on a single record-then-throw below rather
+  // than each carrying its own copy (AAASM-5665). Two call sites is an
+  // invitation to fix one and miss the other — which is exactly what happened
+  // in review: the approval-rejected copy could be deleted outright with the
+  // whole suite still green. One site cannot drift from itself.
+  let denial: { action: string; error: PolicyViolationError } | undefined;
 
-  if (decision.pending) {
+  if (decision.denied) {
+    denial = {
+      action: "tool_call_denied",
+      error: new PolicyViolationError(`Tool '${name}' blocked: ${decision.reason ?? "Denied"}`)
+    };
+  } else if (decision.pending) {
     const finalDecision = await waitForApprovalWithTimeout(gateway, name, runId, approvalTimeoutMs);
     if (finalDecision.denied) {
-      const error = new PolicyViolationError(
-        `Approval rejected for '${name}': ${finalDecision.reason ?? "Rejected"}`
-      );
-      await recordDeny(gateway, "tool_call_approval_rejected", runId, error.message);
-      throw error;
+      denial = {
+        action: "tool_call_approval_rejected",
+        error: new PolicyViolationError(
+          `Approval rejected for '${name}': ${finalDecision.reason ?? "Rejected"}`
+        )
+      };
     }
+  }
+
+  if (denial) {
+    await recordDeny(gateway, denial.action, runId, denial.error.message);
+    throw denial.error;
   }
 }
 
