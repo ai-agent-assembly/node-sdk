@@ -297,12 +297,51 @@ function ensureLangChainTools(config: AssemblyConfig): Record<string, LangChainT
   return config.langchain.tools;
 }
 
+/**
+ * One-time advisory that `@langchain/core` was found but nothing was wired.
+ *
+ * The sibling auto-detected frameworks (Vercel AI SDK, LangGraph, Mastra) all warn
+ * on stderr when their patch cannot deliver governance. LangChain had no equivalent
+ * signal for the detected-but-unwired case, so the only evidence was an
+ * `activeAdapters` entry that claimed the opposite (AAASM-5664). Written straight to
+ * `process.stderr`, like its siblings, so log configuration cannot silence it.
+ */
+function warnLangChainDetectedButUnwired(): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: "@langchain/core" is installed but no \`langchain\` ` +
+      `config was supplied to initAssembly, so this SDK has nothing to attach to and ` +
+      `LangChain activity will NOT be observed or governed. Unlike the other ` +
+      `auto-detected frameworks, LangChain cannot be patched globally — the callback ` +
+      `handler has to be reachable from your chain. Pass \`langchain: { callbacks: [...] }\` ` +
+      `(and \`tools\` for in-process tool governance) so the handler lands in an object ` +
+      `you own. Reported in \`unpatchedAdapters\`, never \`activeAdapters\` (AAASM-5664).\n`
+  );
+}
+
 async function registerLangChainHandler(
   config: AssemblyConfig,
   client: GatewayClient,
   frameworks: readonly string[]
 ): Promise<AssemblyCallbackHandler | undefined> {
-  if (!frameworks.includes("langchain-js") && !config.langchain) {
+  // Reachability, not mere presence. `initAssembly` patches a SHALLOW copy of the
+  // caller's config, so `config.langchain` is shared by reference only when the
+  // caller supplied it. Read it before `ensureLangChainCallbacks` can mint one.
+  const callerSuppliedLangChain = config.langchain !== undefined;
+
+  if (!frameworks.includes("langchain-js") && !callerSuppliedLangChain) {
+    return undefined;
+  }
+
+  // AAASM-5664: with `@langchain/core` merely detected and no `langchain` config,
+  // the `??=` in `ensureLangChainCallbacks` mints a fresh object on the COPY, so the
+  // handler is pushed into an array the caller can never read and is discarded when
+  // `initAssembly` returns. `AssemblyCallbackHandler`'s constructor only calls
+  // `super()` — there is no global callback-manager registration that could rescue
+  // it. Registering here would therefore be a no-op that still reported
+  // `langchain-js` as an active adapter: precisely the false success this ticket
+  // exists to remove. Decline, and say so on stderr.
+  if (!callerSuppliedLangChain) {
+    warnLangChainDetectedButUnwired();
     return undefined;
   }
 
@@ -317,10 +356,15 @@ async function registerLangChainHandler(
 
 async function wrapLangChainTools(
   config: AssemblyConfig,
-  client: GatewayClient,
-  frameworks: readonly string[]
+  client: GatewayClient
 ): Promise<string[]> {
-  if (!frameworks.includes("langchain-js") && !config.langchain) {
+  // Only the caller's own `langchain.tools` can be wrapped: `wrapToolWithAssembly`
+  // mutates the tool objects in place, so a map minted by `ensureLangChainTools` on
+  // the shallow copy has nothing in it and nothing the caller could invoke. Detection
+  // alone therefore cannot wrap anything (AAASM-5664) — the old condition returned an
+  // empty list here anyway, but only after pointlessly importing the optional
+  // LangChain adapter. Mirrors the reachability guard in `registerLangChainHandler`.
+  if (config.langchain === undefined) {
     return [];
   }
 
@@ -506,7 +550,7 @@ async function applyFrameworkPatches(
   frameworks: readonly string[]
 ): Promise<FrameworkPatchResult> {
   const langChainHandler = await registerLangChainHandler(config, client, frameworks);
-  const wrappedLangChainTools = await wrapLangChainTools(config, client, frameworks);
+  const wrappedLangChainTools = await wrapLangChainTools(config, client);
   const vercelAiSdkPatched = await patchDetectedVercelAiSdk(config, client, frameworks, config.agentId);
   const openAIAgentsPatched = await patchDetectedOpenAIAgents(config, client, frameworks);
   const langGraphPatched = await patchDetectedLangGraph(config, frameworks, config.agentId);
@@ -536,9 +580,15 @@ async function applyFrameworkPatches(
 interface AdapterStates {
   /** Frameworks found installed in the environment, patched or not. */
   detected: string[];
-  /** Frameworks whose patch actually took effect — governance is in force. */
+  /**
+   * Frameworks whose patch was applied and is reachable by the caller. NOT an
+   * enforcement claim — LangGraph and Mastra are lineage-only, the LangChain
+   * callback layer is audit-only, and every enforcing path degrades to a
+   * non-blocking check under the allow-all no-op client. See the
+   * `AssemblyContext.activeAdapters` TSDoc for the per-framework breakdown.
+   */
   active: string[];
-  /** Detected frameworks whose patch did not take effect (failed, inert, or skipped). */
+  /** Detected frameworks whose patch did not take effect (failed, inert, skipped, or unreachable). */
   unpatched: string[];
 }
 
