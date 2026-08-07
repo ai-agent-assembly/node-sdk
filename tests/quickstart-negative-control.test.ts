@@ -30,8 +30,10 @@ import { PolicyViolationError } from "../src/errors/policy-violation-error.js";
 import { initAssembly } from "../src/core/init-assembly.js";
 import { withAssembly } from "../src/wrappers/with-assembly.js";
 import {
+  createFailingRecordGatewayClient,
   createFileSideEffect,
   createNetworkSideEffect,
+  createPendingThenRejectGatewayClient,
   createPolicyGatewayClient,
   type FileSideEffect,
   type NetworkSideEffect
@@ -239,7 +241,7 @@ describe("quick-start negative control: what a deny is and is not attributed to"
   });
 });
 
-describe("quick-start negative control: a deny reaches the audit sink", () => {
+describe("quick-start negative control: a deny is handed to the gateway's record call", () => {
   it("hands the gateway an audit event naming the denied tool and its run", async () => {
     const effect = fileEffect();
     const gateway = createPolicyGatewayClient({ denyTools: ["write_file"] });
@@ -278,6 +280,61 @@ describe("quick-start negative control: a deny reaches the audit sink", () => {
     // so there is no result to record. Without this, an implementation that
     // recorded a bogus empty result would pass the assertions above.
     expect(gateway.auditResults).toHaveLength(0);
+  });
+
+  it("hands the gateway a distinct audit event when an approval is rejected", async () => {
+    // The second refusal route. Review round 1 found this call site executed by
+    // five tests and asserted by none: deleting it left the suite bit-identical,
+    // while deleting its policy-deny sibling failed a test. Execution is not
+    // pinning, so the action string gets its own control.
+    const effect = fileEffect();
+    const gateway = createPendingThenRejectGatewayClient();
+    const tools = {
+      write_file: { execute: async (content: string) => effect.write(content) }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+    const outcome = await settle(tools.write_file.execute("denied-content"));
+
+    expect(effect.occurred()).toBe(false);
+    expect(outcome).toBeInstanceOf(PolicyViolationError);
+
+    expect(gateway.auditEvents).toHaveLength(1);
+    const event = gateway.auditEvents[0];
+    // Distinct from the policy-deny action, so the two routes stay
+    // distinguishable in whatever sink eventually retains them.
+    expect(event?.action).toBe("tool_call_approval_rejected");
+    expect(event?.runId).toBe(gateway.decisions[0]?.runId);
+    expect(event?.reason).toContain("write_file");
+    expect(gateway.auditResults).toHaveLength(0);
+  });
+
+  it("still throws the policy violation when the record call itself fails", async () => {
+    // A caller-supplied gatewayClient is a documented public injection point, so
+    // a record() that throws is reachable user code. Both failure shapes are
+    // covered: a rejected promise, and a SYNCHRONOUS throw — the latter produces
+    // no promise for a trailing .catch() to attach to and escaped past the deny
+    // before this was a try/catch.
+    for (const mode of ["async-reject", "sync-throw"] as const) {
+      const effect = fileEffect();
+      const gateway = createFailingRecordGatewayClient(mode);
+      const tools = {
+        write_file: { execute: async (content: string) => effect.write(content) }
+      };
+
+      withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+      const outcome = await settle(tools.write_file.execute("denied-content"));
+
+      expect(effect.occurred(), `[${mode}] the denied tool body ran`).toBe(false);
+      // The enforcement decision survives the audit failure — a caller doing
+      // `catch (e) { if (e instanceof PolicyViolationError) ... }` still sees it.
+      expect(outcome, `[${mode}] the audit failure replaced the deny`).toBeInstanceOf(
+        PolicyViolationError
+      );
+      expect(gateway.recordAttempts, `[${mode}] record() was never attempted`).toBe(1);
+    }
   });
 });
 
