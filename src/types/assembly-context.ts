@@ -9,18 +9,31 @@ export interface AssemblyContext {
    * necessary but **not sufficient** for a policy DENY to block a call:
    *
    * - `langgraph-js`, `mastra` — lineage tagging only (`NON_ENFORCING_MODULES`,
-   *   AAASM-4830). *Observed*: no in-process tool-governance check runs at all, so
-   *   a DENY never blocks these in-process.
-   * - `langchain-js` — two layers with different powers (AAASM-4799). The callback
-   *   handler is audit-only; only tools passed through `langchain.tools` and wrapped
-   *   by `wrapToolWithAssembly` reach *Denied before execution*.
-   * - `vercel-ai-sdk`, `openai-agents` — the governed tool factory is installed, so
-   *   they can reach *Denied before execution*.
+   *   AAASM-4830). These earn **no ADR 0033 §6 term of their own**: the patch wraps
+   *   the call in an `AsyncLocalStorage` binding of the agent id and nothing else —
+   *   it emits no event, requests no decision, and runs no check. What it provides
+   *   is attribution: any evidence produced by *another* layer during the call
+   *   carries this agent's id. Judged on its own, an in-process LangGraph or Mastra
+   *   tool call is §6 *Unmeasured*, and a DENY never blocks it in-process.
+   * - `langchain-js` — two layers with different powers (AAASM-4799). Only tools
+   *   passed through `langchain.tools` and wrapped by `wrapToolWithAssembly` reach
+   *   *Denied before execution*. The callback handler is audit-only and cannot
+   *   block; it reaches *Observed* only when the gateway client actually persists
+   *   what it records, which the default no-op client and the `napi-inprocess`
+   *   client both do not (`record`/`recordResult` are deliberate no-ops there,
+   *   AAASM-4847) — so in practice that requires a caller-supplied client.
+   * - `vercel-ai-sdk`, `openai-agents` — the governed tool factory is installed and
+   *   the refusal precedes the effect, so these reach *Denied before execution*.
    *
-   * Independently of the above, every enforcing path degrades to *Evaluated* (a check
-   * is made but its answer cannot block) when the run routes through the allow-all
-   * no-op gateway client — i.e. any mode other than `napi-inprocess` with no
-   * caller-supplied `gatewayClient`. `initAssembly` warns on stderr when that applies.
+   * Independently of the above, an enforcing path only reaches *Denied before
+   * execution* in a check-capable run — `napi-inprocess`, or a caller-supplied
+   * `gatewayClient`. Otherwise `check()` is the allow-all no-op stub, which produces
+   * no control-plane decision record: the call is then not even *Evaluated*, it is
+   * §6 *Unmeasured* in-process. `initAssembly` warns on stderr when that applies.
+   *
+   * All of the above is scoped to what this SDK does **in-process**. Per §6,
+   * *Unmeasured* here does not mean the activity was unobserved elsewhere — the
+   * proxy and eBPF layers are independent and may still see the same traffic.
    *
    * A framework that was detected but whose patch failed, was inert, or was
    * unreachable is **not** listed here (AAASM-5664) — see
