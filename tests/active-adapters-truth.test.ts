@@ -2,11 +2,10 @@
  * Adapter-state truthfulness controls for `initAssembly` (AAASM-5664, Epic AAASM-5526).
  *
  * `AssemblyContext.activeAdapters` is the field a caller reads to learn which
- * frameworks this SDK is actually governing — the docs call it "the adapters
- * active for a given run". It was built by unioning the *detection* list with a
- * set of patch-success flags, and because every one of those flags is itself
- * gated on detection, the union could only ever equal the detection list. A
- * framework that was found on disk but whose patch was warned to have failed
+ * frameworks this SDK attached to. It was built by unioning the *detection* list
+ * with a set of patch-success flags, and because every non-LangChain flag is
+ * itself gated on detection, the union could only ever equal the detection list.
+ * A framework that was found on disk but whose patch was warned to have failed
  * was therefore still reported active in that same run.
  *
  * That is the AAASM-5529 failure shape restated at the reporting layer: a
@@ -14,6 +13,15 @@
  * controls assert over the value a consumer actually reads (`ctx.*Adapters`),
  * paired against the un-silenceable stderr warning emitted by the same run, so
  * "active" cannot drift back into meaning "detected".
+ *
+ * Scope note, so these controls are not read as more than they are: membership in
+ * `activeAdapters` is a claim about *mechanism* — a patch was applied and is
+ * reachable — never about enforcement. LangGraph and Mastra are lineage-only
+ * (`NON_ENFORCING_MODULES`, AAASM-4830), the LangChain callback layer is audit-only
+ * (AAASM-4799), and every enforcing path degrades to a non-blocking check under the
+ * allow-all no-op client. Where a control below can assert enforcement it does so
+ * against the artifact that decides (a wrapped tool's `invoke` rejecting); where it
+ * cannot, it says so rather than implying the stronger claim.
  *
  * Every negative control here is paired with a positive control over the same
  * framework and the same code path. Without the pair, "vercel-ai-sdk is absent
@@ -24,6 +32,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GatewayClient } from "../src/gateway/client.js";
+import type { AssemblyConfig } from "../src/types/assembly-config.js";
+import type { LangChainToolLike } from "../src/types/langchain-adapter.js";
 import type {
   VercelAiToolDefinition,
   VercelAiToolFactory
@@ -78,6 +88,9 @@ function captureStderr(): { text: () => string; restore: () => void } {
 
 /** The un-silenceable AAASM-4842 signal that Vercel governance is NOT in effect. */
 const VERCEL_UNGOVERNED_WARNING = "Vercel AI SDK tool calls will NOT be governed by this SDK";
+
+/** The AAASM-5664 signal that a detected LangChain had nothing to attach to. */
+const LANGCHAIN_UNWIRED_WARNING = "LangChain activity will NOT be observed or governed";
 
 afterEach(async () => {
   const hooks = await import("../src/hooks/ai-sdk.js");
@@ -151,10 +164,18 @@ describe("activeAdapters reports only successfully patched adapters", () => {
   });
 
   it("POSITIVE CONTROL: the same framework with its prerequisite met is reported active", async () => {
+    // NOT an enforcement claim. LangGraph is in NON_ENFORCING_MODULES (AAASM-4830):
+    // an applied patch installs lineage tagging and nothing else, so a policy DENY
+    // still will not block a LangGraph tool call in-process. What this control pins
+    // is only that a patch which DID take effect keeps its place in activeAdapters —
+    // the counterweight that stops the negative controls above from being satisfied
+    // by an always-empty list. The mechanism assertion below (the StateGraph
+    // prototype was actually replaced) is what makes "took effect" observable rather
+    // than merely asserted.
     const fakeCompiled = { invoke: vi.fn(async () => ({})), stream: vi.fn(async () => ({})) };
-    vi.doMock("@langchain/langgraph", () => ({
-      StateGraph: { prototype: { compile: vi.fn(() => fakeCompiled) } }
-    }));
+    const originalCompile = vi.fn(() => fakeCompiled);
+    const stateGraph = { prototype: { compile: originalCompile } };
+    vi.doMock("@langchain/langgraph", () => ({ StateGraph: stateGraph }));
     mockInstalledPackages(new Set(["@langchain/langgraph"]));
 
     const { initAssembly } = await import("../src/core/init-assembly.js");
@@ -168,6 +189,80 @@ describe("activeAdapters reports only successfully patched adapters", () => {
 
     expect(context.activeAdapters).toContain("langgraph-js");
     expect(context.unpatchedAdapters).not.toContain("langgraph-js");
+    // The artifact that decides whether the patch took effect: `compile` is no
+    // longer the function we handed in. Asserting only the string membership would
+    // be asserting over a proxy for the thing we care about.
+    expect(stateGraph.prototype.compile).not.toBe(originalCompile);
+  });
+
+  it("NEGATIVE CONTROL: @langchain/core detected with no langchain config is not reported active", async () => {
+    // AAASM-5664 / review B1. `initAssembly` patches a SHALLOW COPY of the caller's
+    // config. With no caller-supplied `langchain`, `ensureLangChainCallbacks`'s `??=`
+    // mints a fresh object on that copy, so the handler is pushed into an array the
+    // caller can never read and is discarded when `initAssembly` returns. It used to
+    // be credited as active anyway — the ticket's own defect, surviving in the one
+    // branch that is not detection-gated.
+    mockInstalledPackages(new Set(["@langchain/core"]));
+    const stderr = captureStderr();
+
+    const callerConfig: AssemblyConfig = {
+      gatewayUrl: "https://gateway.example.com",
+      apiKey: "test-key",
+      mode: "sdk-only",
+      gatewayClient: createGatewayClientMock()
+    };
+
+    const { initAssembly } = await import("../src/core/init-assembly.js");
+    const context = await initAssembly(callerConfig);
+
+    const warnings = stderr.text();
+    stderr.restore();
+
+    // Guard the guard: prove the handler really is unreachable in this fixture,
+    // rather than trusting that the shallow-copy reasoning still holds. If the
+    // caller could see it, the assertions below would be testing the wrong thing.
+    expect(callerConfig.langchain).toBeUndefined();
+
+    expect(context.detectedAdapters).toContain("langchain-js");
+    expect(context.activeAdapters).not.toContain("langchain-js");
+    expect(context.unpatchedAdapters).toContain("langchain-js");
+    expect(warnings).toContain(LANGCHAIN_UNWIRED_WARNING);
+  });
+
+  it("POSITIVE CONTROL: explicit langchain config without @langchain/core installed governs tools", async () => {
+    // The load-bearing case for keeping the two LangChain flags in
+    // `patchedAdapterIds`: an explicit `config.langchain` wires the adapter up even
+    // when the package does not resolve, so `langchain-js` is active while absent
+    // from `detectedAdapters`. Deriving `active` from detection would silently drop
+    // a genuinely governed adapter.
+    //
+    // Asserted over the artifact that decides — the tool's `invoke` must now reject
+    // under a denying gateway — not over the string's presence in a list. A string
+    // in an array is exactly the proxy evidence this Epic exists to replace.
+    const denyingGateway = createGatewayClientMock();
+    denyingGateway.check = vi.fn(async () => ({ denied: true, reason: "blocked by policy" }));
+    const originalInvoke = vi.fn(async () => "send_email-ok");
+    const tool: LangChainToolLike = { name: "send_email", invoke: originalInvoke };
+
+    mockInstalledPackages(new Set([]));
+
+    const { initAssembly } = await import("../src/core/init-assembly.js");
+    const context = await initAssembly({
+      gatewayUrl: "https://gateway.example.com",
+      apiKey: "test-key",
+      mode: "sdk-only",
+      gatewayClient: denyingGateway,
+      enforcementMode: "enforce",
+      langchain: { tools: { sendEmail: tool } }
+    });
+
+    expect(context.activeAdapters).toContain("langchain-js");
+    expect(context.detectedAdapters).not.toContain("langchain-js");
+
+    // The decisive assertion: the tool is really wrapped, and the deny really stops
+    // the underlying implementation from running.
+    await expect(tool.invoke({ to: "user@example.com" })).rejects.toThrow("send_email");
+    expect(originalInvoke).not.toHaveBeenCalled();
   });
 
   it("POSITIVE CONTROL: a framework whose patch succeeded is still reported active", async () => {
