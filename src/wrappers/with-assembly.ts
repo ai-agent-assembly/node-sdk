@@ -144,10 +144,20 @@ function hasInvoke(
  * change, so the tool is named inside `reason` — reusing the thrown error's own
  * message, so the audit event and the error a caller sees cannot drift apart.
  *
- * Rejections are swallowed. A failing audit sink must not convert a policy deny
- * into some other error: the throw that follows this call is the enforcement
- * decision and has to survive. This matches the fire-and-forget `.catch()` the
- * `ai-sdk` and `openai-agents` hooks already use for `recordResult`.
+ * **Every failure mode is swallowed, synchronous throws included.** A failing
+ * audit sink must not convert a policy deny into some other error: the throw
+ * that follows this call is the enforcement decision and has to survive. The
+ * `try`/`catch` is load-bearing rather than stylistic — `gatewayClient` is a
+ * documented public injection point, so a caller-supplied `record` that throws
+ * synchronously never produces a promise for a trailing `.catch()` to attach
+ * to, and would escape past the `PolicyViolationError`. Mirrors the Python
+ * companion's `try/except Exception` around the same hook (AAASM-4782).
+ *
+ * This is deliberately awaited, unlike the `void ... .catch()` in
+ * `recordToolResultNonBlocking` (`hooks/ai-sdk.ts`, `hooks/openai-agents.ts`):
+ * the event is handed over before the deny is thrown, so it cannot be lost if
+ * the caller exits on the error. The cost is that a `record` which hangs delays
+ * the deny — there is no timeout here, unlike `waitForApprovalWithTimeout`.
  *
  * What this does *not* do is make a deny observable in a released binary. Both
  * shipped clients discard the event — `createNoopGatewayClient` returns
@@ -161,7 +171,11 @@ async function recordDeny(
   runId: string,
   reason: string
 ): Promise<void> {
-  await gateway.record({ action, runId, reason }).catch(() => undefined);
+  try {
+    await gateway.record({ action, runId, reason });
+  } catch {
+    // Intentionally ignored — see the note above on why the deny must survive.
+  }
 }
 
 /**
