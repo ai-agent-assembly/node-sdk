@@ -50,8 +50,18 @@ Every supported framework is integrated through an object that satisfies the
 adapters are added to an `AdapterRegistry` (`src/adapters/adapter-registry.ts`), and
 `applyAll()` activates each one's framework-specific hooks. This is how a single
 `initAssembly()` call can wrap LangChain tools, patch the Vercel AI SDK, and so on,
-without you wiring each framework by hand. The list of adapters that activated for a
-given run is returned to you as `ctx.activeAdapters`.
+without you wiring each framework by hand. The adapters whose patch was applied and is
+reachable for a given run are returned to you as `ctx.activeAdapters`. Detection alone is
+not enough to appear there: a framework that is installed but whose patch failed, was
+inert, or had nothing to attach to is reported in `ctx.unpatchedAdapters` instead, and
+this SDK neither observes nor governs it.
+
+Membership in `ctx.activeAdapters` is a statement about **mechanism, not enforcement**.
+It says a patch was applied — it does not say a policy DENY will block a call. LangGraph
+and Mastra are lineage-tagging only, the LangChain callback layer is audit-only, and even
+the genuinely enforcing paths degrade to a non-blocking check outside a check-capable
+mode. See [Guides → Other frameworks](../04-guides/index.md#other-frameworks-experimental-auto-detected)
+for the per-framework capability table.
 
 ## The `initAssembly` lifecycle
 
@@ -81,7 +91,12 @@ payload, lives in **[Configuration → The init flow](../05-configuration/index.
 
 ```ts
 interface AssemblyContext {
+  /** Patch applied and reachable. NOT an enforcement guarantee — see above. */
   readonly activeAdapters: readonly string[];
+  /** Found installed. NOT a superset of activeAdapters (see the note below). */
+  readonly detectedAdapters: readonly string[];
+  /** Detected but not attached — patch failed, was inert, skipped, or unreachable. */
+  readonly unpatchedAdapters: readonly string[];
   readonly parentAgentId?: string;
   readonly teamId?: string;
   readonly delegationReason?: string;
@@ -90,6 +105,19 @@ interface AssemblyContext {
   shutdown: () => Promise<void>;
 }
 ```
+
+:::caution[`activeAdapters` is not a subset of `detectedAdapters`]
+A framework you configure **explicitly** is active without ever being detected. Today
+that is `langchain-js` only: passing a `langchain` config wires the adapter up even when
+`@langchain/core` does not resolve on disk. So with an explicit `langchain` config and an
+inert `ai` install you can see `active: ["langchain-js"]` alongside
+`detected: ["vercel-ai-sdk"]` — an empty intersection.
+
+Do not compute "the governed frameworks" as `detected.filter(d => active.includes(d))`;
+that silently drops the one adapter that is genuinely wrapped. Read `activeAdapters`
+directly. The invariant that does hold is
+`unpatchedAdapters === detectedAdapters \ activeAdapters`.
+:::
 
 Always `await ctx.shutdown()` when your agent is done — it tears down the adapters and
 the gateway client.

@@ -27,7 +27,7 @@ describe("coverage regression guards", () => {
     expect(adapters[0]?.id).toBe("langchain-js");
   });
 
-  it("initAssembly builds active adapters and shutdown iterates them", async () => {
+  it("initAssembly builds adapter states and shutdown iterates them", async () => {
     const { initAssembly } = await loadCoreWithInstalledPackages(new Set(["ai"]));
 
     const runtime = await initAssembly({
@@ -36,7 +36,14 @@ describe("coverage regression guards", () => {
       mode: "sdk-only"
     });
 
-    expect(runtime.activeAdapters).toEqual(["vercel-ai-sdk"]);
+    // `ai` resolves but is left unmocked, so the real frozen ES module namespace
+    // rejects the governed `tool` factory and the patch warns-and-fails
+    // (AAASM-4842). This case previously asserted `["vercel-ai-sdk"]` — i.e. it
+    // pinned the AAASM-5664 defect, reporting a framework as active in the same
+    // run that warned it was ungoverned. It is detected and unpatched, not active.
+    expect(runtime.detectedAdapters).toEqual(["vercel-ai-sdk"]);
+    expect(runtime.unpatchedAdapters).toEqual(["vercel-ai-sdk"]);
+    expect(runtime.activeAdapters).toEqual([]);
     await expect(runtime.shutdown()).resolves.toBeUndefined();
   });
 
