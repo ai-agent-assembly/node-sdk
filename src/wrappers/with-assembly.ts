@@ -134,6 +134,51 @@ function hasInvoke(
 }
 
 /**
+ * Hand a pre-execution deny to the gateway's audit sink (AAASM-5665).
+ *
+ * Before this, `withAssembly` called `check` and never `record`, so a denied
+ * call produced no audit event at all — the thrown `PolicyViolationError` was
+ * the only trace, and it never leaves the process.
+ *
+ * `GatewayRecordEvent` carries no tool-name field and adding one is a wire
+ * change, so the tool is named inside `reason` — reusing the thrown error's own
+ * message, so the audit event and the error a caller sees cannot drift apart.
+ *
+ * **Every failure mode is swallowed, synchronous throws included.** A failing
+ * audit sink must not convert a policy deny into some other error: the throw
+ * that follows this call is the enforcement decision and has to survive. The
+ * `try`/`catch` is load-bearing rather than stylistic — `gatewayClient` is a
+ * documented public injection point, so a caller-supplied `record` that throws
+ * synchronously never produces a promise for a trailing `.catch()` to attach
+ * to, and would escape past the `PolicyViolationError`. Mirrors the Python
+ * companion's `try/except Exception` around the same hook (AAASM-4782).
+ *
+ * This is deliberately awaited, unlike the `void ... .catch()` in
+ * `recordToolResultNonBlocking` (`hooks/ai-sdk.ts`, `hooks/openai-agents.ts`):
+ * the event is handed over before the deny is thrown, so it cannot be lost if
+ * the caller exits on the error. The cost is that a `record` which hangs delays
+ * the deny — there is no timeout here, unlike `waitForApprovalWithTimeout`.
+ *
+ * What this does *not* do is make a deny observable in a released binary. Both
+ * shipped clients discard the event — `createNoopGatewayClient` returns
+ * undefined, `createNativeGatewayClient` fires only a one-time `AA_DEBUG` note
+ * — so a deny stays Unmeasured in audit evidence (ADR 0033 §6). Supplying a
+ * sink that retains it is tracked as AAASM-5681.
+ */
+async function recordDeny(
+  gateway: GatewayClient,
+  action: string,
+  runId: string,
+  reason: string
+): Promise<void> {
+  try {
+    await gateway.record({ action, runId, reason });
+  } catch {
+    // Intentionally ignored — see the note above on why the deny must survive.
+  }
+}
+
+/**
  * Run the full pre-execution governance chain for one wrapped tool call.
  *
  * Order is load-bearing: the live op-control kill switch (AAASM-3491) runs
@@ -161,17 +206,33 @@ async function enforceGovernance(
     runId
   });
 
-  if (decision.denied) {
-    throw new PolicyViolationError(`Tool '${name}' blocked: ${decision.reason ?? "Denied"}`);
-  }
+  // Both refusal routes converge on a single record-then-throw below rather
+  // than each carrying its own copy (AAASM-5665). Two call sites is an
+  // invitation to fix one and miss the other — which is exactly what happened
+  // in review: the approval-rejected copy could be deleted outright with the
+  // whole suite still green. One site cannot drift from itself.
+  let denial: { action: string; error: PolicyViolationError } | undefined;
 
-  if (decision.pending) {
+  if (decision.denied) {
+    denial = {
+      action: "tool_call_denied",
+      error: new PolicyViolationError(`Tool '${name}' blocked: ${decision.reason ?? "Denied"}`)
+    };
+  } else if (decision.pending) {
     const finalDecision = await waitForApprovalWithTimeout(gateway, name, runId, approvalTimeoutMs);
     if (finalDecision.denied) {
-      throw new PolicyViolationError(
-        `Approval rejected for '${name}': ${finalDecision.reason ?? "Rejected"}`
-      );
+      denial = {
+        action: "tool_call_approval_rejected",
+        error: new PolicyViolationError(
+          `Approval rejected for '${name}': ${finalDecision.reason ?? "Rejected"}`
+        )
+      };
     }
+  }
+
+  if (denial) {
+    await recordDeny(gateway, denial.action, runId, denial.error.message);
+    throw denial.error;
   }
 }
 

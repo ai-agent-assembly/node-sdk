@@ -30,8 +30,10 @@ import { PolicyViolationError } from "../src/errors/policy-violation-error.js";
 import { initAssembly } from "../src/core/init-assembly.js";
 import { withAssembly } from "../src/wrappers/with-assembly.js";
 import {
+  createFailingRecordGatewayClient,
   createFileSideEffect,
   createNetworkSideEffect,
+  createPendingThenRejectGatewayClient,
   createPolicyGatewayClient,
   type FileSideEffect,
   type NetworkSideEffect
@@ -236,6 +238,109 @@ describe("quick-start negative control: what a deny is and is not attributed to"
         "correct agent id — passing withAssembly a different agentId than the " +
         "fixture expects, so that the new assertion is able to fail."
     ).toEqual(["action", "args", "runId", "toolName"]);
+  });
+});
+
+describe("quick-start negative control: a deny is handed to the gateway's record call", () => {
+  it("hands the gateway an audit event naming the denied tool and its run", async () => {
+    const effect = fileEffect();
+    const gateway = createPolicyGatewayClient({ denyTools: ["write_file"] });
+    const tools = {
+      write_file: { execute: async (content: string) => effect.write(content) }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+    const outcome = await settle(tools.write_file.execute("denied-content"));
+
+    // Absence of the effect first, as everywhere else in this file.
+    expect(effect.occurred()).toBe(false);
+    expect(outcome).toBeInstanceOf(PolicyViolationError);
+
+    // The load-bearing assertion for AAASM-5665: the audit event the wrapper
+    // handed the gateway. Before this, `withAssembly` called `check` and never
+    // `record`, so `auditEvents` stayed empty on a deny while `decisions` was
+    // 1 — a deny existed only in the decision log.
+    //
+    // Scope of the evidence: this is the fixture's in-process array. Both
+    // shipped GatewayClient implementations discard the event
+    // (createNoopGatewayClient, createNativeGatewayClient), so a deny is
+    // Unmeasured in audit evidence on the shipped path — AAASM-5681. What this
+    // pins is the wrapper's call.
+    expect(gateway.auditEvents).toHaveLength(1);
+    const event = gateway.auditEvents[0];
+    expect(event?.action).toBe("tool_call_denied");
+    // Correlates the audit event with the decision that produced it.
+    expect(event?.runId).toBe(gateway.decisions[0]?.runId);
+    // GatewayRecordEvent has no tool-name field, so the tool is named in the
+    // reason. Asserting that keeps the event attributable without a wire change.
+    expect(event?.reason).toContain("write_file");
+
+    // The allowed-result sink is still untouched on a deny: the tool never ran,
+    // so there is no result to record. Without this, an implementation that
+    // recorded a bogus empty result would pass the assertions above.
+    expect(gateway.auditResults).toHaveLength(0);
+  });
+
+  it("hands the gateway a distinct audit event when an approval is rejected", async () => {
+    // The second refusal route. Review round 1 found this call site executed by
+    // five tests and asserted by none: deleting it left the suite bit-identical,
+    // while deleting its policy-deny sibling failed a test. Execution is not
+    // pinning, so the action string gets its own control.
+    // Run with and without an approver reason. A gateway is not obliged to
+    // explain a rejection, and attribution must survive that: the tool name
+    // comes from the wrapper's own message, not from the gateway's text.
+    for (const approvalReason of ["approver said no", undefined]) {
+      const effect = fileEffect();
+      const gateway = createPendingThenRejectGatewayClient(approvalReason);
+      const tools = {
+        write_file: { execute: async (content: string) => effect.write(content) }
+      };
+      const label = approvalReason === undefined ? "no reason" : "with reason";
+
+      withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+      const outcome = await settle(tools.write_file.execute("denied-content"));
+
+      expect(effect.occurred(), `[${label}] the rejected tool body ran`).toBe(false);
+      expect(outcome, `[${label}]`).toBeInstanceOf(PolicyViolationError);
+
+      expect(gateway.auditEvents, `[${label}]`).toHaveLength(1);
+      const event = gateway.auditEvents[0];
+      // Distinct from the policy-deny action, so the two routes stay
+      // distinguishable in whatever sink eventually retains them.
+      expect(event?.action, `[${label}]`).toBe("tool_call_approval_rejected");
+      expect(event?.runId, `[${label}]`).toBe(gateway.decisions[0]?.runId);
+      expect(event?.reason, `[${label}]`).toContain("write_file");
+      expect(gateway.auditResults, `[${label}]`).toHaveLength(0);
+    }
+  });
+
+  it("still throws the policy violation when the record call itself fails", async () => {
+    // A caller-supplied gatewayClient is a documented public injection point, so
+    // a record() that throws is reachable user code. Both failure shapes are
+    // covered: a rejected promise, and a SYNCHRONOUS throw — the latter produces
+    // no promise for a trailing .catch() to attach to and escaped past the deny
+    // before this was a try/catch.
+    for (const mode of ["async-reject", "sync-throw"] as const) {
+      const effect = fileEffect();
+      const gateway = createFailingRecordGatewayClient(mode);
+      const tools = {
+        write_file: { execute: async (content: string) => effect.write(content) }
+      };
+
+      withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+      const outcome = await settle(tools.write_file.execute("denied-content"));
+
+      expect(effect.occurred(), `[${mode}] the denied tool body ran`).toBe(false);
+      // The enforcement decision survives the audit failure — a caller doing
+      // `catch (e) { if (e instanceof PolicyViolationError) ... }` still sees it.
+      expect(outcome, `[${mode}] the audit failure replaced the deny`).toBeInstanceOf(
+        PolicyViolationError
+      );
+      expect(gateway.recordAttempts, `[${mode}] record() was never attempted`).toBe(1);
+    }
   });
 });
 
