@@ -50,8 +50,10 @@ Every supported framework is integrated through an object that satisfies the
 adapters are added to an `AdapterRegistry` (`src/adapters/adapter-registry.ts`), and
 `applyAll()` activates each one's framework-specific hooks. This is how a single
 `initAssembly()` call can wrap LangChain tools, patch the Vercel AI SDK, and so on,
-without you wiring each framework by hand. The list of adapters that activated for a
-given run is returned to you as `ctx.activeAdapters`.
+without you wiring each framework by hand. The adapters whose patch actually took
+effect for a given run are returned to you as `ctx.activeAdapters`. Detection alone is
+not enough to appear there: a framework that is installed but whose patch failed or was
+inert is reported in `ctx.unpatchedAdapters` instead, and is **not** governed.
 
 ## The `initAssembly` lifecycle
 
@@ -81,7 +83,12 @@ payload, lives in **[Configuration → The init flow](../05-configuration/index.
 
 ```ts
 interface AssemblyContext {
+  /** Frameworks whose patch took effect — governance is in force for these. */
   readonly activeAdapters: readonly string[];
+  /** Frameworks found installed, whether or not their patch succeeded. */
+  readonly detectedAdapters: readonly string[];
+  /** Detected but ungoverned — the patch failed, was inert, or was skipped. */
+  readonly unpatchedAdapters: readonly string[];
   readonly parentAgentId?: string;
   readonly teamId?: string;
   readonly delegationReason?: string;

@@ -116,7 +116,15 @@ import { initAssembly } from "@agent-assembly/sdk";
 const ctx = await initAssembly({ agentId: "demo" });
 
 console.log(ctx.activeAdapters);
-// e.g. ["vercel-ai-sdk"] or ["openai-agents"] or ["langgraph-js"] or ["mastra"]
+// Only the frameworks whose patch actually took effect, e.g. ["openai-agents"]
+// or ["langgraph-js"] or ["mastra"].
+//
+// A framework can be installed and still be absent here. `ai` (Vercel AI SDK) is
+// the common case: it ships as a frozen ES module namespace that the governed
+// `tool` factory cannot be written onto, so init warns loudly and reports it as
+// ungoverned rather than active (AAASM-4842).
+console.log(ctx.detectedAdapters); // e.g. ["vercel-ai-sdk"] — found on disk
+console.log(ctx.unpatchedAdapters); // e.g. ["vercel-ai-sdk"] — NOT governed
 ```
 
 | Framework     | Detected package       | Status                           |

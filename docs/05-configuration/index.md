@@ -43,8 +43,10 @@ flowchart TD
 6. **Adapter wiring.** The LangChain callback handler is registered, configured LangChain
    tools are wrapped, and any other detected framework (Vercel AI SDK, OpenAI Agents,
    LangGraph, Mastra) is patched.
-7. **Return.** An `AssemblyContext` is returned with the list of `activeAdapters`, any
-   echoed lineage fields, and an async `shutdown()` that tears down adapters and clients.
+7. **Return.** An `AssemblyContext` is returned with `activeAdapters` (the frameworks
+   whose patch took effect), `detectedAdapters` / `unpatchedAdapters` (installed, and
+   installed-but-ungoverned), any echoed lineage fields, and an async `shutdown()` that
+   tears down adapters and clients.
 
 ## Gateway URL & API key resolution
 
