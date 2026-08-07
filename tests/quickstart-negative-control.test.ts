@@ -239,6 +239,48 @@ describe("quick-start negative control: what a deny is and is not attributed to"
   });
 });
 
+describe("quick-start negative control: a deny reaches the audit sink", () => {
+  it("hands the gateway an audit event naming the denied tool and its run", async () => {
+    const effect = fileEffect();
+    const gateway = createPolicyGatewayClient({ denyTools: ["write_file"] });
+    const tools = {
+      write_file: { execute: async (content: string) => effect.write(content) }
+    };
+
+    withAssembly(tools, { gatewayClient: gateway, agentId: AGENT_ID });
+
+    const outcome = await settle(tools.write_file.execute("denied-content"));
+
+    // Absence of the effect first, as everywhere else in this file.
+    expect(effect.occurred()).toBe(false);
+    expect(outcome).toBeInstanceOf(PolicyViolationError);
+
+    // The load-bearing assertion for AAASM-5665: the audit event the wrapper
+    // handed the gateway. Before this, `withAssembly` called `check` and never
+    // `record`, so `auditEvents` stayed empty on a deny while `decisions` was
+    // 1 — a deny existed only in the decision log.
+    //
+    // Scope of the evidence: this is the fixture's in-process array. Both
+    // shipped GatewayClient implementations discard the event
+    // (createNoopGatewayClient, createNativeGatewayClient), so a deny is
+    // Unmeasured in audit evidence on the shipped path — AAASM-5681. What this
+    // pins is the wrapper's call.
+    expect(gateway.auditEvents).toHaveLength(1);
+    const event = gateway.auditEvents[0];
+    expect(event?.action).toBe("tool_call_denied");
+    // Correlates the audit event with the decision that produced it.
+    expect(event?.runId).toBe(gateway.decisions[0]?.runId);
+    // GatewayRecordEvent has no tool-name field, so the tool is named in the
+    // reason. Asserting that keeps the event attributable without a wire change.
+    expect(event?.reason).toContain("write_file");
+
+    // The allowed-result sink is still untouched on a deny: the tool never ran,
+    // so there is no result to record. Without this, an implementation that
+    // recorded a bogus empty result would pass the assertions above.
+    expect(gateway.auditResults).toHaveLength(0);
+  });
+});
+
 describe("quick-start negative control: an ungoverned seam cannot look protected", () => {
   it("a tool with no execute/invoke seam is warned about and still performs its effect", async () => {
     const effect = fileEffect();
