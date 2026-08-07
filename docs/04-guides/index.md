@@ -105,35 +105,49 @@ await tools.search.execute({ query: "hello" }); // now policy-checked
 
 ## Other frameworks (experimental, auto-detected)
 
-If one of these packages is installed, `initAssembly()` detects it and patches its
+If one of these packages is installed, `initAssembly()` attempts to attach to its
 execution surface. Pass `agentId` so lineage is attributed correctly.
+
+**Installing a package is not enough to make it enforcing**, and the amount an
+attached adapter buys you differs per framework — read `ctx.activeAdapters` to see
+what actually attached, and the table below for what each one then does.
 
 ```ts
 import { initAssembly } from "@agent-assembly/sdk";
 
-// With @openai/agents, ai (Vercel AI SDK), @langchain/langgraph, or @mastra/core
-// installed, this is all that is required to activate governance for it:
 const ctx = await initAssembly({ agentId: "demo" });
 
 console.log(ctx.activeAdapters);
-// Only the frameworks whose patch actually took effect, e.g. ["openai-agents"]
-// or ["langgraph-js"] or ["mastra"].
+// Only the frameworks whose patch was applied AND is reachable, e.g.
+// ["openai-agents"] or ["langgraph-js"] or ["mastra"].
 //
-// A framework can be installed and still be absent here. `ai` (Vercel AI SDK) is
-// the common case: it ships as a frozen ES module namespace that the governed
+// Being listed here does NOT mean a policy DENY will block a call:
+//   - langgraph-js / mastra are lineage-tagging only — no tool check runs at all.
+//   - langchain-js callbacks are audit-only; only tools wrapped via
+//     `langchain.tools` are denied before execution.
+//   - every enforcing path still degrades to a non-blocking check unless the run
+//     is check-capable (see "Enforcement modes" below).
+//
+// A framework can also be installed and absent from this list. `ai` (Vercel AI SDK)
+// is the common case: it ships as a frozen ES module namespace that the governed
 // `tool` factory cannot be written onto, so init warns loudly and reports it as
-// ungoverned rather than active (AAASM-4842).
+// unpatched (AAASM-4842). `@langchain/core` installed with no `langchain` config is
+// another: there is nothing for the SDK to attach the handler to (AAASM-5664).
 console.log(ctx.detectedAdapters); // e.g. ["vercel-ai-sdk"] — found on disk
-console.log(ctx.unpatchedAdapters); // e.g. ["vercel-ai-sdk"] — NOT governed
+console.log(ctx.unpatchedAdapters); // e.g. ["vercel-ai-sdk"] — NOT attached at all
 ```
 
-| Framework     | Detected package       | Status                           |
-| ------------- | ---------------------- | -------------------------------- |
-| LangChain     | `@langchain/core`      | Validated (test suite)           |
-| OpenAI Agents | `@openai/agents`       | Experimental (auto-detect patch) |
-| Vercel AI SDK | `ai`                   | Experimental (auto-detect patch) |
-| LangGraph     | `@langchain/langgraph` | Experimental (auto-detect patch) |
-| Mastra        | `@mastra/core`         | Experimental (auto-detect patch) |
+| Framework     | Detected package       | Status                           | What an applied patch actually does                                                                                      |
+| ------------- | ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| LangChain     | `@langchain/core`      | Validated (test suite)           | Callbacks **observe only** (audit; cannot block). Tools passed via `langchain.tools` are **denied before execution**.\* Requires a `langchain` config — detection alone attaches nothing. |
+| OpenAI Agents | `@openai/agents`       | Experimental (auto-detect patch) | Tool calls **denied before execution**.\*                                                                                  |
+| Vercel AI SDK | `ai`                   | Experimental (auto-detect patch) | Tool calls **denied before execution**.\* Frozen-ESM installs cannot be patched at all and report as unpatched.            |
+| LangGraph     | `@langchain/langgraph` | Experimental (auto-detect patch) | **Lineage tagging only** — no in-process tool check runs, so a policy DENY never blocks a call.                            |
+| Mastra        | `@mastra/core`         | Experimental (auto-detect patch) | **Lineage tagging only** — no in-process tool check runs, so a policy DENY never blocks a call.                            |
+
+\* Only in a check-capable run — `mode: "napi-inprocess"` or your own `gatewayClient`.
+Otherwise `check()` is the allow-all no-op and the deny is evaluated but not enforced;
+see the note below.
 
 > **Tool naming caveat (Vercel AI SDK).** Vercel AI SDK tools do not expose a `.name`
 > field, so governance policies must match by tool description content (or the tool-map
