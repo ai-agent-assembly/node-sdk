@@ -246,7 +246,9 @@ governs LangChain tools with two cooperating layers instead:
 `initAssembly()` registers the callback handler and wraps your configured LangChain tools
 for you, so you do not wire either layer by hand. If you attach `AssemblyCallbackHandler`
 without wrapping the tool (e.g. a tool from a library you don't construct yourself),
-denies are still recorded but **not enforced** — wrap the tool with `wrapToolWithAssembly`
+denies are still **emitted as audit events** but **not enforced** — and on the default
+path those events are discarded rather than recorded, so there is nothing to read back
+(see the callback-layer bullet above). Wrap the tool with `wrapToolWithAssembly`
 (or pass it through `initAssembly`'s `langchain.tools`) to actually block it.
 
 ## Matching policies to tools
