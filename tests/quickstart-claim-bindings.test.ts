@@ -123,8 +123,7 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "auto-start-is-opt-in",
     quote:
-      "Auto-start is opt-in — without it, a missing gateway throws a `ConfigurationError` " +
-      "instead of spawning anything.",
+      "Auto-start is opt-in — without it, a missing gateway throws a `ConfigurationError` instead of spawning anything.",
     controls: [
       `${RESOLVER}throws ConfigurationError instead of auto-starting when AA_AUTO_START is unset`
     ]
@@ -132,25 +131,28 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "policy-enforced-before-each-tool-runs",
     quote:
-      "`withAssembly` wraps a map of tools so the local policy is enforced before each one runs: " +
-      "an allowed call executes normally, while a denied call throws a `PolicyViolationError` and " +
-      "the tool body never runs.",
+      "`withAssembly` wraps a map of tools so the local policy is enforced before each one runs: an allowed call executes normally, while a denied call throws a `PolicyViolationError` and the tool body never runs.",
     // Both halves. The negative controls prove the "before" by absence of the
     // side effect; the positive controls prove the probe would have seen that
     // effect had it happened.
     controls: ALLOW_AND_DENY_CONTROLS
   },
   {
+    id: "allow-path-runs-and-returns",
+    quote: "The tool runs normally and returns its result.",
+    controls: [
+      `${NEG}filesystem side effect > POSITIVE CONTROL: an allowed write_file really creates the file on disk`,
+      `${NEG}network side effect > POSITIVE CONTROL: an allowed egress tool reaches the listener`
+    ]
+  },
+  {
     id: "allow-event-is-discarded-not-retained",
     quote:
-      "A governance event is emitted — but with either gateway client this SDK ships it is " +
-      "discarded, not retained, so there is no audit trail to read it back from.",
-    // Repointed under review. This was bound to a negative control that hands
-    // the event to a FIXTURE client, which retains it — so flipping the shipped
-    // clients' disposition left that control green and the binding could not
-    // fail when the claim became false. The control named here drives the
-    // SHIPPED client against a downstream boundary probe, and its sibling at
-    // :164 is the reachability positive control for that same probe.
+      "A governance event is emitted — but with either gateway client this SDK ships it is discarded, not retained, so there is no audit trail to read it back from.",
+    // Bound to the audit-sink suite, which drives the SHIPPED client against a
+    // downstream boundary probe. It was previously bound to a negative control
+    // whose FIXTURE client retains the record, so that control stayed green
+    // when the claim became false.
     controls: [
       `${AUDIT}shipped clients declare what they do with audit events > a client declaring "discarded" reaches nothing with any audit method`
     ]
@@ -158,8 +160,7 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "init-warns-and-reports-the-discard",
     quote:
-      '`initAssembly` warns about this at startup and reports `auditSink: "discarded"` on the ' +
-      "returned context; supply your own `gatewayClient` to retain the event (AAASM-5681).",
+      '`initAssembly` warns about this at startup and reports `auditSink: "discarded"` on the returned context; supply your own `gatewayClient` to retain the event (AAASM-5681).',
     controls: [
       `${AUDIT}initAssembly surfaces the drop without AA_DEBUG > WARNS on stderr and reports auditSink="discarded" with AA_DEBUG unset`
     ]
@@ -167,15 +168,13 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "deny-rejects-and-body-never-runs",
     quote:
-      "**Deny.** The wrapped `invoke()` *rejects* with a `PolicyViolationError` whose message " +
-      "includes the tool name and the gateway's reason — the tool body never runs.",
+      "The wrapped `invoke()` *rejects* with a `PolicyViolationError` whose message includes the tool name and the gateway's reason — the tool body never runs.",
     controls: DENY_CONTROLS
   },
   {
     id: "pending-waits-then-proceeds-or-rejects",
     quote:
-      "**Pending (needs approval).** The call waits up to `langchain.approvalTimeoutMs` (default " +
-      "applies if unset) for a human decision, then either proceeds or rejects.",
+      "The call waits up to `langchain.approvalTimeoutMs` (default applies if unset) for a human decision, then either proceeds or rejects.",
     controls: [
       `${NEG}a deny is handed to the gateway's record call > hands the gateway a distinct audit event when an approval is rejected`
     ]
@@ -194,8 +193,7 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "observe-mode-does-not-block",
     quote:
-      "If you want to watch what *would* be blocked without actually blocking it while you tune " +
-      "policy, register the agent in observe mode:",
+      "If you want to watch what *would* be blocked without actually blocking it while you tune policy, register the agent in observe mode:",
     controls: [
       `${NEG}the zero-config initAssembly path > BOUNDARY: enforcementMode observe inits and lets the tool body run`
     ]
@@ -206,10 +204,6 @@ const BINDINGS: readonly ClaimBinding[] = [
  * Allow-list categories. Permitted only for a sentence that does NOT match the
  * vocabulary below; anything that does needs a written justification.
  */
-const NOT_A_CLAIM =
-  "Descriptive or instructional prose. Says nothing about what governance does to a tool call.";
-const NAVIGATION =
-  "A cross-reference. The claim, if any, lives on the page linked to and is gated there.";
 
 /**
  * Every sentence that makes no capability claim, keyed exactly.
@@ -218,131 +212,186 @@ const NAVIGATION =
  * since the guard checked the heading still existed and said nothing about its
  * contents.
  */
+/**
+ * STRUCTURAL is the ONLY bare constant, permitted solely for lines that are not
+ * prose — MDX tags, admonition delimiters, tab captions, bare link items —
+ * matched by STRUCTURAL_LINE. Every other entry carries a written justification
+ * unique to that sentence.
+ *
+ * The previous rule required a justification only when the sentence matched the
+ * enforcement vocabulary, which is backwards: the sentences that most need
+ * explaining are the ones that EVADE it, since evading it is the whole reason
+ * the scan was inverted.
+ */
+const STRUCTURAL =
+  "Structurally non-prose: an MDX tag, admonition delimiter, tab caption, or bare link item.";
+
+const STRUCTURAL_LINE = /^<\/?Tabs|^<\/?TabItem|^:::|^import\s|^\*\*\[|^\[|^<\/?\w+>/;
+
+/** A floor, not a real check: no gate can tell a justification from noise. */
+const MIN_JUSTIFICATION = 40;
+
 const ALLOWED = new Map<string, string>([
-  ['import Tabs from "@theme/Tabs"; import TabItem from "@theme/TabItem";', NOT_A_CLAIM],
   [
-    "Everything here is copy-paste; the snippets mirror the patterns the SDK's own test suite exercises.",
-    NOT_A_CLAIM
+    '**AI SDK 4.x:** `import { useChat } from "ai/react";`',
+    "A before/after import pair from the Vercel AI SDK migration note."
   ],
   [
-    '<Tabs groupId="quickstart-install-package-manager"> <TabItem value="pnpm" label="pnpm" default>',
-    NOT_A_CLAIM
-  ],
-  ['</TabItem> <TabItem value="npm" label="npm">', NOT_A_CLAIM],
-  ['</TabItem> <TabItem value="yarn" label="yarn">', NOT_A_CLAIM],
-  ['</TabItem> <TabItem value="bun" label="bun">', NOT_A_CLAIM],
-  ["</TabItem> </Tabs>", NOT_A_CLAIM],
-  [
-    "The package ships dual ESM/CJS entries and selects a prebuilt native binding for your platform during `postinstall`, so there is no extra build step for typical consumers.",
-    NOT_A_CLAIM
+    '**AI SDK ≥ 5.0 (current):** `import { useChat } from "@ai-sdk/react";` :::',
+    "The after half of the Vercel AI SDK import pair, closing its admonition."
   ],
   [
-    ":::note[Pre-1.0 / release candidate] The public surface (`initAssembly`, `withAssembly`) is stabilizing but may change between pre-releases.",
-    NOT_A_CLAIM
-  ],
-  ["Pin an exact version for reproducible installs:", NOT_A_CLAIM],
-  ["`npm install @agent-assembly/sdk@0.0.1-rc.6`", NOT_A_CLAIM],
-  [":::", NOT_A_CLAIM],
-  ["You have two options:", NOT_A_CLAIM],
-  [
-    "**Let the SDK auto-start a local gateway.** If you have the `aasm` binary on your `PATH` (`brew install ai-agent-assembly/tap/aasm`, or `curl -fsSL https://agent-assembly.com/install.sh | sh`) and set `AA_AUTO_START=1`, a zero-config `initAssembly()` will probe `http://localhost:7391` and start a local gateway for you if nothing is running.",
-    NOT_A_CLAIM
+    "**Allow.**",
+    "The bold label of a What-to-expect bullet. The claims it introduces are the two sentences after it, both bound."
   ],
   [
-    "**Point at a gateway you already run.** Set `AA_GATEWAY_URL` (and `AA_API_KEY` if it requires auth), or pass `gatewayUrl` explicitly.",
-    NOT_A_CLAIM
+    "**Deny.**",
+    "The bold label of a What-to-expect bullet. The claim it introduces is the next sentence, which is bound to the deny controls."
   ],
-  [
-    ":::note[Local-mode transports: `:7391` REST + `:50051` gRPC] Starting the local gateway binds **two** loopback surfaces in one process:",
-    NOT_A_CLAIM
-  ],
-  [
-    "This exposes the REST API on `http://localhost:7391` (what `gatewayUrl` points to, and what the SDK probes and, with `AA_AUTO_START=1`, auto-starts) **and** the gRPC `AgentLifecycleService` on `127.0.0.1:50051`, which is the endpoint the native `aa-sdk-client` binding dials to **register** your agent.",
-    NOT_A_CLAIM
-  ],
-  [
-    "You don't configure `:50051` yourself — registration dials it automatically — so a no-argument `initAssembly()` both connects and shows the agent in the dashboard once a gateway is reachable.",
-    NOT_A_CLAIM
-  ],
-  [
-    "To confirm both surfaces are actually up rather than guessing from the SDK's behavior, check them directly:",
-    NOT_A_CLAIM
-  ],
-  ["See [Configuration](../05-configuration/index.md) for the full resolution order.", NAVIGATION],
   [
     "**LangChain.js** is the validated path; the remaining frameworks are experimental.",
-    NOT_A_CLAIM
+    "Ranks the framework tabs by support level. A maturity statement about coverage, not about what governance does to a call."
   ],
   [
-    'The excerpts are ESM / TypeScript; under CommonJS, swap the import for `const { withAssembly } = require("@agent-assembly/sdk")`.',
-    NOT_A_CLAIM
+    "**Let the SDK auto-start a local gateway.**",
+    "The bold label of one of the two gateway options; the mechanics follow in the sentences after it."
   ],
   [
-    '<Tabs groupId="quickstart-node-framework"> <TabItem value="langchain-js-basic-agent" label="LangChain.js" default>',
-    NOT_A_CLAIM
+    "**Pending (needs approval).**",
+    "The bold label of a What-to-expect bullet. The behaviour it introduces is the next sentence, which is bound."
   ],
-  [
-    ":::note[Version compatibility] Base tool abstractions like `Tool` moved out of the `langchain` monolith into `@langchain/core` when LangChain split the package in [v0.1.0](https://www.langchain.com/blog/langchain-v0-1-0) (Jan 2024; `@langchain/core` first published to npm 2023-11-22).",
-    NOT_A_CLAIM
-  ],
-  ['**`langchain` < 0.1.0:** `import { Tool } from "langchain/tools";`', NOT_A_CLAIM],
-  [
-    '**`langchain` / `@langchain/core` ≥ 0.1.0 (current):** `import { tool } from "@langchain/core/tools";` :::',
-    NOT_A_CLAIM
-  ],
-  ['</TabItem> <TabItem value="custom-tool-policy" label="Custom (no framework)">', NOT_A_CLAIM],
-  [
-    '</TabItem> <TabItem value="openai-node-tool-policy" label="OpenAI (Node) (Experimental)">',
-    NOT_A_CLAIM
-  ],
-  ['</TabItem> <TabItem value="vercel-ai" label="Vercel AI SDK (Experimental)">', NOT_A_CLAIM],
-  [
-    ":::note[Version compatibility] The React UI hooks were extracted out of the core `ai` package into a dedicated package in [AI SDK 5.0](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0), which removed the deprecated `ai/react` export.",
-    NOT_A_CLAIM
-  ],
-  [
-    'The `tool()` factory used above is unaffected — it still imports from `"ai"` unchanged through the 7.x line this example pins.',
-    NOT_A_CLAIM
-  ],
-  ['**AI SDK 4.x:** `import { useChat } from "ai/react";`', NOT_A_CLAIM],
-  ['**AI SDK ≥ 5.0 (current):** `import { useChat } from "@ai-sdk/react";` :::', NOT_A_CLAIM],
-  ['</TabItem> <TabItem value="langgraph-js" label="LangGraph.js (Experimental)">', NOT_A_CLAIM],
-  ['</TabItem> <TabItem value="mastra" label="Mastra (Experimental)">', NOT_A_CLAIM],
-  [
-    ":::note[Version compatibility] Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved every export except `Mastra` itself off the `@mastra/core` root entry point onto subpaths (see the `npx @mastra/codemod@latest v1/mastra-core-imports` codemod).",
-    NOT_A_CLAIM
-  ],
-  ["This example's `@mastra/core` pin (`^1.50.1`) already uses the new layout.", NOT_A_CLAIM],
-  [
-    '**`@mastra/core` 0.x:** `import { Agent, Workflow, createTool } from "@mastra/core";`',
-    NOT_A_CLAIM
-  ],
-  [
-    '**`@mastra/core` ≥ 1.0 (current):** `import { createTool } from "@mastra/core/tools";` (similarly `Agent` from `@mastra/core/agent`, `Workflow` from `@mastra/core/workflows`) :::',
-    NOT_A_CLAIM
-  ],
-  ["**Allow.** The tool runs normally and returns its result.", NOT_A_CLAIM],
+  ["**Point at a gateway you already run.**", "The bold label of the other gateway option."],
   [
     "**[Configuration](../05-configuration/index.md)** — every `AssemblyConfig` field and the gateway/API-key resolution precedence.",
-    NAVIGATION
+    STRUCTURAL
   ],
   [
     "**[Core Concepts](../03-core-concepts/index.md)** — what the native binding, the adapter registry, and the `initAssembly` lifecycle actually do.",
-    NAVIGATION
-  ],
-  // --- sentences matching the vocabulary: written justification required ---
-  [
-    "Pick your framework below — each tab is the governance-wiring excerpt from that framework's runnable [example](https://github.com/ai-agent-assembly/examples/tree/HEAD/node), vendored into this repo and kept in lock-step with this page by a CI drift check — the check catches this page drifting from the vendored snippet, not the vendored snippet drifting from the upstream example.",
-    "Describes where the tab content comes from, and is unusually precise about the limit of the drift check. 'governance-wiring excerpt' names the excerpt's provenance, not an enforcement outcome."
-  ],
-  [
-    "Copy the full, runnable script — imports, tools, and the agent run — from the linked example; the slice below is just the part that wires in governance.",
-    "An instruction about which lines to copy. 'wires in governance' identifies the excerpt and makes no claim about what that wiring then does to a tool call."
+    STRUCTURAL
   ],
   [
     "**[Guides](../04-guides/index.md)** — the full LangChain walkthrough, the low-level `withAssembly` wrapper, experimental frameworks, and how to handle allow/deny decisions and errors.",
-    "A cross-reference. It matches the vocabulary only through the linked page's title ('allow/deny decisions'); the claims live on that page."
-  ]
+    STRUCTURAL
+  ],
+  [
+    '**`@mastra/core` 0.x:** `import { Agent, Workflow, createTool } from "@mastra/core";`',
+    "A before/after import pair from the Mastra migration note."
+  ],
+  [
+    '**`@mastra/core` ≥ 1.0 (current):** `import { createTool } from "@mastra/core/tools";` (similarly `Agent` from `@mastra/core/agent`, `Workflow` from `@mastra/core/workflows`) :::',
+    "The after half of the Mastra import pair, listing the new module paths and closing its admonition."
+  ],
+  [
+    '**`langchain` / `@langchain/core` ≥ 0.1.0 (current):** `import { tool } from "@langchain/core/tools";` :::',
+    "The after half of the LangChain.js import pair, closing its admonition."
+  ],
+  [
+    '**`langchain` < 0.1.0:** `import { Tool } from "langchain/tools";`',
+    "The before half of the LangChain.js import pair."
+  ],
+  [":::", STRUCTURAL],
+  [
+    ":::note[Local-mode transports: `:7391` REST + `:50051` gRPC] Starting the local gateway binds **two** loopback surfaces in one process:",
+    STRUCTURAL
+  ],
+  [
+    ":::note[Pre-1.0 / release candidate] The public surface (`initAssembly`, `withAssembly`) is stabilizing but may change between pre-releases.",
+    STRUCTURAL
+  ],
+  [
+    ":::note[Version compatibility] Base tool abstractions like `Tool` moved out of the `langchain` monolith into `@langchain/core` when LangChain split the package in [v0.1.0](https://www.langchain.com/blog/langchain-v0-1-0) (Jan 2024; `@langchain/core` first published to npm 2023-11-22).",
+    STRUCTURAL
+  ],
+  [
+    ":::note[Version compatibility] Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved every export except `Mastra` itself off the `@mastra/core` root entry point onto subpaths (see the `npx @mastra/codemod@latest v1/mastra-core-imports` codemod).",
+    STRUCTURAL
+  ],
+  [
+    ":::note[Version compatibility] The React UI hooks were extracted out of the core `ai` package into a dedicated package in [AI SDK 5.0](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0), which removed the deprecated `ai/react` export.",
+    STRUCTURAL
+  ],
+  ["</TabItem> </Tabs>", STRUCTURAL],
+  ['</TabItem> <TabItem value="bun" label="bun">', STRUCTURAL],
+  ['</TabItem> <TabItem value="custom-tool-policy" label="Custom (no framework)">', STRUCTURAL],
+  ['</TabItem> <TabItem value="langgraph-js" label="LangGraph.js (Experimental)">', STRUCTURAL],
+  ['</TabItem> <TabItem value="mastra" label="Mastra (Experimental)">', STRUCTURAL],
+  ['</TabItem> <TabItem value="npm" label="npm">', STRUCTURAL],
+  [
+    '</TabItem> <TabItem value="openai-node-tool-policy" label="OpenAI (Node) (Experimental)">',
+    STRUCTURAL
+  ],
+  ['</TabItem> <TabItem value="vercel-ai" label="Vercel AI SDK (Experimental)">', STRUCTURAL],
+  ['</TabItem> <TabItem value="yarn" label="yarn">', STRUCTURAL],
+  [
+    '<Tabs groupId="quickstart-install-package-manager"> <TabItem value="pnpm" label="pnpm" default>',
+    STRUCTURAL
+  ],
+  [
+    '<Tabs groupId="quickstart-node-framework"> <TabItem value="langchain-js-basic-agent" label="LangChain.js" default>',
+    STRUCTURAL
+  ],
+  [
+    "Copy the full, runnable script — imports, tools, and the agent run — from the linked example; the slice below is just the part that wires in governance.",
+    "An instruction about which lines to copy. Identifies the excerpt without claiming what the wiring achieves."
+  ],
+  [
+    "Everything here is copy-paste; the snippets mirror the patterns the SDK's own test suite exercises.",
+    "Describes how the snippets relate to the test suite. A provenance statement about the page."
+  ],
+  [
+    "If you have the `aasm` binary on your `PATH` (`brew install ai-agent-assembly/tap/aasm`, or `curl -fsSL https://agent-assembly.com/install.sh | sh`) and set `AA_AUTO_START=1`, a zero-config `initAssembly()` will probe `http://localhost:7391` and start a local gateway for you if nothing is running.",
+    "Describes the auto-start opt-in, its binary prerequisite, and the port probed. Startup mechanics, not a claim that a call is checked."
+  ],
+  [
+    "Pick your framework below — each tab is the governance-wiring excerpt from that framework's runnable [example](https://github.com/ai-agent-assembly/examples/tree/HEAD/node), vendored into this repo and kept in lock-step with this page by a CI drift check — the check catches this page drifting from the vendored snippet, not the vendored snippet drifting from the upstream example.",
+    "Describes tab provenance, and is unusually precise about the limit of the drift check. Names the excerpt, not an enforcement outcome."
+  ],
+  [
+    "Pin an exact version for reproducible installs:",
+    "Introduces the pinned-install command below it."
+  ],
+  [
+    "See [Configuration](../05-configuration/index.md) for the full resolution order.",
+    "A cross-reference to the gateway and credential resolution documentation."
+  ],
+  [
+    "Set `AA_GATEWAY_URL` (and `AA_API_KEY` if it requires auth), or pass `gatewayUrl` explicitly.",
+    "Names the environment variables and option for pointing at an existing gateway."
+  ],
+  [
+    'The `tool()` factory used above is unaffected — it still imports from `"ai"` unchanged through the 7.x line this example pins.',
+    "Scopes the Vercel AI SDK migration note, saying which import did not move."
+  ],
+  [
+    'The excerpts are ESM / TypeScript; under CommonJS, swap the import for `const { withAssembly } = require("@agent-assembly/sdk")`.',
+    "Tells a CommonJS reader how to adapt the import line."
+  ],
+  [
+    "The package ships dual ESM/CJS entries and selects a prebuilt native binding for your platform during `postinstall`, so there is no extra build step for typical consumers.",
+    "Describes packaging and install mechanics: module formats and prebuilt binary selection."
+  ],
+  [
+    "This example's `@mastra/core` pin (`^1.50.1`) already uses the new layout.",
+    "Notes that the Mastra example is already on the post-migration import layout."
+  ],
+  [
+    "This exposes the REST API on `http://localhost:7391` (what `gatewayUrl` points to, and what the SDK probes and, with `AA_AUTO_START=1`, auto-starts) **and** the gRPC `AgentLifecycleService` on `127.0.0.1:50051`, which is the endpoint the native `aa-sdk-client` binding dials to **register** your agent.",
+    "Maps each local-mode port to the consumer that dials it. Transport topology, not enforcement."
+  ],
+  [
+    "To confirm both surfaces are actually up rather than guessing from the SDK's behavior, check them directly:",
+    "Tells the reader to verify the ports themselves; the commands follow below."
+  ],
+  [
+    "You don't configure `:50051` yourself — registration dials it automatically — so a no-argument `initAssembly()` both connects and shows the agent in the dashboard once a gateway is reachable.",
+    "Describes registration transport and dashboard visibility, conditioned on a reachable gateway. Connectivity, not a claim that any call is checked."
+  ],
+  ["You have two options:", "A list lead-in with no predicate of its own."],
+  [
+    "`npm install @agent-assembly/sdk@0.0.1-rc.6`",
+    "A pinned install command, shown as inline code."
+  ],
+  ['import Tabs from "@theme/Tabs"; import TabItem from "@theme/TabItem";', STRUCTURAL]
 ]);
 
 /**
@@ -389,9 +438,25 @@ function splitUnits(paragraph: string): string[] {
 /**
  * '.' and '?' only. '!' is not a terminator: emphatic prose and admonition
  * markers would otherwise split into fragments.
+ *
+ * Closing markup between the terminator and the space is kept WITH the
+ * sentence, so a bold lead-in like "**Deny.**" ends there instead of running
+ * into the claim it introduces — binding the glued pair covered both. A
+ * backtick is deliberately excluded from that trailing class: inline code such
+ * as `phi.*` would otherwise be read as a sentence end.
  */
+const SENTENCE_END = /[.?][*)\]_"']*(?=\s)/g;
+
 function splitSentences(unit: string): string[] {
-  return unit.split(/(?<=[.?])\s/);
+  const out: string[] = [];
+  let start = 0;
+  for (const match of unit.matchAll(SENTENCE_END)) {
+    const cut = match.index + match[0].length;
+    out.push(unit.slice(start, cut));
+    start = cut;
+  }
+  out.push(unit.slice(start));
+  return out;
 }
 
 /**
@@ -409,13 +474,25 @@ const ENFORCEMENT_VOCABULARY =
  * a comment is invisible to a reader, so a bound claim commented out of the
  * rendered page must not still satisfy this gate.
  */
-function scannedSentences(): Record<string, string> {
+interface Occurrence {
+  readonly text: string;
+  readonly section: string;
+}
+
+/**
+ * Every (sentence, section) OCCURRENCE. An array, not a record: keying by
+ * sentence collapsed duplicates before anything counted them, so `matched === 1`
+ * could only ever be 0 or 1 and a bound true sentence could be pasted into a
+ * section that inverts its meaning — an observe-mode block, a "what not to do"
+ * block — and still count once. Section attribution was last-write-wins too.
+ */
+function scannedOccurrences(): Occurrence[] {
   let body = stripFrontMatter(readQuickStart());
   for (const pattern of [/```[\s\S]*?```/g, /<!--[\s\S]*?-->/g, /\{\/\*[\s\S]*?\*\/\}/g]) {
     body = body.replace(pattern, "\n\n");
   }
 
-  const sentences: Record<string, string> = {};
+  const occurrences: Occurrence[] = [];
   let section = "(preamble)";
   for (const chunk of body.split(/^(#{1,6} .*)$/m)) {
     if (chunk === undefined) continue;
@@ -427,12 +504,17 @@ function scannedSentences(): Record<string, string> {
       for (const unit of splitUnits(paragraph)) {
         for (const raw of splitSentences(unit.replace(LIST_MARKER, ""))) {
           const flat = flattenMarkdown(raw);
-          if (flat !== "") sentences[flat] = section;
+          if (flat !== "") occurrences.push({ text: flat, section });
         }
       }
     }
   }
-  return sentences;
+  return occurrences;
+}
+
+/** The de-duplicated set, for membership questions where count does not matter. */
+function scannedTexts(): Set<string> {
+  return new Set(scannedOccurrences().map((occ) => occ.text));
 }
 
 /**
@@ -483,11 +565,11 @@ describe("claim gate: it can see what it gates", () => {
   // Positive controls for the gate itself. An empty parse and a clean result
   // are otherwise indistinguishable.
   it("reads the whole document and splits it into sentences", () => {
-    expect(Object.keys(scannedSentences()).length).toBeGreaterThan(30);
+    expect(scannedOccurrences().length).toBeGreaterThan(30);
   });
 
   it("reaches every section, including the last", () => {
-    const sections = new Set(Object.values(scannedSentences()));
+    const sections = new Set(scannedOccurrences().map((occ) => occ.section));
     expect(sections.size).toBeGreaterThanOrEqual(5);
     // "## Next steps" used to be excluded by name, which made it a black hole:
     // a claim inserted there was never seen.
@@ -501,7 +583,7 @@ describe("claim gate: it can see what it gates", () => {
     expect(document, "this control assumes the page still contains an MDX or HTML comment").toMatch(
       /<!--|\{\/\*/
     );
-    for (const sentence of Object.keys(scannedSentences())) {
+    for (const sentence of scannedTexts()) {
       expect(sentence).not.toContain("<!--");
       expect(sentence).not.toContain("{/*");
     }
@@ -525,8 +607,8 @@ describe("claim gate: the allow-list cannot become a bypass", () => {
   it("every allowed sentence is still present verbatim", () => {
     // An entry is a whole sentence, so rewording the claim makes the entry
     // stale and fails here rather than silently exempting the new wording.
-    const scanned = scannedSentences();
-    const stale = [...ALLOWED.keys()].filter((sentence) => !Object.hasOwn(scanned, sentence));
+    const scanned = scannedTexts();
+    const stale = [...ALLOWED.keys()].filter((sentence) => !scanned.has(sentence));
     expect(
       stale,
       "ALLOWED contains sentences that no longer appear in the quick-start. Delete the stale " +
@@ -534,19 +616,42 @@ describe("claim gate: the allow-list cannot become a bypass", () => {
     ).toEqual([]);
   });
 
-  it("a claim-like sentence needs a written justification", () => {
-    // Waving through a sentence that reads like a claim must cost a sentence of
-    // prose. The category constants are deliberately unusable here.
+  it("only structural lines may use the bare constant", () => {
+    // Every prose entry needs a written justification, not only the ones the
+    // vocabulary already catches. Keying off the vocabulary was backwards: a
+    // sentence that MATCHES it has already warned the author; one that EVADES
+    // it has not, and evading it is why this scan was inverted.
     const offenders = [...ALLOWED.entries()]
-      .filter(
-        ([sentence, reason]) =>
-          ENFORCEMENT_VOCABULARY.test(sentence) && (reason === NOT_A_CLAIM || reason === NAVIGATION)
-      )
+      .filter(([sentence, reason]) => reason === STRUCTURAL && !STRUCTURAL_LINE.test(sentence))
       .map(([sentence]) => sentence);
     expect(
       offenders,
-      "These allow-listed sentences match the enforcement vocabulary but are waved through " +
-        "with a bare category. Replace it with a written justification, or bind them."
+      "These allow-listed sentences are prose but are waved through with the bare STRUCTURAL " +
+        "constant. Replace it with a written justification saying why this particular sentence " +
+        "makes no capability claim, or bind it."
+    ).toEqual([]);
+  });
+
+  it("written justifications are substantial and distinct", () => {
+    // A cheap partial, and only that. No gate can tell a justification from
+    // noise — reason="x" is prose to a computer. Length and uniqueness only
+    // make an empty gesture and a copy-paste visible in review.
+    const written = [...ALLOWED.entries()].filter(([, reason]) => reason !== STRUCTURAL);
+    const tooShort = written
+      .filter(([, reason]) => reason.length < MIN_JUSTIFICATION)
+      .map(([s]) => s);
+    expect(tooShort, `justifications shorter than ${MIN_JUSTIFICATION} characters`).toEqual([]);
+
+    const seen = new Map<string, string>();
+    const duplicates: string[] = [];
+    for (const [sentence, reason] of written) {
+      const other = seen.get(reason);
+      if (other !== undefined) duplicates.push(`${reason} — used by both ${other} and ${sentence}`);
+      seen.set(reason, sentence);
+    }
+    expect(
+      duplicates,
+      "A justification explains one specific sentence; reuse is copy-paste waving."
     ).toEqual([]);
   });
 
@@ -565,11 +670,16 @@ describe("claim gate: every documented claim is bound", () => {
     // plain sentences, one of them the negation of the product, and every
     // keyword-gated revision of this gate stayed green.
     const quotes = new Set(BINDINGS.map((binding) => binding.quote));
-    const loose = Object.entries(scannedSentences())
-      .filter(([sentence]) => !quotes.has(sentence) && !ALLOWED.has(sentence))
+    const seen = new Set<string>();
+    const loose = scannedOccurrences()
+      .filter(({ text }) => {
+        if (quotes.has(text) || ALLOWED.has(text) || seen.has(text)) return false;
+        seen.add(text);
+        return true;
+      })
       .map(
-        ([sentence, section]) =>
-          `  [${ENFORCEMENT_VOCABULARY.test(sentence) ? "CLAIM-LIKE" : "prose"}] [${section}] ${sentence}`
+        ({ text, section }) =>
+          `  [${ENFORCEMENT_VOCABULARY.test(text) ? "CLAIM-LIKE" : "prose"}] [${section}] ${text}`
       );
 
     expect(
@@ -594,15 +704,18 @@ describe("claim gate: every documented claim is bound", () => {
       // Whole-sentence equality, not containment. Containment allowed a
       // sentence to carry extra unbound claims — up to and including its own
       // negation — while one bound fragment kept the gate green.
-      const matches = Object.keys(scannedSentences()).filter(
-        (sentence) => sentence === binding.quote
-      );
+      // Whole-sentence equality over OCCURRENCES, so `=== 1` is live: more
+      // than one means the sentence now appears in two places, and a true
+      // claim pasted into a section that inverts its meaning would otherwise
+      // still be counted by this binding as the sentence that was proven.
+      const where = scannedOccurrences()
+        .filter((occ) => occ.text === binding.quote)
+        .map((occ) => occ.section);
       expect(
-        matches.length,
-        `ClaimBinding "${binding.id}" must match exactly one whole sentence; it matched ` +
-          `${matches.length}.\nIts quote is:\n  ${binding.quote}\n` +
-          "The claim was reworded, split, or merged. Update the quote to the new whole sentence " +
-          "and re-check that the named controls still prove it."
+        where.length,
+        `ClaimBinding "${binding.id}" must match exactly one whole sentence occurrence; it ` +
+          `matched ${where.length} (sections: ${JSON.stringify(where)}).\nIts quote is:\n  ${binding.quote}\n` +
+          "0 means the claim was reworded, split, merged, or commented out."
       ).toBe(1);
     }
   );
