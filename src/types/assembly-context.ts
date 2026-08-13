@@ -99,8 +99,16 @@ export interface AssemblyContext {
    * `"caller-supplied"` means the caller passed their own `gatewayClient`, so
    * this SDK makes no claim either way. It is the absence of a claim, **not** an
    * assurance that events are retained.
+   *
+   * Optional only because `AssemblyContext` is part of this package's public
+   * export surface (`exports["."].types`), so a consumer can construct one in a
+   * test fixture or a custom integration; requiring the field would be a compile
+   * break for them, introduced by a diagnostic. `initAssembly` always populates
+   * it. The guarantee this ticket adds does not rest here — it rests on every
+   * *shipped client* declaring its disposition, which is enforced by
+   * `tests/audit-sink-disposition.test.ts`.
    */
-  readonly auditSink: AuditSinkDisposition;
+  readonly auditSink?: AuditSinkDisposition;
   readonly parentAgentId?: string;
   readonly teamId?: string;
   readonly delegationReason?: string;
