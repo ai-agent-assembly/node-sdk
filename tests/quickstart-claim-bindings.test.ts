@@ -1,44 +1,53 @@
 /**
- * Drift gate binding the documented Node quick-start's enforcement claims to
- * the controls that prove them (AAASM-5529, Epic AAASM-5526).
+ * Drift gate binding the documented Node quick-start's claims to the controls
+ * that prove them (AAASM-5529, Epic AAASM-5526).
  *
- * `docs/02-quick-start/index.md` tells a reader what governance does for them.
- * Those sentences are the product's load-bearing enforcement claims, and
- * nothing connected them to the controls that prove them.
+ * Every sentence in `docs/02-quick-start/index.md` must be either BOUND to a
+ * control that proves it, or explicitly ALLOW-LISTED as making no capability
+ * claim. There is no third state and no keyword filter.
+ *
+ * WHY THE DEFAULT IS INVERTED
+ *
+ * Earlier revisions only scanned sentences matching an enforcement vocabulary.
+ * Review appended three plain sentences using none of the 21 terms — the last,
+ * "Tool bodies always execute; the policy result is recorded alongside them",
+ * is the negation of the product — and every gate stayed green. Widening 3 → 21
+ * closed the instance, not the class: a keyword allow-list cannot be completed,
+ * because whoever adds the claim picks the words after reading the list.
+ *
+ * The vocabulary now gates nothing. It survives as a severity hint in the
+ * failure message, and as the trigger for a stricter allow-list rule: an entry
+ * whose sentence reads like a claim needs a written justification, not a
+ * category.
+ *
+ * Section-level exclusions are gone. An excluded section was a black hole — the
+ * guard checked the heading still existed and said nothing about its contents —
+ * so a claim inserted into "## Next steps" was never scanned at all.
  *
  * WHAT THIS GATE PROVES
  *
- * 1. The WHOLE document is scanned, not opted-in regions. Every sentence using
- *    enforcement vocabulary must be bound. Sections and sentences are excluded
- *    only through the two named allow-lists, each entry carrying a reason and
- *    an exact sentence, so an entry cannot cover a reworded or new claim.
- * 2. A binding must match a WHOLE sentence, exactly — compared with ===, never
- *    with `includes`. Containment let a sentence carry unlimited extra unbound
- *    claims as long as one bound fragment survived. The reviewer replaced the
- *    true claim with its opposite, left the bound fragment intact, and this
- *    gate stayed green; that is what this revision closes.
- * 3. Exactly one binding may match a sentence.
- * 4. Every control a binding names still exists, extracted from each control
- *    file's TypeScript AST as `<file> :: <describe> > <it>`.
- * 5. Every claim is proven or openly unproven, with no exempt category. There
- *    was a `kind` field; it was written and never read, which is worse than a
- *    bypass because a reader assumes it is enforced. Removed.
- * 6. The error class the document names is the one the SDK actually throws,
- *    derived from `constructor.name` on a real deny rather than imported.
+ * 1. Every sentence in the document is accounted for.
+ * 2. A binding matches a WHOLE sentence, exactly, and only one binding may.
+ * 3. Every control a binding names exists, extracted from the control files'
+ *    TypeScript ASTs rather than transcribed.
+ * 4. Every claim is proven or openly unproven, and an unproven claim may not
+ *    name the ticket this file implements — that pointer resolves to a closed
+ *    issue the moment the work merges.
+ * 5. Comments are stripped before scanning, HTML and MDX alike, because a
+ *    reader cannot see them. Leaving them in let a bound claim be commented out
+ *    of the rendered page while the gate still counted it.
  *
  * WHAT THIS GATE DOES NOT PROVE
  *
  * It does not execute or lint a documented snippet.
  * `metadata/quickstart-snippets/` is excluded from ESLint (`eslint.config.mjs`)
  * and Prettier (`.prettierignore`), and the snippets import
- * `createPolicyGatewayClient` from `"./policy.js"` — a file the reader supplies
- * from the examples repo, not an SDK export. The base `tsconfig.json` DOES
- * include the snippet files, but no CI job type-checks with that config
- * (`pnpm typecheck` runs `tsconfig.test.json`), so nothing gates them. The
- * existing drift step round-trips them as text only, and this gate does not
- * change that.
+ * `createPolicyGatewayClient` from `"./policy.js"` — a file the reader supplies.
+ * The base `tsconfig.json` DOES include them, but no CI job type-checks with
+ * that config (`pnpm typecheck` runs `tsconfig.test.json`), so nothing gates
+ * them. The existing drift step round-trips them as text only.
  *
- * Binding a claim also does not make it true.
+ * Binding a claim does not make it true.
  */
 
 import { readFileSync } from "node:fs";
@@ -49,6 +58,12 @@ import { withAssembly } from "../src/wrappers/with-assembly.js";
 import { createFileSideEffect, createPolicyGatewayClient } from "./helpers/negative-control.js";
 
 const QUICK_START = resolve(process.cwd(), "docs/02-quick-start/index.md");
+
+/**
+ * The ticket this file implements. An unproven claim may not name it: on merge
+ * that pointer resolves to a closed issue and nothing would notice.
+ */
+const IMPLEMENTING_TICKET = "AAASM-5529";
 
 /**
  * The test files a binding may name.
@@ -152,14 +167,14 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "deny-rejects-and-body-never-runs",
     quote:
-      "- **Deny.** The wrapped `invoke()` *rejects* with a `PolicyViolationError` whose message " +
+      "**Deny.** The wrapped `invoke()` *rejects* with a `PolicyViolationError` whose message " +
       "includes the tool name and the gateway's reason — the tool body never runs.",
     controls: DENY_CONTROLS
   },
   {
     id: "pending-waits-then-proceeds-or-rejects",
     quote:
-      "- **Pending (needs approval).** The call waits up to `langchain.approvalTimeoutMs` (default " +
+      "**Pending (needs approval).** The call waits up to `langchain.approvalTimeoutMs` (default " +
       "applies if unset) for a human decision, then either proceeds or rejects.",
     controls: [
       `${NEG}a deny is handed to the gateway's record call > hands the gateway a distinct audit event when an approval is rejected`
@@ -187,19 +202,148 @@ const BINDINGS: readonly ClaimBinding[] = [
   }
 ];
 
-/** Whole sections excluded from the scan, each with a reason. */
-const EXCLUDED_SECTIONS: Record<string, string> = {
-  "## Next steps":
-    "A link list. Every line is a cross-reference to another page; the claims live on the pages " +
-    "linked to and are gated there."
-};
+/**
+ * Allow-list categories. Permitted only for a sentence that does NOT match the
+ * vocabulary below; anything that does needs a written justification.
+ */
+const NOT_A_CLAIM =
+  "Descriptive or instructional prose. Says nothing about what governance does to a tool call.";
+const NAVIGATION =
+  "A cross-reference. The claim, if any, lives on the page linked to and is gated there.";
 
 /**
- * Individual sentences excluded from the scan, each with a reason. Exact
- * flattened sentences, never patterns, so an entry cannot silently cover a
- * reworded or newly added claim.
+ * Every sentence that makes no capability claim, keyed exactly.
+ *
+ * There is no section-level exclusion: an excluded section was a black hole,
+ * since the guard checked the heading still existed and said nothing about its
+ * contents.
  */
-const EXCLUDED_SENTENCES: Record<string, string> = {};
+const ALLOWED = new Map<string, string>([
+  ['import Tabs from "@theme/Tabs"; import TabItem from "@theme/TabItem";', NOT_A_CLAIM],
+  [
+    "Everything here is copy-paste; the snippets mirror the patterns the SDK's own test suite exercises.",
+    NOT_A_CLAIM
+  ],
+  [
+    '<Tabs groupId="quickstart-install-package-manager"> <TabItem value="pnpm" label="pnpm" default>',
+    NOT_A_CLAIM
+  ],
+  ['</TabItem> <TabItem value="npm" label="npm">', NOT_A_CLAIM],
+  ['</TabItem> <TabItem value="yarn" label="yarn">', NOT_A_CLAIM],
+  ['</TabItem> <TabItem value="bun" label="bun">', NOT_A_CLAIM],
+  ["</TabItem> </Tabs>", NOT_A_CLAIM],
+  [
+    "The package ships dual ESM/CJS entries and selects a prebuilt native binding for your platform during `postinstall`, so there is no extra build step for typical consumers.",
+    NOT_A_CLAIM
+  ],
+  [
+    ":::note[Pre-1.0 / release candidate] The public surface (`initAssembly`, `withAssembly`) is stabilizing but may change between pre-releases.",
+    NOT_A_CLAIM
+  ],
+  ["Pin an exact version for reproducible installs:", NOT_A_CLAIM],
+  ["`npm install @agent-assembly/sdk@0.0.1-rc.6`", NOT_A_CLAIM],
+  [":::", NOT_A_CLAIM],
+  ["You have two options:", NOT_A_CLAIM],
+  [
+    "**Let the SDK auto-start a local gateway.** If you have the `aasm` binary on your `PATH` (`brew install ai-agent-assembly/tap/aasm`, or `curl -fsSL https://agent-assembly.com/install.sh | sh`) and set `AA_AUTO_START=1`, a zero-config `initAssembly()` will probe `http://localhost:7391` and start a local gateway for you if nothing is running.",
+    NOT_A_CLAIM
+  ],
+  [
+    "**Point at a gateway you already run.** Set `AA_GATEWAY_URL` (and `AA_API_KEY` if it requires auth), or pass `gatewayUrl` explicitly.",
+    NOT_A_CLAIM
+  ],
+  [
+    ":::note[Local-mode transports: `:7391` REST + `:50051` gRPC] Starting the local gateway binds **two** loopback surfaces in one process:",
+    NOT_A_CLAIM
+  ],
+  [
+    "This exposes the REST API on `http://localhost:7391` (what `gatewayUrl` points to, and what the SDK probes and, with `AA_AUTO_START=1`, auto-starts) **and** the gRPC `AgentLifecycleService` on `127.0.0.1:50051`, which is the endpoint the native `aa-sdk-client` binding dials to **register** your agent.",
+    NOT_A_CLAIM
+  ],
+  [
+    "You don't configure `:50051` yourself — registration dials it automatically — so a no-argument `initAssembly()` both connects and shows the agent in the dashboard once a gateway is reachable.",
+    NOT_A_CLAIM
+  ],
+  [
+    "To confirm both surfaces are actually up rather than guessing from the SDK's behavior, check them directly:",
+    NOT_A_CLAIM
+  ],
+  ["See [Configuration](../05-configuration/index.md) for the full resolution order.", NAVIGATION],
+  [
+    "**LangChain.js** is the validated path; the remaining frameworks are experimental.",
+    NOT_A_CLAIM
+  ],
+  [
+    'The excerpts are ESM / TypeScript; under CommonJS, swap the import for `const { withAssembly } = require("@agent-assembly/sdk")`.',
+    NOT_A_CLAIM
+  ],
+  [
+    '<Tabs groupId="quickstart-node-framework"> <TabItem value="langchain-js-basic-agent" label="LangChain.js" default>',
+    NOT_A_CLAIM
+  ],
+  [
+    ":::note[Version compatibility] Base tool abstractions like `Tool` moved out of the `langchain` monolith into `@langchain/core` when LangChain split the package in [v0.1.0](https://www.langchain.com/blog/langchain-v0-1-0) (Jan 2024; `@langchain/core` first published to npm 2023-11-22).",
+    NOT_A_CLAIM
+  ],
+  ['**`langchain` < 0.1.0:** `import { Tool } from "langchain/tools";`', NOT_A_CLAIM],
+  [
+    '**`langchain` / `@langchain/core` ≥ 0.1.0 (current):** `import { tool } from "@langchain/core/tools";` :::',
+    NOT_A_CLAIM
+  ],
+  ['</TabItem> <TabItem value="custom-tool-policy" label="Custom (no framework)">', NOT_A_CLAIM],
+  [
+    '</TabItem> <TabItem value="openai-node-tool-policy" label="OpenAI (Node) (Experimental)">',
+    NOT_A_CLAIM
+  ],
+  ['</TabItem> <TabItem value="vercel-ai" label="Vercel AI SDK (Experimental)">', NOT_A_CLAIM],
+  [
+    ":::note[Version compatibility] The React UI hooks were extracted out of the core `ai` package into a dedicated package in [AI SDK 5.0](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0), which removed the deprecated `ai/react` export.",
+    NOT_A_CLAIM
+  ],
+  [
+    'The `tool()` factory used above is unaffected — it still imports from `"ai"` unchanged through the 7.x line this example pins.',
+    NOT_A_CLAIM
+  ],
+  ['**AI SDK 4.x:** `import { useChat } from "ai/react";`', NOT_A_CLAIM],
+  ['**AI SDK ≥ 5.0 (current):** `import { useChat } from "@ai-sdk/react";` :::', NOT_A_CLAIM],
+  ['</TabItem> <TabItem value="langgraph-js" label="LangGraph.js (Experimental)">', NOT_A_CLAIM],
+  ['</TabItem> <TabItem value="mastra" label="Mastra (Experimental)">', NOT_A_CLAIM],
+  [
+    ":::note[Version compatibility] Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved every export except `Mastra` itself off the `@mastra/core` root entry point onto subpaths (see the `npx @mastra/codemod@latest v1/mastra-core-imports` codemod).",
+    NOT_A_CLAIM
+  ],
+  ["This example's `@mastra/core` pin (`^1.50.1`) already uses the new layout.", NOT_A_CLAIM],
+  [
+    '**`@mastra/core` 0.x:** `import { Agent, Workflow, createTool } from "@mastra/core";`',
+    NOT_A_CLAIM
+  ],
+  [
+    '**`@mastra/core` ≥ 1.0 (current):** `import { createTool } from "@mastra/core/tools";` (similarly `Agent` from `@mastra/core/agent`, `Workflow` from `@mastra/core/workflows`) :::',
+    NOT_A_CLAIM
+  ],
+  ["**Allow.** The tool runs normally and returns its result.", NOT_A_CLAIM],
+  [
+    "**[Configuration](../05-configuration/index.md)** — every `AssemblyConfig` field and the gateway/API-key resolution precedence.",
+    NAVIGATION
+  ],
+  [
+    "**[Core Concepts](../03-core-concepts/index.md)** — what the native binding, the adapter registry, and the `initAssembly` lifecycle actually do.",
+    NAVIGATION
+  ],
+  // --- sentences matching the vocabulary: written justification required ---
+  [
+    "Pick your framework below — each tab is the governance-wiring excerpt from that framework's runnable [example](https://github.com/ai-agent-assembly/examples/tree/HEAD/node), vendored into this repo and kept in lock-step with this page by a CI drift check — the check catches this page drifting from the vendored snippet, not the vendored snippet drifting from the upstream example.",
+    "Describes where the tab content comes from, and is unusually precise about the limit of the drift check. 'governance-wiring excerpt' names the excerpt's provenance, not an enforcement outcome."
+  ],
+  [
+    "Copy the full, runnable script — imports, tools, and the agent run — from the linked example; the slice below is just the part that wires in governance.",
+    "An instruction about which lines to copy. 'wires in governance' identifies the excerpt and makes no claim about what that wiring then does to a tool call."
+  ],
+  [
+    "**[Guides](../04-guides/index.md)** — the full LangChain walkthrough, the low-level `withAssembly` wrapper, experimental frameworks, and how to handle allow/deny decisions and errors.",
+    "A cross-reference. It matches the vocabulary only through the linked page's title ('allow/deny decisions'); the claims live on that page."
+  ]
+]);
 
 /**
  * Read the quick-start with line endings normalised to LF.
@@ -224,54 +368,71 @@ function flattenMarkdown(text: string): string {
   return text.split(/\s+/).join(" ").trim();
 }
 
-function splitSentences(paragraph: string): string[] {
-  const parts = paragraph.split(/(?<=\.)\s/);
-  return parts;
+/** A line that opens a list item or a table row starts a new unit. */
+const UNIT_OPENER = /^\s*(?:[-*+]|\d+\.)\s|^\|/;
+const LIST_MARKER = /^\s*(?:[-*+]|\d+\.)\s+/gm;
+
+function splitUnits(paragraph: string): string[] {
+  const units: string[] = [];
+  let current: string[] = [];
+  for (const line of paragraph.split("\n")) {
+    if (UNIT_OPENER.test(line) && current.length > 0) {
+      units.push(current.join("\n"));
+      current = [];
+    }
+    current.push(line);
+  }
+  if (current.length > 0) units.push(current.join("\n"));
+  return units;
 }
+
+/**
+ * '.' and '?' only. '!' is not a terminator: emphatic prose and admonition
+ * markers would otherwise split into fragments.
+ */
+function splitSentences(unit: string): string[] {
+  return unit.split(/(?<=[.?])\s/);
+}
+
+/**
+ * Gates NOTHING. A severity hint in the failure message, and the trigger for the
+ * stricter allow-list rule. See the header for why a keyword list is unsound.
+ */
+const ENFORCEMENT_VOCABULARY =
+  /\bdenie[sd]\b|\bdeny\b|\bblocked\b|\bblocking\b|\bnever runs?\b|\bbefore execution\b|\bchecked against\b|\benforces?\b|\benforced\b|\bpassthrough\b|\bdiscards?\b|\bdiscarded\b|\bthrows?\b|\brejects?\b|\brouted\b|\bintercepts?\b|\binterception\b|\bgovern(s|ed|ance)?\b|\bverified\b|\bprotection\b|\bunprotected\b|\bbypass(ed|es)?\b/i;
 
 /**
  * Every sentence in the document, keyed to its section heading.
  *
- * The gate opts sections OUT by name rather than opting them in, so a claim
- * added to a section nobody thought about is still caught. A fenced block
- * becomes a PARAGRAPH break, not a space: replacing it with a space glued the
- * sentence before a code sample to the one after it, and a binding quoting the
- * glued pair would cover two claims at once — fragment containment one level up.
+ * No section is skipped. Fenced code and comments become PARAGRAPH breaks:
+ * replacing a fence with a space glued the sentences either side into one, and
+ * a comment is invisible to a reader, so a bound claim commented out of the
+ * rendered page must not still satisfy this gate.
  */
 function scannedSentences(): Record<string, string> {
-  const body = stripFrontMatter(readQuickStart()).replace(/```[\s\S]*?```/g, "\n\n");
+  let body = stripFrontMatter(readQuickStart());
+  for (const pattern of [/```[\s\S]*?```/g, /<!--[\s\S]*?-->/g, /\{\/\*[\s\S]*?\*\/\}/g]) {
+    body = body.replace(pattern, "\n\n");
+  }
 
   const sentences: Record<string, string> = {};
   let section = "(preamble)";
-  for (const chunk of body.split(/^(#{2,6} .*)$/m)) {
+  for (const chunk of body.split(/^(#{1,6} .*)$/m)) {
     if (chunk === undefined) continue;
-    if (/^#{2,6} /.test(chunk)) {
+    if (/^#{1,6} /.test(chunk)) {
       section = chunk.trim();
       continue;
     }
-    if (section in EXCLUDED_SECTIONS) continue;
     for (const paragraph of chunk.split("\n\n")) {
-      for (const raw of splitSentences(paragraph)) {
-        const flat = flattenMarkdown(raw);
-        if (flat !== "") sentences[flat] = section;
+      for (const unit of splitUnits(paragraph)) {
+        for (const raw of splitSentences(unit.replace(LIST_MARKER, ""))) {
+          const flat = flattenMarkdown(raw);
+          if (flat !== "") sentences[flat] = section;
+        }
       }
     }
   }
   return sentences;
-}
-
-const ENFORCEMENT_VOCABULARY =
-  /\bdenie[sd]\b|\bdeny\b|\bblocked\b|\bblocking\b|\bnever runs?\b|\bbefore execution\b|\bchecked against\b|\benforces?\b|\benforced\b|\bpassthrough\b|\bdiscards?\b|\bdiscarded\b|\bthrows?\b|\brejects?\b|\brouted\b|\bintercepts?\b|\binterception\b|\bgoverned\b|\bverified\b|\bprotection\b|\bunprotected\b|\bbypass(ed|es)?\b/i;
-
-/** The scanned sentences that make an enforcement claim. */
-function claimSentences(): Record<string, string> {
-  const claims: Record<string, string> = {};
-  for (const [sentence, section] of Object.entries(scannedSentences())) {
-    if (!ENFORCEMENT_VOCABULARY.test(sentence)) continue;
-    if (sentence in EXCLUDED_SENTENCES) continue;
-    claims[sentence] = section;
-  }
-  return claims;
 }
 
 /**
@@ -325,12 +486,25 @@ describe("claim gate: it can see what it gates", () => {
     expect(Object.keys(scannedSentences()).length).toBeGreaterThan(30);
   });
 
-  it("finds enforcement claims in more than one section", () => {
-    const claims = claimSentences();
-    expect(Object.keys(claims).length).toBeGreaterThanOrEqual(8);
-    // Narrowing the scan back to one region would otherwise look identical to
-    // a clean pass.
-    expect(new Set(Object.values(claims)).size).toBeGreaterThanOrEqual(3);
+  it("reaches every section, including the last", () => {
+    const sections = new Set(Object.values(scannedSentences()));
+    expect(sections.size).toBeGreaterThanOrEqual(5);
+    // "## Next steps" used to be excluded by name, which made it a black hole:
+    // a claim inserted there was never seen.
+    expect([...sections], "'## Next steps' must be scanned, not excluded").toContain(
+      "## Next steps"
+    );
+  });
+
+  it("strips comments before scanning", () => {
+    const document = readQuickStart();
+    expect(document, "this control assumes the page still contains an MDX or HTML comment").toMatch(
+      /<!--|\{\/\*/
+    );
+    for (const sentence of Object.keys(scannedSentences())) {
+      expect(sentence).not.toContain("<!--");
+      expect(sentence).not.toContain("{/*");
+    }
   });
 
   it("extracts control titles from every control file", () => {
@@ -348,47 +522,70 @@ describe("claim gate: it can see what it gates", () => {
 });
 
 describe("claim gate: the allow-list cannot become a bypass", () => {
-  it("every excluded section is still a real heading", () => {
-    const document = readQuickStart();
-    for (const [heading, reason] of Object.entries(EXCLUDED_SECTIONS)) {
-      expect(document, `EXCLUDED_SECTIONS names "${heading}", no longer a heading`).toContain(
-        heading
-      );
-      expect(reason.trim()).not.toBe("");
-    }
-  });
-
-  it("every excluded sentence is still present verbatim", () => {
+  it("every allowed sentence is still present verbatim", () => {
     // An entry is a whole sentence, so rewording the claim makes the entry
     // stale and fails here rather than silently exempting the new wording.
     const scanned = scannedSentences();
-    for (const [sentence, reason] of Object.entries(EXCLUDED_SENTENCES)) {
-      expect(
-        Object.hasOwn(scanned, sentence),
-        `EXCLUDED_SENTENCES contains a sentence no longer in the quick-start:\n  ${sentence}\n` +
-          "Delete the stale entry, and if the replacement makes a claim, bind it."
-      ).toBe(true);
-      expect(reason.trim()).not.toBe("");
-    }
+    const stale = [...ALLOWED.keys()].filter((sentence) => !Object.hasOwn(scanned, sentence));
+    expect(
+      stale,
+      "ALLOWED contains sentences that no longer appear in the quick-start. Delete the stale " +
+        "entries, and if a replacement makes a capability claim, bind it."
+    ).toEqual([]);
+  });
+
+  it("a claim-like sentence needs a written justification", () => {
+    // Waving through a sentence that reads like a claim must cost a sentence of
+    // prose. The category constants are deliberately unusable here.
+    const offenders = [...ALLOWED.entries()]
+      .filter(
+        ([sentence, reason]) =>
+          ENFORCEMENT_VOCABULARY.test(sentence) && (reason === NOT_A_CLAIM || reason === NAVIGATION)
+      )
+      .map(([sentence]) => sentence);
+    expect(
+      offenders,
+      "These allow-listed sentences match the enforcement vocabulary but are waved through " +
+        "with a bare category. Replace it with a written justification, or bind them."
+    ).toEqual([]);
+  });
+
+  it("every allow-list reason is non-empty", () => {
+    const empty = [...ALLOWED.entries()]
+      .filter(([, reason]) => reason.trim() === "")
+      .map(([s]) => s);
+    expect(empty).toEqual([]);
   });
 });
 
 describe("claim gate: every documented claim is bound", () => {
-  it("no enforcement sentence is unbound", () => {
+  it("no sentence is unbound and unallowed", () => {
+    // The inversion. A keyword filter cannot be completed, because whoever adds
+    // a claim picks the words after reading the filter — review appended three
+    // plain sentences, one of them the negation of the product, and every
+    // keyword-gated revision of this gate stayed green.
     const quotes = new Set(BINDINGS.map((binding) => binding.quote));
-    const unbound = Object.entries(claimSentences())
-      .filter(([sentence]) => !quotes.has(sentence))
-      .map(([sentence, section]) => `[${section}] ${sentence}`);
+    const loose = Object.entries(scannedSentences())
+      .filter(([sentence]) => !quotes.has(sentence) && !ALLOWED.has(sentence))
+      .map(
+        ([sentence, section]) =>
+          `  [${ENFORCEMENT_VOCABULARY.test(sentence) ? "CLAIM-LIKE" : "prose"}] [${section}] ${sentence}`
+      );
 
     expect(
-      unbound,
-      "These quick-start sentences make an enforcement claim and have no ClaimBinding:\n" +
-        unbound.map((s) => `  ${s}`).join("\n") +
-        "\n\nAdd a ClaimBinding whose quote is the WHOLE sentence, naming the control that proves " +
-        "it. If no control does, set unprovenReason and name the ticket. If the sentence makes no " +
-        "capability claim, add it to EXCLUDED_SENTENCES with a reason — do not delete the claim " +
-        "from this gate to make it pass."
+      loose,
+      `${loose.length} sentence(s) are neither bound nor allow-listed:\n${loose.join("\n")}\n\n` +
+        "CLAIM-LIKE marks a vocabulary match — a severity hint only. A sentence marked " +
+        "'prose' can still be a claim, which is exactly why this gate does not filter on the " +
+        "vocabulary.\nAdd a ClaimBinding whose quote is the WHOLE sentence and which names the " +
+        "control that proves it (or an unprovenReason naming a ticket), or add it to ALLOWED " +
+        "with a category. A vocabulary match needs a written justification there, not a category."
     ).toEqual([]);
+  });
+
+  it("nothing is both bound and allowed", () => {
+    const overlap = BINDINGS.filter((binding) => ALLOWED.has(binding.quote)).map((b) => b.id);
+    expect(overlap).toEqual([]);
   });
 
   it.each(BINDINGS.map((binding) => [binding.id, binding] as const))(
@@ -432,6 +629,21 @@ describe("claim gate: every binding names something real", () => {
           "or removed. Re-point the binding at the control that now proves the claim, or mark " +
           "the claim unproven and name the ticket."
       ).toEqual([]);
+    }
+  );
+
+  it.each(BINDINGS.map((binding) => [binding.id, binding] as const))(
+    "%s does not name the implementing ticket",
+    (_id, binding) => {
+      // An unproven claim may not point at the ticket that closes it. On merge
+      // that pointer resolves to a CLOSED issue and nothing would notice: the
+      // ticket-shaped check below is satisfied by any AAASM-nnnn, open or not.
+      expect(
+        binding.unprovenReason ?? "",
+        `Claim "${binding.id}" is registered unproven against ${IMPLEMENTING_TICKET}, the ticket ` +
+          "this file implements. On merge that pointer resolves to a closed issue and the claim " +
+          "is silently orphaned. Name the ticket that will actually resolve it, or file one."
+      ).not.toContain(IMPLEMENTING_TICKET);
     }
   );
 
