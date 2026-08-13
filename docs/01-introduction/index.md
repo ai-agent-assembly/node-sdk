@@ -19,11 +19,16 @@ action is emitted as an audit event.
 
 Whether those events are *retained* depends on which gateway client you use. Both
 clients this SDK ships discard hook-layer audit events, so on the default path
-governed actions produce no audit trail — enforcement still applies, but nothing on
-that path can be attributed or reviewed after the fact. Supply your own
-`gatewayClient` to retain them; `initAssembly` warns at startup and reports
-`auditSink` on the returned context when it knows the events are being dropped
-(AAASM-5681).
+governed actions produce no audit trail — nothing on that path can be attributed or
+reviewed after the fact. Supply your own `gatewayClient` to retain them;
+`initAssembly` warns at startup and reports `auditSink` on the returned context when
+it knows the events are being dropped (AAASM-5681).
+
+The audit drop does not change the enforcement posture either way — but do not read
+that as "enforcement still applies". Whether a policy DENY can block a tool depends on
+the mode: only a check-capable run (`napi-inprocess`, or your own `gatewayClient`)
+gets an authoritative `check()`. In `auto` / `sdk-only` / `grpc-sidecar` the check is
+the allow-all no-op stub, so the call is not even *Evaluated*.
 
 In practice the SDK is two things working together:
 
@@ -42,8 +47,10 @@ approval decision.
 
 ## Who this is for
 
-- Developers building agents in Node/TypeScript who need allow/deny enforcement,
-  redaction, or an audit trail without rewriting their agent code.
+- Developers building agents in Node/TypeScript who need allow/deny enforcement or
+  redaction without rewriting their agent code. An audit trail is **not** part of the
+  default path: both gateway clients this SDK ships discard hook-layer audit events,
+  so retaining them requires supplying your own `gatewayClient` (AAASM-5681).
 - Teams adopting Agent Assembly who want the fastest, in-process interception path —
   the SDK layer — rather than (or in addition to) the sidecar proxy and eBPF layers.
 

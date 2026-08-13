@@ -229,8 +229,8 @@ export function createNativeGatewayClient(
     // there is no separate gateway wire for the SDK to POST audit events to, so
     // hook-layer `record` / `recordResult` / `scanPrompts` calls have nowhere to
     // go here and are dropped. This is a deliberate, accepted telemetry gap — NOT
-    // an enforcement gap: allow/deny still flows through `check` /
-    // `waitForApproval` above, consistent with this SDK's non-authoritative
+    // an enforcement gap: the drop does not change what `check` /
+    // `waitForApproval` above decide, consistent with this SDK's non-authoritative
     // posture (`aa-runtime` in the monorepo is the authoritative point). If the
     // hook layer's audit events ever need to reach a central sink from this mode,
     // that is a new wiring task, not a bug to patch here. Emit a one-time,

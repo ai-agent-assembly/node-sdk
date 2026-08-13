@@ -14,8 +14,11 @@
 export type AuditSinkDisposition =
   /**
    * The client is known to drop hook-layer audit events. Both shipped clients
-   * declare this. Enforcement is unaffected — allow/deny still flows through
-   * `check` / `waitForApproval` — but no audit evidence is produced, so no
+   * declare this. The drop does not change the enforcement posture either way:
+   * whether a DENY can block depends on the client's `check`, which is
+   * authoritative only in a check-capable run (`napi-inprocess`, or a
+   * caller-supplied client). On the no-op client `check` is allow-all. Either
+   * way no audit evidence is produced, so no
    * downstream claim of attributability or after-the-fact review holds on this
    * path. ADR 0033 §6: recording here is **Planned** (AAASM-5681), not
    * *Observed*.

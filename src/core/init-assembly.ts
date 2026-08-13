@@ -120,7 +120,10 @@ function warnAuditEventsDiscarded(mode: AssemblyMode | "auto"): void {
       `"${mode}" mode: the gateway client this SDK ships drops record / ` +
       `recordResult / scanPrompts, so governed actions produce NO audit ` +
       `evidence and nothing on this path can be attributed or reviewed after ` +
-      `the fact. Enforcement is unaffected — allow/deny still applies. Supply ` +
+      `the fact. This does not change the enforcement posture either way — ` +
+      `whether a policy DENY can block a tool depends on the mode, and in ` +
+      `"${mode}" it is the allow-all no-op client unless you supply your own. ` +
+      `Supply ` +
       `your own "gatewayClient" to retain audit events. Inspect the ` +
       `"auditSink" field on the returned assembly context to detect this ` +
       `programmatically (AAASM-5681).\n`
