@@ -20,7 +20,7 @@ export type AuditSinkDisposition =
    * caller-supplied client). On the no-op client `check` is allow-all. Either
    * way no audit evidence is produced, so no
    * downstream claim of attributability or after-the-fact review holds on this
-   * path. ADR 0033 §6: recording here is **Planned** (AAASM-5681), not
+   * path. ADR 0033 §6: recording here is **Planned** (AAASM-5750), not
    * *Observed*.
    */
   | "discarded"

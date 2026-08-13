@@ -163,7 +163,7 @@ function hasInvoke(
  * shipped clients discard the event — `createNoopGatewayClient` returns
  * undefined, `createNativeGatewayClient` fires only a one-time `AA_DEBUG` note
  * — so a deny stays Unmeasured in audit evidence (ADR 0033 §6). Supplying a
- * sink that retains it is tracked as AAASM-5681.
+ * sink that retains it is tracked as AAASM-5750.
  */
 async function recordDeny(
   gateway: GatewayClient,
