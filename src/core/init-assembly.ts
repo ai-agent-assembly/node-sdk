@@ -19,6 +19,7 @@ import { ConfigurationError } from "../errors/index.js";
 import type { AssemblyConfig } from "../types/assembly-config.js";
 import type { AssemblyContext } from "../types/assembly-context.js";
 import type { AssemblyMode } from "../types/assembly-mode.js";
+import type { AuditSinkDisposition } from "../types/gateway-governance.js";
 import { ENFORCEMENT_MODES, resolveFailClosed } from "../types/enforcement-mode.js";
 import type {
   LangChainCallbackHandlerLike,
@@ -84,6 +85,46 @@ function buildRegisterOptions(
     ...(config.teamId ? { teamId: config.teamId } : {}),
     ...(config.parentAgentId ? { parentAgentId: config.parentAgentId } : {})
   };
+}
+
+/**
+ * Resolve what the client in use does with hook-layer audit events, for the
+ * `auditSink` field on the returned context (AAASM-5681).
+ *
+ * An omitted `auditSink` means the client did not come from this package, so
+ * the honest answer is `"caller-supplied"` — the absence of a claim, not an
+ * assurance. Both shipped clients declare `"discarded"` explicitly.
+ */
+function resolveAuditSink(client: GatewayClient): AuditSinkDisposition {
+  return client.auditSink ?? "caller-supplied";
+}
+
+/**
+ * Tell the caller, once per `initAssembly`, that governed actions will produce
+ * no audit evidence (AAASM-5681).
+ *
+ * Before this, the only signal was a one-shot note gated on `AA_DEBUG=1` — so a
+ * caller had to already suspect the problem in order to discover it. Enforcement
+ * is genuinely unaffected, which is exactly why the drop is easy to miss: denies
+ * still deny, and every audit call resolves successfully.
+ *
+ * Written straight to `process.stderr` rather than `console`/a swappable logger,
+ * and at init rather than per audit call, for the same reasons as
+ * {@link warnAgentUnregistered}: it cannot be silenced by log configuration and
+ * it cannot become steady-state noise. It does not fail init — a caller may not
+ * need SDK-side audit at all, and the proxy / eBPF layers are unaffected.
+ */
+function warnAuditEventsDiscarded(mode: AssemblyMode | "auto"): void {
+  process.stderr.write(
+    `[agent-assembly] WARNING: hook-layer audit events are DISCARDED in ` +
+      `"${mode}" mode: the gateway client this SDK ships drops record / ` +
+      `recordResult / scanPrompts, so governed actions produce NO audit ` +
+      `evidence and nothing on this path can be attributed or reviewed after ` +
+      `the fact. Enforcement is unaffected — allow/deny still applies. Supply ` +
+      `your own "gatewayClient" to retain audit events. Inspect the ` +
+      `"auditSink" field on the returned assembly context to detect this ` +
+      `programmatically (AAASM-5681).\n`
+  );
 }
 
 /**
@@ -779,11 +820,20 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
   const patches = await applyFrameworkPatches(resolvedConfig, client, frameworks);
   const adapterStates = buildAdapterStates(adapters, patches);
 
+  // AAASM-5681 — surface a discarding audit sink on the default path. Emitted
+  // after patching so it lands once the governed surface is actually in place,
+  // and only when this SDK knows the events go nowhere.
+  const auditSink = resolveAuditSink(client);
+  if (auditSink === "discarded") {
+    warnAuditEventsDiscarded(resolvedConfig.mode ?? "auto");
+  }
+
   return {
     activeAdapters: adapterStates.active,
     detectedAdapters: adapterStates.detected,
     unpatchedAdapters: adapterStates.unpatched,
     registered,
+    auditSink,
     ...(resolvedConfig.parentAgentId !== undefined && {
       parentAgentId: resolvedConfig.parentAgentId
     }),
