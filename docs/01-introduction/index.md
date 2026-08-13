@@ -54,7 +54,7 @@ approval decision.
     own `gatewayClient`, routes checks to the runtime; `auto` / `sdk-only` /
     `grpc-sidecar` route through the allow-all no-op client, where a DENY does not block.
   - **Redaction** — applied by the runtime/proxy, not here. Under `enforce` this layer
-    treats a `redact` verdict as allow (see [Configuration](../05-configuration/)).
+    treats a `redact` verdict as allow (see [Configuration](../05-configuration/index.md)).
   - **An audit trail** — not on the default path at all: both gateway clients this SDK
     ships discard hook-layer audit events, so retaining them requires supplying your own
     `gatewayClient` (AAASM-5681).
