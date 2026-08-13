@@ -6,6 +6,7 @@ export { ENFORCEMENT_MODES } from "./enforcement-mode.js";
 export type { ToolMap } from "./tool-map.js";
 export type { AuditEvent, CallStackNode, CallStackNodeKind } from "./audit.js";
 export type {
+  AuditSinkDisposition,
   GatewayApprovalResult,
   GatewayCheckRequest,
   GatewayDecision,
