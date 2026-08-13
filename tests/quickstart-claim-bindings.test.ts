@@ -252,6 +252,22 @@ const STRUCTURAL_LINE =
  */
 const CONTRASTIVE_CONJUNCTION = /\s(?:but|because|though|although|however|whereas|while)\s/i;
 
+/**
+ * The "so" rule, deliberately separate from CONTRASTIVE_CONJUNCTION.
+ *
+ * The risk "so" carries is not adversativeness but POLARITY CHANGE. "We don't
+ * do X but Y" is a concession; "we don't do X so Y covers it" is a REASSURANCE,
+ * and reassurance is the register documentation over-claims in. A negated
+ * clause followed by an un-negated one is the shape that hides an affirmative
+ * capability claim behind a limitation.
+ *
+ * Flagging "so" flat would catch live sentences in all three repos, every one
+ * of which turns the way it started. This form catches none of them and still
+ * catches the payload, which is the only negative-to-positive case.
+ */
+const NEGATION = /\b(?:not|no|never|cannot|can't|without)\b/i;
+const SO_CONNECTOR = /\sso\s/gi;
+
 /** A floor, not a real check: no gate can tell a justification from noise. */
 const MIN_JUSTIFICATION = 40;
 
@@ -672,6 +688,29 @@ describe("claim gate: the allow-list cannot become a bypass", () => {
       "These allow-listed sentences contain a contrastive conjunction, so part of each may be " +
         "an affirmative capability claim riding along under its justification. Split the " +
         "affirmative clause into its own sentence and bind it to the controls that prove it."
+    ).toEqual([]);
+  });
+
+  it("no allow-listed sentence reassures across a negation", () => {
+    // "Network-layer interception is not enabled by default, so the in-process
+    // adapter verifies every outbound request before it leaves the host
+    // instead." reads as a limitation and asserts a capability the product does
+    // not have. The contrastive list does not catch it, because "so" is not
+    // adversative — it is the reassurance that follows a denial, which is
+    // precisely where an unbacked claim hides.
+    const offenders = [...ALLOWED.keys()].filter((sentence) =>
+      [...sentence.matchAll(SO_CONNECTOR)].some((match) => {
+        const before = sentence.slice(0, match.index);
+        const after = sentence.slice(match.index + match[0].length);
+        return NEGATION.test(before) && !NEGATION.test(after);
+      })
+    );
+    expect(
+      offenders,
+      'These allow-listed sentences negate something and then say "so ..." without a second ' +
+        "negation — the shape of a limitation followed by a reassurance, where the reassurance " +
+        'may be an unbacked capability claim. Split the clause after "so" into its own sentence ' +
+        "and bind it to the controls that prove it."
     ).toEqual([]);
   });
 
