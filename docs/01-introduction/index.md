@@ -15,7 +15,15 @@ agent.
 [Agent Assembly](https://github.com/ai-agent-assembly). It lets you put a
 governance layer in front of the AI agents you build in Node — so every tool an
 agent calls is checked against policy *before* it runs, and every governance-relevant
-action is recorded in an audit trail.
+action is emitted as an audit event.
+
+Whether those events are *retained* depends on which gateway client you use. Both
+clients this SDK ships discard hook-layer audit events, so on the default path
+governed actions produce no audit trail — enforcement still applies, but nothing on
+that path can be attributed or reviewed after the fact. Supply your own
+`gatewayClient` to retain them; `initAssembly` warns at startup and reports
+`auditSink` on the returned context when it knows the events are being dropped
+(AAASM-5681).
 
 In practice the SDK is two things working together:
 

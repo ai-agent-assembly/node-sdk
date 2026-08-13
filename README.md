@@ -232,9 +232,13 @@ value, and `@langchain/core` discards a callback handler's `handleToolEnd` retur
 value too — so a callback can never substitute or redact a tool's output. The SDK
 governs LangChain tools with two cooperating layers instead:
 
-- **Callback layer** (`AssemblyCallbackHandler`) — records denials and results for
-  the audit trail (including a `policy_post_block` event if a tool ran despite an
-  earlier deny signal), but cannot block or redact output.
+- **Callback layer** (`AssemblyCallbackHandler`) — emits denials and results as audit
+  events (including a `policy_post_block` event if a tool ran despite an earlier deny
+  signal), but cannot block or redact output. **Whether those events are retained
+  depends on the gateway client**: both clients this SDK ships discard them, so on the
+  default path they reach no audit trail. Supply your own `gatewayClient` to retain
+  them, and read `auditSink` on the assembly context to tell which you have
+  (AAASM-5681).
 - **Wrapper layer** (`wrapToolWithAssembly`) — the actual enforcement point: performs
   the real pre-execution allow / deny / pending check and throws
   `PolicyViolationError` before the tool runs.
