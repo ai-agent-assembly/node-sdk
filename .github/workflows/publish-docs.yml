@@ -74,6 +74,28 @@ jobs:
           pnpm run generate:docs-metadata
           git diff --exit-code -- README.md docs src/generated
 
+      # AAASM-5529. The step above round-trips the quickstart tab block as TEXT:
+      # it proves docs match the vendored snippets under metadata/ and nothing
+      # more. The snippets are never executed, type-checked or linted — they are
+      # excluded from ESLint (eslint.config.mjs), Prettier (.prettierignore) and
+      # every tsconfig, and they import "./policy.js", a file the reader supplies.
+      #
+      # This step gates a different surface: the prose in §2, §3 and §4, where
+      # the quick-start states what governance does. Each claim is bound to the
+      # control that proves it.
+      #
+      # It runs HERE because test-matrix.yml sets paths-ignore on docs/** and
+      # **/*.md, so a docs-only PR — precisely the change that rewords a claim —
+      # runs no tests at all.
+      #
+      # SCOPE OF ENFORCEMENT, so nobody reads this as more than it is: this
+      # workflow is NOT one of the workflows ci-success.yml aggregates, and
+      # branch protection on main currently declares no required status checks
+      # at all. This step therefore makes the drift VISIBLE on the PR; it does
+      # not by itself block a merge. Closing that gap is AAASM-5677's scope.
+      - name: Every documented enforcement claim names the control that proves it
+        run: pnpm exec vitest run tests/quickstart-claim-bindings.test.ts
+
       - name: Install website dependencies
         # `--ignore-workspace` tells pnpm to skip the parent
         # `pnpm-workspace.yaml` (added under AAASM-1220) when installing
