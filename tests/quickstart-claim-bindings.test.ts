@@ -2,46 +2,43 @@
  * Drift gate binding the documented Node quick-start's enforcement claims to
  * the controls that prove them (AAASM-5529, Epic AAASM-5526).
  *
- * `docs/02-quick-start/index.md` §3 and §4 are where the quick-start tells a
- * reader what governance does for them: that policy is enforced before a tool
- * runs, that a deny throws a `PolicyViolationError` with the tool body never
- * running, and that the allow path's governance event is discarded rather than
- * retained. Nothing connected those sentences to the controls in
- * `quickstart-negative-control.test.ts`, so a claim could be added, reworded,
- * or left standing after the behaviour beneath it changed, and no gate would
- * notice.
+ * `docs/02-quick-start/index.md` tells a reader what governance does for them.
+ * Those sentences are the product's load-bearing enforcement claims, and
+ * nothing connected them to the controls that prove them.
  *
  * WHAT THIS GATE PROVES
  *
- * 1. Every enforcement sentence in the gated sections is bound to a named
- *    control. The sentences are read out of the document, so a new claim that
- *    no binding quotes fails here rather than shipping unbacked.
- * 2. Every binding still describes the document. Rewording a claim breaks its
- *    quote and fails.
- * 3. Every control a binding names still exists. Control ids are extracted from
- *    each control file's TypeScript AST as `<file> :: <describe> > <it>`, not
- *    transcribed, so renaming or deleting one fails here.
- * 4. The error class the document names is the one the SDK actually throws.
- *    Derived by driving a real deny through `withAssembly` and reading
- *    `constructor.name` off the thrown value. The class is deliberately NOT
- *    imported here: importing it would make a rename a *type* error, which is
- *    red but aborts before the assertion meant to catch it can run — the
- *    inverted-order defect the round-1 review of this ticket found in all three
- *    SDKs.
+ * 1. The WHOLE document is scanned, not opted-in regions. Every sentence using
+ *    enforcement vocabulary must be bound. Sections and sentences are excluded
+ *    only through the two named allow-lists, each entry carrying a reason and
+ *    an exact sentence, so an entry cannot cover a reworded or new claim.
+ * 2. A binding must match a WHOLE sentence, exactly — compared with ===, never
+ *    with `includes`. Containment let a sentence carry unlimited extra unbound
+ *    claims as long as one bound fragment survived. The reviewer replaced the
+ *    true claim with its opposite, left the bound fragment intact, and this
+ *    gate stayed green; that is what this revision closes.
+ * 3. Exactly one binding may match a sentence.
+ * 4. Every control a binding names still exists, extracted from each control
+ *    file's TypeScript AST as `<file> :: <describe> > <it>`.
+ * 5. Every claim is proven or openly unproven, with no exempt category. There
+ *    was a `kind` field; it was written and never read, which is worse than a
+ *    bypass because a reader assumes it is enforced. Removed.
+ * 6. The error class the document names is the one the SDK actually throws,
+ *    derived from `constructor.name` on a real deny rather than imported.
  *
  * WHAT THIS GATE DOES NOT PROVE
  *
- * It does not execute, type-check or lint a documented snippet.
- * `metadata/quickstart-snippets/` is excluded from ESLint
- * (`eslint.config.mjs:22`), from Prettier (`.prettierignore:10`) and from every
- * tsconfig, and the snippets import `createPolicyGatewayClient` from
- * `"./policy.js"` — a file the reader supplies from the examples repo, not an
- * SDK export. The existing drift check round-trips them as *text*: it proves
- * this page matches the vendored snippet and nothing more. This gate does not
+ * It does not execute or lint a documented snippet.
+ * `metadata/quickstart-snippets/` is excluded from ESLint (`eslint.config.mjs`)
+ * and Prettier (`.prettierignore`), and the snippets import
+ * `createPolicyGatewayClient` from `"./policy.js"` — a file the reader supplies
+ * from the examples repo, not an SDK export. The base `tsconfig.json` DOES
+ * include the snippet files, but no CI job type-checks with that config
+ * (`pnpm typecheck` runs `tsconfig.test.json`), so nothing gates them. The
+ * existing drift step round-trips them as text only, and this gate does not
  * change that.
  *
- * Nor does binding a claim make the claim true. A binding records which control
- * stands behind a sentence.
+ * Binding a claim also does not make it true.
  */
 
 import { readFileSync } from "node:fs";
@@ -57,25 +54,24 @@ const QUICK_START = resolve(process.cwd(), "docs/02-quick-start/index.md");
  * The test files a binding may name.
  *
  * More than one, because the quick-start's claims are not all proved in the
- * same place: the deny claims are proved by the negative controls, while the
- * "reports auditSink" claim is proved by the AAASM-5681 disposition suite.
- * Control ids are file-qualified so two suites cannot collide on a title.
+ * same place: the deny claims come from the negative controls, the audit-sink
+ * claims from the AAASM-5681 disposition suite, and the auto-start claim from
+ * the gateway resolver's suite. Control ids are file-qualified so two suites
+ * cannot collide on a title.
  */
 const CONTROL_FILES = [
   "tests/quickstart-negative-control.test.ts",
-  "tests/audit-sink-disposition.test.ts"
+  "tests/audit-sink-disposition.test.ts",
+  "tests/gateway-resolver.test.ts"
 ] as const;
 
-const ENFORCEMENT = "enforcement";
-const LIFECYCLE = "lifecycle";
+const NEG = "tests/quickstart-negative-control.test.ts :: quick-start negative control: ";
+const AUDIT = "tests/audit-sink-disposition.test.ts :: AAASM-5681: ";
+const RESOLVER = "tests/gateway-resolver.test.ts :: resolveGatewayUrl > ";
 
 interface ClaimBinding {
   readonly id: string;
-  readonly kind: typeof ENFORCEMENT | typeof LIFECYCLE;
-  /**
-   * A verbatim fragment of the claim as it appears in the document, with
-   * Markdown's soft wrapping collapsed. Rewording the document breaks it.
-   */
+  /** The claim as a WHOLE sentence, flattened. Compared with ===, not includes. */
   readonly quote: string;
   /** `<file> :: <describe> > <it>` ids drawn from CONTROL_FILES. */
   readonly controls?: readonly string[];
@@ -83,139 +79,188 @@ interface ClaimBinding {
   readonly unprovenReason?: string;
 }
 
+const DENY_CONTROLS = [
+  `${NEG}filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk`,
+  `${NEG}network side effect > NEGATIVE CONTROL: a denied egress tool never reaches the listener`
+] as const;
+
+const ALLOW_AND_DENY_CONTROLS = [
+  `${NEG}filesystem side effect > POSITIVE CONTROL: an allowed write_file really creates the file on disk`,
+  `${NEG}filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk`,
+  `${NEG}network side effect > POSITIVE CONTROL: an allowed egress tool reaches the listener`,
+  `${NEG}network side effect > NEGATIVE CONTROL: a denied egress tool never reaches the listener`
+] as const;
+
 const BINDINGS: readonly ClaimBinding[] = [
   {
-    id: "policy-enforced-before-each-tool-runs",
-    kind: ENFORCEMENT,
-    quote: "wraps a map of tools so the local policy is enforced before each one runs",
-    // Both halves are named. The negative controls prove the "before" by the
-    // absence of the side effect; the positive controls prove the probe would
-    // have seen that effect had it happened. Either alone is the vacuous
-    // evidence this Epic exists to remove.
+    id: "page-takes-you-to-a-governed-agent",
+    quote: "This page takes you from nothing to a governed agent in a few minutes.",
+    controls: ALLOW_AND_DENY_CONTROLS
+  },
+  {
+    id: "sdk-enforces-by-talking-to-a-gateway",
+    quote: "The SDK enforces policy by talking to an Agent Assembly **gateway**.",
+    unprovenReason:
+      "AAASM-5663: both README entrypoints were executed and neither runs as written, so no " +
+      "control covers a reader actually reaching a gateway. The control that exists asserts " +
+      "the documented config REFUSES to init; it does not prove this sentence."
+  },
+  {
+    id: "auto-start-is-opt-in",
+    quote:
+      "Auto-start is opt-in — without it, a missing gateway throws a `ConfigurationError` " +
+      "instead of spawning anything.",
     controls: [
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: filesystem side effect > POSITIVE CONTROL: an allowed write_file really creates the file on disk",
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk",
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: network side effect > POSITIVE CONTROL: an allowed egress tool reaches the listener",
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: network side effect > NEGATIVE CONTROL: a denied egress tool never reaches the listener"
+      `${RESOLVER}throws ConfigurationError instead of auto-starting when AA_AUTO_START is unset`
     ]
   },
   {
+    id: "policy-enforced-before-each-tool-runs",
+    quote:
+      "`withAssembly` wraps a map of tools so the local policy is enforced before each one runs: " +
+      "an allowed call executes normally, while a denied call throws a `PolicyViolationError` and " +
+      "the tool body never runs.",
+    // Both halves. The negative controls prove the "before" by absence of the
+    // side effect; the positive controls prove the probe would have seen that
+    // effect had it happened.
+    controls: ALLOW_AND_DENY_CONTROLS
+  },
+  {
     id: "allow-event-is-discarded-not-retained",
-    kind: ENFORCEMENT,
-    // A negative capability claim, and the honest one: it says the SDK retains
-    // nothing. Bound so that if someone deletes the caveat because a sink was
-    // wired (AAASM-5750), this gate makes them revisit the control rather than
-    // quietly dropping the sentence.
-    quote: "it is discarded, not retained, so there is no audit trail to read it back from",
+    quote:
+      "A governance event is emitted — but with either gateway client this SDK ships it is " +
+      "discarded, not retained, so there is no audit trail to read it back from.",
+    // Repointed under review. This was bound to a negative control that hands
+    // the event to a FIXTURE client, which retains it — so flipping the shipped
+    // clients' disposition left that control green and the binding could not
+    // fail when the claim became false. The control named here drives the
+    // SHIPPED client against a downstream boundary probe, and its sibling at
+    // :164 is the reachability positive control for that same probe.
     controls: [
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: a deny is handed to the gateway's record call > hands the gateway an audit event naming the denied tool and its run"
+      `${AUDIT}shipped clients declare what they do with audit events > a client declaring "discarded" reaches nothing with any audit method`
     ]
   },
   {
     id: "init-warns-and-reports-the-discard",
-    kind: ENFORCEMENT,
-    // Found by this gate's own unbound-sentence check, not by reading: the
-    // sentence before it was bound, this one was not, and the two make
-    // different claims. The first says the event is dropped; this one says
-    // initAssembly tells you so at startup and on the context. A reader relying
-    // on the second without the first would not know to look.
     quote:
-      'warns about this at startup and reports `auditSink: "discarded"` on the returned context',
+      '`initAssembly` warns about this at startup and reports `auditSink: "discarded"` on the ' +
+      "returned context; supply your own `gatewayClient` to retain the event (AAASM-5681).",
     controls: [
-      'tests/audit-sink-disposition.test.ts :: AAASM-5681: initAssembly surfaces the drop without AA_DEBUG > WARNS on stderr and reports auditSink="discarded" with AA_DEBUG unset'
+      `${AUDIT}initAssembly surfaces the drop without AA_DEBUG > WARNS on stderr and reports auditSink="discarded" with AA_DEBUG unset`
     ]
   },
   {
     id: "deny-rejects-and-body-never-runs",
-    kind: ENFORCEMENT,
-    quote: "message includes the tool name and the gateway's reason — the tool body never runs",
-    controls: [
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk",
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: network side effect > NEGATIVE CONTROL: a denied egress tool never reaches the listener"
-    ]
+    quote:
+      "- **Deny.** The wrapped `invoke()` *rejects* with a `PolicyViolationError` whose message " +
+      "includes the tool name and the gateway's reason — the tool body never runs.",
+    controls: DENY_CONTROLS
   },
   {
     id: "pending-waits-then-proceeds-or-rejects",
-    kind: ENFORCEMENT,
-    quote: "for a human decision, then either proceeds or rejects",
+    quote:
+      "- **Pending (needs approval).** The call waits up to `langchain.approvalTimeoutMs` (default " +
+      "applies if unset) for a human decision, then either proceeds or rejects.",
     controls: [
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: a deny is handed to the gateway's record call > hands the gateway a distinct audit event when an approval is rejected"
+      `${NEG}a deny is handed to the gateway's record call > hands the gateway a distinct audit event when an approval is rejected`
     ]
   },
   {
     id: "deny-throws-instead-of-executing",
-    kind: ENFORCEMENT,
-    // Also found by the unbound-sentence check. It restates the deny claim in
-    // the strongest terms the page uses ("the whole point"), and a restatement
-    // is exactly the kind of sentence that survives a behaviour change because
-    // nobody thinks of it as the claim.
-    quote: "a denied tool call throws instead of executing",
+    // A restatement, which is exactly the kind of sentence that survives a
+    // behaviour change because nobody thinks of it as the claim.
+    quote:
+      "That deny-on-policy behavior is the whole point: a denied tool call throws instead of executing.",
     controls: [
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk",
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: filesystem side effect > FALSIFICATION: the same write, ungoverned, does create the file"
+      `${NEG}filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk`,
+      `${NEG}filesystem side effect > FALSIFICATION: the same write, ungoverned, does create the file`
     ]
   },
   {
     id: "observe-mode-does-not-block",
-    kind: ENFORCEMENT,
-    quote: "watch what *would* be blocked without actually blocking it",
+    quote:
+      "If you want to watch what *would* be blocked without actually blocking it while you tune " +
+      "policy, register the agent in observe mode:",
     controls: [
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: the zero-config initAssembly path > BOUNDARY: enforcementMode observe inits and lets the tool body run"
+      `${NEG}the zero-config initAssembly path > BOUNDARY: enforcementMode observe inits and lets the tool body run`
     ]
-  },
-  {
-    id: "gateway-must-be-reachable",
-    kind: LIFECYCLE,
-    quote: "The SDK enforces policy by talking to an Agent Assembly **gateway**",
-    unprovenReason:
-      "AAASM-5663: both README entrypoints were executed and neither runs as written, " +
-      "so no control covers the documented zero-config path end to end. The control " +
-      "that exists asserts the documented config REFUSES to init; it does not prove a " +
-      "reader can reach a working gateway."
   }
 ];
 
-/** Drops fenced code and collapses soft wrapping. */
+/** Whole sections excluded from the scan, each with a reason. */
+const EXCLUDED_SECTIONS: Record<string, string> = {
+  "## Next steps":
+    "A link list. Every line is a cross-reference to another page; the claims live on the pages " +
+    "linked to and are gated there."
+};
+
+/**
+ * Individual sentences excluded from the scan, each with a reason. Exact
+ * flattened sentences, never patterns, so an entry cannot silently cover a
+ * reworded or newly added claim.
+ */
+const EXCLUDED_SENTENCES: Record<string, string> = {};
+
+/** Strips Docusaurus front matter, which otherwise flattens into sentence one. */
+function stripFrontMatter(text: string): string {
+  return text.replace(/^---\n[\s\S]*?\n---\n/, "");
+}
+
 function flattenMarkdown(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, " ")
-    .split(/\s+/)
-    .join(" ")
-    .trim();
+  return text.split(/\s+/).join(" ").trim();
+}
+
+function splitSentences(paragraph: string): string[] {
+  const parts = paragraph.split(/(?<=\.)\s/);
+  return parts;
 }
 
 /**
- * The flattened text of the quick-start regions this gate is responsible for.
+ * Every sentence in the document, keyed to its section heading.
  *
- * Read from the document rather than transcribed, so a claim added to either
- * region shows up here without anyone editing this file.
+ * The gate opts sections OUT by name rather than opting them in, so a claim
+ * added to a section nobody thought about is still caught. A fenced block
+ * becomes a PARAGRAPH break, not a space: replacing it with a space glued the
+ * sentence before a code sample to the one after it, and a binding quoting the
+ * glued pair would cover two claims at once — fragment containment one level up.
  */
-function gatedDocumentRegions(): Record<string, string> {
-  const document = readFileSync(QUICK_START, "utf-8");
-  const openings: Record<string, string> = {
-    "gateway-reachable": "## 2. Make sure a gateway is reachable",
-    "govern-your-first-agent": "## 3. Govern your first agent",
-    "what-to-expect": "## 4. What to expect"
-  };
+function scannedSentences(): Record<string, string> {
+  const body = stripFrontMatter(readFileSync(QUICK_START, "utf-8")).replace(
+    /```[\s\S]*?```/g,
+    "\n\n"
+  );
 
-  const regions: Record<string, string> = {};
-  for (const [name, opening] of Object.entries(openings)) {
-    const start = document.indexOf(opening);
-    expect(
-      start,
-      `${QUICK_START} no longer contains the "${name}" region (looked for ${JSON.stringify(opening)}). ` +
-        "If the quick-start was restructured, re-point this gate at the section that now " +
-        "carries the enforcement claims — do not delete it."
-    ).toBeGreaterThan(-1);
-
-    // Skip the region's own heading LINE before looking for the next heading.
-    const body = document.slice(start);
-    const afterHeading = body.indexOf("\n");
-    const rest = afterHeading === -1 ? "" : body.slice(afterHeading);
-    const next = rest.search(/\n#{1,6} /);
-    regions[name] = flattenMarkdown(next === -1 ? body : body.slice(0, afterHeading + next));
+  const sentences: Record<string, string> = {};
+  let section = "(preamble)";
+  for (const chunk of body.split(/^(#{2,6} .*)$/m)) {
+    if (chunk === undefined) continue;
+    if (/^#{2,6} /.test(chunk)) {
+      section = chunk.trim();
+      continue;
+    }
+    if (section in EXCLUDED_SECTIONS) continue;
+    for (const paragraph of chunk.split("\n\n")) {
+      for (const raw of splitSentences(paragraph)) {
+        const flat = flattenMarkdown(raw);
+        if (flat !== "") sentences[flat] = section;
+      }
+    }
   }
-  return regions;
+  return sentences;
+}
+
+const ENFORCEMENT_VOCABULARY =
+  /\bdenie[sd]\b|\bdeny\b|\bblocked\b|\bblocking\b|\bnever runs?\b|\bbefore execution\b|\bchecked against\b|\benforces?\b|\benforced\b|\bpassthrough\b|\bdiscards?\b|\bdiscarded\b|\bthrows?\b|\brejects?\b|\brouted\b|\bintercepts?\b|\binterception\b|\bgoverned\b|\bverified\b|\bprotection\b|\bunprotected\b|\bbypass(ed|es)?\b/i;
+
+/** The scanned sentences that make an enforcement claim. */
+function claimSentences(): Record<string, string> {
+  const claims: Record<string, string> = {};
+  for (const [sentence, section] of Object.entries(scannedSentences())) {
+    if (!ENFORCEMENT_VOCABULARY.test(sentence)) continue;
+    if (sentence in EXCLUDED_SENTENCES) continue;
+    claims[sentence] = section;
+  }
+  return claims;
 }
 
 /**
@@ -263,78 +308,103 @@ function controlTitles(): Set<string> {
 }
 
 describe("claim gate: it can see what it gates", () => {
-  // Positive controls for the gate itself. Every check below reads a real
-  // artifact; these prove the reads arrived. An empty parse and a clean result
+  // Positive controls for the gate itself. An empty parse and a clean result
   // are otherwise indistinguishable.
-  it("finds the gated document regions and they are non-empty", () => {
-    const regions = gatedDocumentRegions();
-    expect(Object.keys(regions).sort()).toEqual([
-      "gateway-reachable",
-      "govern-your-first-agent",
-      "what-to-expect"
-    ]);
-    for (const [name, text] of Object.entries(regions)) {
-      expect(
-        text.length,
-        `region "${name}" is too short to hold its claims: ${text}`
-      ).toBeGreaterThan(80);
-    }
+  it("reads the whole document and splits it into sentences", () => {
+    expect(Object.keys(scannedSentences()).length).toBeGreaterThan(30);
   });
 
-  it("extracts the negative-control titles from the AST", () => {
-    const titles = controlTitles();
-    expect(titles.size).toBeGreaterThanOrEqual(12);
-    // A named one, so an extraction that returned an unrelated set of the right
-    // size cannot satisfy the count above.
-    expect([...titles]).toContain(
-      "tests/quickstart-negative-control.test.ts :: quick-start negative control: filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk"
+  it("finds enforcement claims in more than one section", () => {
+    const claims = claimSentences();
+    expect(Object.keys(claims).length).toBeGreaterThanOrEqual(8);
+    // Narrowing the scan back to one region would otherwise look identical to
+    // a clean pass.
+    expect(new Set(Object.values(claims)).size).toBeGreaterThanOrEqual(3);
+  });
+
+  it("extracts control titles from every control file", () => {
+    const titles = [...controlTitles()];
+    for (const file of CONTROL_FILES) {
+      expect(
+        titles.some((title) => title.startsWith(`${file} :: `)),
+        `AST extraction found no controls in ${file}`
+      ).toBe(true);
+    }
+    expect(titles).toContain(
+      `${NEG}filesystem side effect > NEGATIVE CONTROL: a denied write_file leaves no file on disk`
     );
   });
 });
 
-describe("claim gate: every documented claim is bound", () => {
-  it.each(BINDINGS.map((binding) => [binding.id, binding] as const))(
-    "%s still quotes the document",
-    (_id, binding) => {
-      const regions = Object.values(gatedDocumentRegions());
+describe("claim gate: the allow-list cannot become a bypass", () => {
+  it("every excluded section is still a real heading", () => {
+    const document = readFileSync(QUICK_START, "utf-8");
+    for (const [heading, reason] of Object.entries(EXCLUDED_SECTIONS)) {
+      expect(document, `EXCLUDED_SECTIONS names "${heading}", no longer a heading`).toContain(
+        heading
+      );
+      expect(reason.trim()).not.toBe("");
+    }
+  });
+
+  it("every excluded sentence is still present verbatim", () => {
+    // An entry is a whole sentence, so rewording the claim makes the entry
+    // stale and fails here rather than silently exempting the new wording.
+    const scanned = scannedSentences();
+    for (const [sentence, reason] of Object.entries(EXCLUDED_SENTENCES)) {
       expect(
-        regions.some((text) => text.includes(binding.quote)),
-        `Claim binding "${binding.id}" quotes:\n  ${JSON.stringify(binding.quote)}\n` +
-          "which no longer appears in the gated regions of the quick-start. The claim was " +
-          "reworded or removed. Update the quote and re-check that the named controls still " +
-          "prove the new wording."
+        Object.hasOwn(scanned, sentence),
+        `EXCLUDED_SENTENCES contains a sentence no longer in the quick-start:\n  ${sentence}\n` +
+          "Delete the stale entry, and if the replacement makes a claim, bind it."
       ).toBe(true);
+      expect(reason.trim()).not.toBe("");
     }
-  );
+  });
+});
 
-  it("no enforcement sentence in the gated regions is unbound", () => {
-    // The check that makes this gate load-bearing rather than decorative: a new
-    // enforcement sentence cannot reach the published quick-start without
-    // someone naming the control behind it.
-    //
-    // Deliberately excludes a bare "policy": it appears in every snippet import
-    // line and tab label, so matching it would sweep in prose that makes no
-    // enforcement claim.
-    const enforcementLanguage =
-      /\bdenie[sd]\b|\bdeny\b|\bblocked\b|\bblocking\b|\bnever runs\b|\benforced?\b|\brejects\b|\bdiscarded\b/i;
-
-    const unbound: string[] = [];
-    for (const [region, text] of Object.entries(gatedDocumentRegions())) {
-      for (const raw of text.split(/(?<=\.)\s+/)) {
-        const sentence = raw.trim();
-        if (sentence === "" || !enforcementLanguage.test(sentence)) continue;
-        if (BINDINGS.some((binding) => sentence.includes(binding.quote))) continue;
-        unbound.push(`[${region}] ${sentence}`);
-      }
-    }
+describe("claim gate: every documented claim is bound", () => {
+  it("no enforcement sentence is unbound", () => {
+    const quotes = new Set(BINDINGS.map((binding) => binding.quote));
+    const unbound = Object.entries(claimSentences())
+      .filter(([sentence]) => !quotes.has(sentence))
+      .map(([sentence, section]) => `[${section}] ${sentence}`);
 
     expect(
       unbound,
-      "These quick-start enforcement sentences have no ClaimBinding:\n" +
+      "These quick-start sentences make an enforcement claim and have no ClaimBinding:\n" +
         unbound.map((s) => `  ${s}`).join("\n") +
-        "\n\nAdd a ClaimBinding naming the control that proves each one. If no control " +
-        "does, set unprovenReason and name the ticket — do not delete the claim from " +
-        "this gate to make it pass."
+        "\n\nAdd a ClaimBinding whose quote is the WHOLE sentence, naming the control that proves " +
+        "it. If no control does, set unprovenReason and name the ticket. If the sentence makes no " +
+        "capability claim, add it to EXCLUDED_SENTENCES with a reason — do not delete the claim " +
+        "from this gate to make it pass."
+    ).toEqual([]);
+  });
+
+  it.each(BINDINGS.map((binding) => [binding.id, binding] as const))(
+    "%s matches exactly one whole sentence",
+    (_id, binding) => {
+      // Whole-sentence equality, not containment. Containment allowed a
+      // sentence to carry extra unbound claims — up to and including its own
+      // negation — while one bound fragment kept the gate green.
+      const matches = Object.keys(scannedSentences()).filter(
+        (sentence) => sentence === binding.quote
+      );
+      expect(
+        matches.length,
+        `ClaimBinding "${binding.id}" must match exactly one whole sentence; it matched ` +
+          `${matches.length}.\nIts quote is:\n  ${binding.quote}\n` +
+          "The claim was reworded, split, or merged. Update the quote to the new whole sentence " +
+          "and re-check that the named controls still prove it."
+      ).toBe(1);
+    }
+  );
+
+  it("no two bindings claim the same sentence", () => {
+    const quotes = BINDINGS.map((binding) => binding.quote);
+    const duplicates = quotes.filter((quote, index) => quotes.indexOf(quote) !== index);
+    expect(
+      duplicates,
+      "Split responsibility like that and neither binding owns the claim."
     ).toEqual([]);
   });
 });
@@ -347,10 +417,9 @@ describe("claim gate: every binding names something real", () => {
       const missing = (binding.controls ?? []).filter((control) => !available.has(control));
       expect(
         missing,
-        `Claim binding "${binding.id}" names controls that do not exist in ` +
-          "quickstart-negative-control.test.ts. The control was renamed or removed. " +
-          "Re-point the binding at the control that now proves the claim, or mark the " +
-          "claim unproven and name the ticket."
+        `ClaimBinding "${binding.id}" names controls that do not exist. The control was renamed ` +
+          "or removed. Re-point the binding at the control that now proves the claim, or mark " +
+          "the claim unproven and name the ticket."
       ).toEqual([]);
     }
   );
@@ -358,18 +427,16 @@ describe("claim gate: every binding names something real", () => {
   it.each(BINDINGS.map((binding) => [binding.id, binding] as const))(
     "%s is either proven or openly unproven",
     (_id, binding) => {
+      // Every claim, with no exempt category. There used to be a `kind` field
+      // that was written and never read — dead decoration a reader would assume
+      // was enforced. Removed rather than wired up.
       if ((binding.controls ?? []).length > 0) return;
       expect(
         binding.unprovenReason,
-        `Claim "${binding.id}" names no control and gives no unprovenReason. One or the ` +
-          "other is required: a documented enforcement claim with neither is exactly the " +
-          "unbacked assertion AAASM-5526 exists to eliminate."
+        `Claim "${binding.id}" names no control and gives no unprovenReason. A documented claim ` +
+          "with neither is exactly the unbacked assertion AAASM-5526 exists to eliminate."
       ).toBeTruthy();
-      expect(
-        binding.unprovenReason ?? "",
-        `Claim "${binding.id}" is unproven but its reason names no ticket. An unproven ` +
-          "claim must be traceable to the work that resolves it."
-      ).toMatch(/AAASM-\d+/);
+      expect(binding.unprovenReason ?? "").toMatch(/AAASM-\d+/);
     }
   );
 });
@@ -390,34 +457,30 @@ describe("claim gate: the documented error class is the one the SDK throws", () 
         (error: unknown) => error
       );
 
-      // Absence of the effect first, as in every control in this suite: an
-      // error assertion placed ahead of it aborts before the side effect is
-      // checked.
+      // Absence of the effect first, as in every control in this suite.
       expect(
         effect.occurred(),
-        "the governed call ran the tool body; this gate is measuring the wrong path"
+        "the governed call ran the tool body; measuring the wrong path"
       ).toBe(false);
       expect(outcome).toBeInstanceOf(Error);
 
       // The name as the running SDK reports it, derived not imported.
       const thrown = (outcome as Error).constructor.name;
 
-      // The names the document promises a reader, read out of the document.
       const documented = [
         ...readFileSync(QUICK_START, "utf-8").matchAll(/`([A-Za-z0-9_]+Error)`/g)
       ].map((match) => match[1]);
       expect(
         documented.length,
-        "The quick-start no longer names any `<Name>Error`. It used to promise a reader " +
-          "the concrete error a deny throws; if that promise was removed, this gate must " +
-          "be re-pointed rather than deleted."
+        "The quick-start no longer names any `<Name>Error`. If that promise was removed, this " +
+          "gate must be re-pointed rather than deleted."
       ).toBeGreaterThan(0);
 
       expect(
         documented,
-        `A denied call rejects with ${thrown}, which the quick-start does not name. ` +
-          "Either the class was renamed and the documentation now points at something a " +
-          "reader cannot import, or the deny path changed which error it throws."
+        `A denied call rejects with ${thrown}, which the quick-start does not name. Either the ` +
+          "class was renamed and the documentation now points at something a reader cannot " +
+          "import, or the deny path changed which error it throws."
       ).toContain(thrown);
     } finally {
       effect.cleanup();
