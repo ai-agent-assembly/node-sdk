@@ -115,16 +115,27 @@ function resolveAuditSink(client: GatewayClient): AuditSinkDisposition {
  * need SDK-side audit at all, and the proxy / eBPF layers are unaffected.
  */
 function warnAuditEventsDiscarded(mode: AssemblyMode | "auto"): void {
+  // The enforcement clause MUST branch on the mode. This warning fires for both
+  // shipped clients, and they differ on exactly this point: in
+  // CHECK_CAPABLE_MODE `createClient` returns the native client, whose `check()`
+  // routes to the runtime and can genuinely deny; in every other mode it returns
+  // the allow-all no-op. A single unconditional sentence is wrong in one
+  // direction or the other, which it has been twice (AAASM-5681).
+  const enforcementClause =
+    mode === CHECK_CAPABLE_MODE
+      ? `This does not change the enforcement posture: policy checks in ` +
+        `"${mode}" route through the native runtime, not the allow-all no-op ` +
+        `client, so a policy DENY can still block a tool. `
+      : `This does not change the enforcement posture — but note that ` +
+        `"${mode}" routes policy checks through the allow-all no-op client, so ` +
+        `a policy DENY does not block a tool call in this mode either way. `;
   process.stderr.write(
     `[agent-assembly] WARNING: hook-layer audit events are DISCARDED in ` +
       `"${mode}" mode: the gateway client this SDK ships drops record / ` +
       `recordResult / scanPrompts, so governed actions produce NO audit ` +
       `evidence and nothing on this path can be attributed or reviewed after ` +
-      `the fact. This does not change the enforcement posture either way — ` +
-      `whether a policy DENY can block a tool depends on the mode, and in ` +
-      `"${mode}" it is the allow-all no-op client unless you supply your own. ` +
-      `Supply ` +
-      `your own "gatewayClient" to retain audit events. Inspect the ` +
+      `the fact. ${enforcementClause}` +
+      `Supply your own "gatewayClient" to retain audit events. Inspect the ` +
       `"auditSink" field on the returned assembly context to detect this ` +
       `programmatically (AAASM-5681).\n`
   );

@@ -65,9 +65,42 @@ function stderrText(spy: ReturnType<typeof vi.spyOn>): string {
  * `9 passed (9)`. Reading the module's own exports is what makes a new shipped
  * client fail by default instead of passing by omission.
  */
+/**
+ * The methods that make an object a governance client. Membership is decided by
+ * this shape, so a shipped client cannot escape the gate by being named
+ * differently.
+ */
+const GATEWAY_CLIENT_SHAPE = ["check", "record", "recordResult", "scanPrompts"] as const;
+
 function exportedClientFactoryNames(): string[] {
   return Object.keys(gatewayModule)
-    .filter((name) => /^create[A-Za-z]*GatewayClient$/.test(name))
+    .filter((name) => {
+      const value = (gatewayModule as unknown as Record<string, unknown>)[name];
+      if (typeof value !== "function") {
+        return false;
+      }
+      // Detect by the SHAPE it returns, not by its name. A name pattern is
+      // still a list: review demonstrated `createGatewayClientFromEnv` escaping
+      // `/^create[A-Za-z]*GatewayClient$/` at `11 passed (11)`, and
+      // `makeGatewayClient` / `newGatewayClient` / `createGatewayClientV2`
+      // would too. A factory that returns a governance client is one whatever
+      // it is called.
+      let built: unknown;
+      try {
+        built = (value as (...args: unknown[]) => unknown)(
+          "napi-inprocess",
+          boundary().native,
+          "agent-1"
+        );
+      } catch {
+        return false; // not a zero-config factory; not a shipped client
+      }
+      if (typeof built !== "object" || built === null) {
+        return false;
+      }
+      const candidate = built as Record<string, unknown>;
+      return GATEWAY_CLIENT_SHAPE.every((method) => typeof candidate[method] === "function");
+    })
     .sort();
 }
 
@@ -200,6 +233,63 @@ describe("AAASM-5681: initAssembly surfaces the drop without AA_DEBUG", () => {
     // reader to the source to find out what to do.
     expect(text).toContain("gatewayClient");
     expect(text).toContain("auditSink");
+    await context.shutdown();
+  });
+
+  // The enforcement clause has now shipped wrong twice — once claiming
+  // enforcement applies everywhere, once claiming the no-op client everywhere.
+  // Neither would have reddened any earlier test, because the assertions only
+  // looked for "gatewayClient" and "auditSink". These pin the claim per mode.
+
+  it("in napi-inprocess, does NOT call the client allow-all no-op", async () => {
+    // The native binding is not compiled in a bare checkout, so drive the mode
+    // the way `create-client-mode-routing.test.ts` does: mock the addon and
+    // re-import, which exercises the real `createClient` routing rather than
+    // asserting on a hand-built client.
+    delete process.env.AA_DEBUG;
+    vi.resetModules();
+    vi.doMock("node:module", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:module")>();
+      return {
+        ...actual,
+        createRequire: () => () => ({
+          connect: vi.fn(async () => ({ id: "handle" })),
+          sendEvent: vi.fn(() => undefined),
+          queryPolicy: vi.fn(() => ({ decision: "deny", reason: "policy denies" })),
+          disconnect: vi.fn(async () => undefined)
+        })
+      };
+    });
+    const mod = await import("../src/core/init-assembly.js");
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    const context = await mod.initAssembly({
+      ...BASE,
+      mode: "napi-inprocess",
+      enforcementMode: "observe"
+    });
+    const text = stderrText(stderrSpy);
+
+    expect(text).toContain(DISCARD_WARNING_SUBSTRING);
+    // createClient returns the NATIVE client here, whose check() routes to the
+    // runtime and can genuinely deny — so the no-op clause must NOT appear.
+    expect(text).toContain("route through the native runtime");
+    expect(text).not.toContain("routes policy checks through the allow-all no-op client");
+    await context.shutdown();
+    vi.doUnmock("node:module");
+    vi.resetModules();
+  });
+
+  it("in auto, DOES say policy checks route through the allow-all no-op client", async () => {
+    delete process.env.AA_DEBUG;
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    const context = await initAssembly({ ...BASE, mode: "auto" });
+    const text = stderrText(stderrSpy);
+
+    expect(text).toContain(DISCARD_WARNING_SUBSTRING);
+    expect(text).toContain("routes policy checks through the allow-all no-op client");
+    expect(text).not.toContain("route through the native runtime");
     await context.shutdown();
   });
 
