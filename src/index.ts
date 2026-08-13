@@ -38,6 +38,7 @@ export { currentAgentId, runWithAgentId } from "./lineage/index.js";
 export { INSTALL_HINT, findAasmBinary } from "./runtime.js";
 export type { GatewayClient } from "./gateway/index.js";
 export type {
+  AuditSinkDisposition,
   GatewayApprovalResult,
   GatewayCheckRequest,
   GatewayDecision,

@@ -1,4 +1,5 @@
 import type { EnforcementMode } from "./enforcement-mode.js";
+import type { AuditSinkDisposition } from "./gateway-governance.js";
 
 export interface AssemblyContext {
   /**
@@ -83,6 +84,31 @@ export interface AssemblyContext {
    * programmatically rather than relying on the warning alone (AAASM-4468).
    */
   readonly registered: boolean;
+  /**
+   * What the resolved gateway client does with hook-layer audit events —
+   * `record` / `recordResult` / `scanPrompts` (AAASM-5681).
+   *
+   * `"discarded"` means this SDK is using one of the two clients it ships, both
+   * of which drop those events: governed actions are enforced but produce **no
+   * audit evidence**, so nothing on this path supports a claim of
+   * attributability or after-the-fact review. A matching stderr warning is
+   * emitted once at init; this field is the programmatic counterpart, so the
+   * gap is detectable in code rather than only by reading stderr — and without
+   * setting `AA_DEBUG=1`, which previously was the only way to learn of it.
+   *
+   * `"caller-supplied"` means the caller passed their own `gatewayClient`, so
+   * this SDK makes no claim either way. It is the absence of a claim, **not** an
+   * assurance that events are retained.
+   *
+   * Optional only because `AssemblyContext` is part of this package's public
+   * export surface (`exports["."].types`), so a consumer can construct one in a
+   * test fixture or a custom integration; requiring the field would be a compile
+   * break for them, introduced by a diagnostic. `initAssembly` always populates
+   * it. The guarantee this ticket adds does not rest here — it rests on every
+   * *shipped client* declaring its disposition, which is enforced by
+   * `tests/audit-sink-disposition.test.ts`.
+   */
+  readonly auditSink?: AuditSinkDisposition;
   readonly parentAgentId?: string;
   readonly teamId?: string;
   readonly delegationReason?: string;

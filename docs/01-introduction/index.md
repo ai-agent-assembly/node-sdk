@@ -15,7 +15,20 @@ agent.
 [Agent Assembly](https://github.com/ai-agent-assembly). It lets you put a
 governance layer in front of the AI agents you build in Node — so every tool an
 agent calls is checked against policy *before* it runs, and every governance-relevant
-action is recorded in an audit trail.
+action is emitted as an audit event.
+
+Whether those events are *retained* depends on which gateway client you use. Both
+clients this SDK ships discard hook-layer audit events, so on the default path
+governed actions produce no audit trail — nothing on that path can be attributed or
+reviewed after the fact. Supply your own `gatewayClient` to retain them;
+`initAssembly` warns at startup and reports `auditSink` on the returned context when
+it knows the events are being dropped (AAASM-5681).
+
+The audit drop does not change the enforcement posture either way — but do not read
+that as "enforcement still applies". Whether a policy DENY can block a tool depends on
+the mode: only a check-capable run (`napi-inprocess`, or your own `gatewayClient`)
+gets an authoritative `check()`. In `auto` / `sdk-only` / `grpc-sidecar` the check is
+the allow-all no-op stub, so the call is not even *Evaluated*.
 
 In practice the SDK is two things working together:
 
@@ -34,8 +47,17 @@ approval decision.
 
 ## Who this is for
 
-- Developers building agents in Node/TypeScript who need allow/deny enforcement,
-  redaction, or an audit trail without rewriting their agent code.
+- Developers building agents in Node/TypeScript who want governance wired in without
+  rewriting their agent code. What this SDK layer gives you by default is narrower than
+  the three things people usually come for, so all three are worth stating:
+  - **Allow/deny enforcement** — only in a check-capable run. `napi-inprocess`, or your
+    own `gatewayClient`, routes checks to the runtime; `auto` / `sdk-only` /
+    `grpc-sidecar` route through the allow-all no-op client, where a DENY does not block.
+  - **Redaction** — applied by the runtime/proxy, not here. Under `enforce` this layer
+    treats a `redact` verdict as allow (see [Configuration](../05-configuration/index.md)).
+  - **An audit trail** — not on the default path at all: both gateway clients this SDK
+    ships discard hook-layer audit events, so retaining them requires supplying your own
+    `gatewayClient` (AAASM-5681).
 - Teams adopting Agent Assembly who want the fastest, in-process interception path —
   the SDK layer — rather than (or in addition to) the sidecar proxy and eBPF layers.
 
