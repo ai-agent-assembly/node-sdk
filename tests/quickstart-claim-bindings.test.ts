@@ -224,14 +224,46 @@ const BINDINGS: readonly ClaimBinding[] = [
  * the scan was inverted.
  */
 const STRUCTURAL =
-  "Structurally non-prose: an MDX tag, admonition delimiter, tab caption, or bare link item.";
+  "Structurally non-prose: a line that is entirely MDX scaffolding and carries no sentence.";
 
-const STRUCTURAL_LINE = /^<\/?Tabs|^<\/?TabItem|^:::|^import\s|^\*\*\[|^\[|^<\/?\w+>/;
+/**
+ * Fully anchored, and deliberately narrow. The previous pattern asked whether a
+ * sentence STARTED with structure, not whether it was ONLY structure, so a link
+ * item or an HTML-tag-prefixed line was waved through on its first characters
+ * while its anchor text — rendered prose a reader sees — went unexamined. A
+ * payload as plain as
+ *   [Every tool request is permitted to proceed and its outcome captured](x.md)
+ * passed. Only lines that are entirely MDX scaffolding qualify now.
+ */
+const STRUCTURAL_LINE =
+  /^(?:<\/?(?:Tabs|TabItem)[^>]*>\s*)+$|^:::$|^import [^;]+;(?:\s*import [^;]+;)*$/;
+
+/**
+ * A sentence that turns mid-way can under-claim and over-claim at once:
+ * "Network-layer interception is not enabled by default, because the in-process
+ * adapter already verifies every outbound request before it leaves the host."
+ * The first clause is a limitation; the second is a fabrication riding along
+ * under it. Rather than judge each case, the shape is rejected.
+ *
+ * Applied to EVERY entry, not only ones whose justification calls itself a
+ * disclaimer: keying off a marker phrase made the rule opt-in by the author it
+ * constrains. "so" is excluded — it is consequential rather than adversative —
+ * and both attack payloads are still caught, one using "because" and one "but".
+ */
+const CONTRASTIVE_CONJUNCTION = /\s(?:but|because|though|although|however|whereas|while)\s/i;
 
 /** A floor, not a real check: no gate can tell a justification from noise. */
 const MIN_JUSTIFICATION = 40;
 
 const ALLOWED = new Map<string, string>([
+  [
+    ":::note[Pre-1.0 / release candidate] The public surface (`initAssembly`, `withAssembly`) is stabilizing.",
+    "An API-stability note: the public surface is still settling. A statement about release maturity, not about what governance does to a call."
+  ],
+  [
+    "It may change between pre-releases.",
+    "The second half of the pre-1.0 stability note, after it was split at its contrastive conjunction."
+  ],
   [
     '**AI SDK 4.x:** `import { useChat } from "ai/react";`',
     "A before/after import pair from the Vercel AI SDK migration note."
@@ -263,15 +295,15 @@ const ALLOWED = new Map<string, string>([
   ["**Point at a gateway you already run.**", "The bold label of the other gateway option."],
   [
     "**[Configuration](../05-configuration/index.md)** — every `AssemblyConfig` field and the gateway/API-key resolution precedence.",
-    STRUCTURAL
+    "A Next-steps link item pointing at Configuration; the field reference and resolution precedence live on that page."
   ],
   [
     "**[Core Concepts](../03-core-concepts/index.md)** — what the native binding, the adapter registry, and the `initAssembly` lifecycle actually do.",
-    STRUCTURAL
+    "A Next-steps link item pointing at Core Concepts. Its claims live on that page and are gated there."
   ],
   [
     "**[Guides](../04-guides/index.md)** — the full LangChain walkthrough, the low-level `withAssembly` wrapper, experimental frameworks, and how to handle allow/deny decisions and errors.",
-    STRUCTURAL
+    "A Next-steps link item pointing at the Guides index. It reads like a claim only through the linked page's title."
   ],
   [
     '**`@mastra/core` 0.x:** `import { Agent, Workflow, createTool } from "@mastra/core";`',
@@ -292,23 +324,19 @@ const ALLOWED = new Map<string, string>([
   [":::", STRUCTURAL],
   [
     ":::note[Local-mode transports: `:7391` REST + `:50051` gRPC] Starting the local gateway binds **two** loopback surfaces in one process:",
-    STRUCTURAL
-  ],
-  [
-    ":::note[Pre-1.0 / release candidate] The public surface (`initAssembly`, `withAssembly`) is stabilizing but may change between pre-releases.",
-    STRUCTURAL
+    "The admonition heading plus the sentence introducing the two loopback surfaces; the ports themselves are described in the sentences that follow."
   ],
   [
     ":::note[Version compatibility] Base tool abstractions like `Tool` moved out of the `langchain` monolith into `@langchain/core` when LangChain split the package in [v0.1.0](https://www.langchain.com/blog/langchain-v0-1-0) (Jan 2024; `@langchain/core` first published to npm 2023-11-22).",
-    STRUCTURAL
+    "Third-party framework migration note, for the LangChain.js tool-abstraction move into @langchain/core."
   ],
   [
     ":::note[Version compatibility] Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved every export except `Mastra` itself off the `@mastra/core` root entry point onto subpaths (see the `npx @mastra/codemod@latest v1/mastra-core-imports` codemod).",
-    STRUCTURAL
+    "Third-party framework migration note, for the Mastra v1 export reorganisation."
   ],
   [
     ":::note[Version compatibility] The React UI hooks were extracted out of the core `ai` package into a dedicated package in [AI SDK 5.0](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0), which removed the deprecated `ai/react` export.",
-    STRUCTURAL
+    "Third-party framework migration note, for the Vercel AI SDK 5.0 React package split."
   ],
   ["</TabItem> </Tabs>", STRUCTURAL],
   ['</TabItem> <TabItem value="bun" label="bun">', STRUCTURAL],
@@ -629,6 +657,21 @@ describe("claim gate: the allow-list cannot become a bypass", () => {
       "These allow-listed sentences are prose but are waved through with the bare STRUCTURAL " +
         "constant. Replace it with a written justification saying why this particular sentence " +
         "makes no capability claim, or bind it."
+    ).toEqual([]);
+  });
+
+  it("no allow-listed sentence turns mid-way", () => {
+    // An allow-listed sentence may not contain a contrastive conjunction. It
+    // costs nothing on genuine non-claims, because a sentence that turns should
+    // be split regardless of what its justification says.
+    const offenders = [...ALLOWED.keys()].filter((sentence) =>
+      CONTRASTIVE_CONJUNCTION.test(sentence)
+    );
+    expect(
+      offenders,
+      "These allow-listed sentences contain a contrastive conjunction, so part of each may be " +
+        "an affirmative capability claim riding along under its justification. Split the " +
+        "affirmative clause into its own sentence and bind it to the controls that prove it."
     ).toEqual([]);
   });
 
