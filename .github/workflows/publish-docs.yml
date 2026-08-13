@@ -17,6 +17,12 @@ on:
       - "src/generated/**"
       - "metadata/**"
       - "scripts/generate-docs-metadata.mjs"
+      # AAASM-5529: the claim-binding gate below reads the control files and the
+      # deny path. Without these, a PR that only WEAKENS the gate — renaming a
+      # control, or changing which error the deny throws — would not re-run it.
+      - "tests/**"
+      - "src/gateway/**"
+      - "src/wrappers/**"
   push:
     branches:
       - main
@@ -76,9 +82,11 @@ jobs:
 
       # AAASM-5529. The step above round-trips the quickstart tab block as TEXT:
       # it proves docs match the vendored snippets under metadata/ and nothing
-      # more. The snippets are never executed, type-checked or linted — they are
-      # excluded from ESLint (eslint.config.mjs), Prettier (.prettierignore) and
-      # every tsconfig, and they import "./policy.js", a file the reader supplies.
+      # more. The snippets are never executed or linted in CI — they are excluded
+      # from ESLint (eslint.config.mjs) and Prettier (.prettierignore), and they
+      # import "./policy.js", a file the reader supplies. The base tsconfig.json
+      # does include them, but no CI job type-checks with it (pnpm typecheck runs
+      # tsconfig.test.json), so nothing gates them.
       #
       # This step gates a different surface: the prose in §2, §3 and §4, where
       # the quick-start states what governance does. Each claim is bound to the
