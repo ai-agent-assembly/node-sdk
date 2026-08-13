@@ -1,4 +1,5 @@
 import type {
+  AuditSinkDisposition,
   GatewayApprovalResult,
   GatewayCheckRequest,
   GatewayDecision,
@@ -18,6 +19,17 @@ export interface GatewayClient {
    * the client is constructed without a URL (e.g. a bare no-op test client).
    */
   readonly httpBaseUrl?: string;
+  /**
+   * What this client does with hook-layer audit events (AAASM-5681).
+   *
+   * Optional so a caller's own `GatewayClient` keeps compiling unchanged; an
+   * omitted value is read as `"caller-supplied"`, i.e. this SDK makes no claim
+   * about it. Every client this package *ships* must declare its disposition
+   * explicitly — `record` / `recordResult` / `scanPrompts` all return
+   * `Promise<void>`, so a discarding client is otherwise indistinguishable from
+   * a recording one, which is the defect this field closes.
+   */
+  readonly auditSink?: AuditSinkDisposition;
   start: () => Promise<void>;
   close: () => Promise<void>;
   check: (request: GatewayCheckRequest) => Promise<GatewayDecision>;
@@ -35,6 +47,10 @@ export function createNoopGatewayClient(mode: AssemblyMode, httpBaseUrl?: string
   return {
     mode,
     ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
+    // AAASM-5681 — the three audit methods below resolve to `undefined` without
+    // retaining anything. Declared so `initAssembly` can surface the gap and so
+    // a test can catch a shipped client that discards without saying so.
+    auditSink: "discarded" as AuditSinkDisposition,
     start: async () => undefined,
     close: async () => undefined,
     check: async () => ({ denied: false, pending: false }),
@@ -164,6 +180,10 @@ export function createNativeGatewayClient(
   return {
     mode,
     ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
+    // AAASM-5681 — hook-layer audit events are dropped here (see the comment on
+    // `record` below). Declared rather than left implicit so the drop reaches
+    // `initAssembly`, and through it the caller, without `AA_DEBUG=1`.
+    auditSink: "discarded" as AuditSinkDisposition,
     start: async () => undefined,
     close: async () => {
       await nativeClient.close();
