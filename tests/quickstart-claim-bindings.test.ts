@@ -201,6 +201,20 @@ const EXCLUDED_SECTIONS: Record<string, string> = {
  */
 const EXCLUDED_SENTENCES: Record<string, string> = {};
 
+/**
+ * Read the quick-start with line endings normalised to LF.
+ *
+ * Without this the paragraph split below never fires on Windows: git checks the
+ * file out with CRLF, so `split("\n\n")` finds no `\n\n` and the whole section
+ * collapses into one "sentence" that matches no binding. The four Windows legs
+ * of test-matrix caught exactly that — the Linux and macOS legs stayed green,
+ * which is why it is worth stating that this gate reads a file whose bytes
+ * differ per platform.
+ */
+function readQuickStart(): string {
+  return readFileSync(QUICK_START, "utf-8").replace(/\r\n/g, "\n");
+}
+
 /** Strips Docusaurus front matter, which otherwise flattens into sentence one. */
 function stripFrontMatter(text: string): string {
   return text.replace(/^---\n[\s\S]*?\n---\n/, "");
@@ -225,10 +239,7 @@ function splitSentences(paragraph: string): string[] {
  * glued pair would cover two claims at once — fragment containment one level up.
  */
 function scannedSentences(): Record<string, string> {
-  const body = stripFrontMatter(readFileSync(QUICK_START, "utf-8")).replace(
-    /```[\s\S]*?```/g,
-    "\n\n"
-  );
+  const body = stripFrontMatter(readQuickStart()).replace(/```[\s\S]*?```/g, "\n\n");
 
   const sentences: Record<string, string> = {};
   let section = "(preamble)";
@@ -338,7 +349,7 @@ describe("claim gate: it can see what it gates", () => {
 
 describe("claim gate: the allow-list cannot become a bypass", () => {
   it("every excluded section is still a real heading", () => {
-    const document = readFileSync(QUICK_START, "utf-8");
+    const document = readQuickStart();
     for (const [heading, reason] of Object.entries(EXCLUDED_SECTIONS)) {
       expect(document, `EXCLUDED_SECTIONS names "${heading}", no longer a heading`).toContain(
         heading
@@ -467,9 +478,9 @@ describe("claim gate: the documented error class is the one the SDK throws", () 
       // The name as the running SDK reports it, derived not imported.
       const thrown = (outcome as Error).constructor.name;
 
-      const documented = [
-        ...readFileSync(QUICK_START, "utf-8").matchAll(/`([A-Za-z0-9_]+Error)`/g)
-      ].map((match) => match[1]);
+      const documented = [...readQuickStart().matchAll(/`([A-Za-z0-9_]+Error)`/g)].map(
+        (match) => match[1]
+      );
       expect(
         documented.length,
         "The quick-start no longer names any `<Name>Error`. If that promise was removed, this " +
