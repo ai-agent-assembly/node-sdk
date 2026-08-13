@@ -23,6 +23,7 @@
  * the point is to prove nothing crosses it.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as gatewayModule from "../src/gateway/index.js";
 import { createNativeGatewayClient, createNoopGatewayClient } from "../src/gateway/index.js";
 import { createClient, initAssembly } from "../src/core/init-assembly.js";
 import type { GatewayClient } from "../src/gateway/client.js";
@@ -56,9 +57,37 @@ function stderrText(spy: ReturnType<typeof vi.spyOn>): string {
 }
 
 /**
- * Every gateway-client factory this package ships. A new shipped client must be
- * added here — that is the point: an undeclared discarding client should fail
- * this suite rather than ship silently.
+ * Every gateway-client factory the module actually exports, discovered rather
+ * than listed.
+ *
+ * A hand-maintained literal is a list, not a gate: review of #363 added a third
+ * exported, discarding, undeclared `createThirdGatewayClient` and the suite went
+ * `9 passed (9)`. Reading the module's own exports is what makes a new shipped
+ * client fail by default instead of passing by omission.
+ */
+function exportedClientFactoryNames(): string[] {
+  return Object.keys(gatewayModule)
+    .filter((name) => /^create[A-Za-z]*GatewayClient$/.test(name))
+    .sort();
+}
+
+/**
+ * Construct an exported factory without knowing its signature. Both current
+ * factories take `mode` first and ignore trailing arguments they do not
+ * declare, so this shape builds either; the assertions below only read
+ * `auditSink`.
+ */
+function buildByName(name: string): GatewayClient {
+  const factory = (gatewayModule as unknown as Record<string, unknown>)[name] as (
+    ...args: unknown[]
+  ) => GatewayClient;
+  return factory("napi-inprocess", boundary().native, "agent-1");
+}
+
+/**
+ * The explicitly-constructed clients, for the behavioural assertions that need a
+ * correctly-built instance. Exhaustiveness against the module is asserted
+ * separately, so this list cannot silently fall behind.
  */
 const SHIPPED_CLIENTS: ReadonlyArray<{ name: string; build: () => GatewayClient }> = [
   { name: "createNoopGatewayClient", build: () => createNoopGatewayClient("auto") },
@@ -72,6 +101,23 @@ describe("AAASM-5681: shipped clients declare what they do with audit events", (
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.AA_DEBUG;
+  });
+
+  it("EVERY exported client factory declares a disposition — discovered, not listed", () => {
+    // The gate. A newly exported factory is covered the moment it exists; it
+    // does not have to be remembered into a literal.
+    const names = exportedClientFactoryNames();
+    expect(names.length).toBeGreaterThan(0); // the discovery itself must work
+    for (const name of names) {
+      expect(buildByName(name).auditSink, `${name} must declare an auditSink`).toBeDefined();
+    }
+  });
+
+  it("the explicit list covers exactly what the module exports", () => {
+    // Keeps the behavioural cases below honest: if a factory is added and not
+    // given real construction here, this fails rather than the case silently
+    // going unexercised.
+    expect(SHIPPED_CLIENTS.map((c) => c.name).sort()).toEqual(exportedClientFactoryNames());
   });
 
   it.each(SHIPPED_CLIENTS)("$name declares an auditSink disposition", ({ build }) => {
