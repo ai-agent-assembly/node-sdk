@@ -87,7 +87,24 @@ npm install @agent-assembly/sdk @langchain/core
 ### ESM (`import`)
 
 ```ts
-import { initAssembly } from "@agent-assembly/sdk";
+import { initAssembly, type GatewayClient } from "@agent-assembly/sdk";
+
+// Decides every wrapped invoke(). This one is a local allow-list so the
+// snippet runs offline; point `check` at a gateway you run to source
+// decisions from there instead.
+const policyClient: GatewayClient = {
+  mode: "sdk-only",
+  start: async () => undefined,
+  close: async () => undefined,
+  check: async (request) =>
+    request.toolName === "search_web"
+      ? { denied: false }
+      : { denied: true, reason: "not on the allow-list" },
+  waitForApproval: async () => ({ denied: false }),
+  record: async () => undefined,
+  recordResult: async () => undefined,
+  scanPrompts: async () => undefined
+};
 
 const searchWeb = {
   name: "search_web",
@@ -97,10 +114,11 @@ const searchWeb = {
 const ctx = await initAssembly({
   gatewayUrl: "http://localhost:7391",
   agentId: "demo",
+  gatewayClient: policyClient,
   langchain: { tools: { searchWeb } }
 });
 
-await searchWeb.invoke({ q: "agent assembly" }); // governed; throws on policy deny
+console.log(await searchWeb.invoke({ q: "agent assembly" }));
 await ctx.shutdown();
 ```
 
@@ -109,19 +127,43 @@ await ctx.shutdown();
 ```js
 const { initAssembly } = require("@agent-assembly/sdk");
 
+// Decides every wrapped invoke(). This one is a local allow-list so the
+// snippet runs offline; point `check` at a gateway you run to source
+// decisions from there instead.
+const policyClient = {
+  mode: "sdk-only",
+  start: async () => undefined,
+  close: async () => undefined,
+  check: async (request) =>
+    request.toolName === "search_web"
+      ? { denied: false }
+      : { denied: true, reason: "not on the allow-list" },
+  waitForApproval: async () => ({ denied: false }),
+  record: async () => undefined,
+  recordResult: async () => undefined,
+  scanPrompts: async () => undefined
+};
+
 const searchWeb = {
   name: "search_web",
   invoke: async (input) => `results for ${input.q}`
 };
 
-const ctx = await initAssembly({
-  gatewayUrl: "http://localhost:7391",
-  agentId: "demo",
-  langchain: { tools: { searchWeb } }
-});
+// CommonJS has no top-level await, so the init/shutdown sequence runs
+// inside an async function.
+async function main() {
+  const ctx = await initAssembly({
+    gatewayUrl: "http://localhost:7391",
+    agentId: "demo",
+    gatewayClient: policyClient,
+    langchain: { tools: { searchWeb } }
+  });
 
-await searchWeb.invoke({ q: "agent assembly" });
-await ctx.shutdown();
+  console.log(await searchWeb.invoke({ q: "agent assembly" }));
+  await ctx.shutdown();
+}
+
+main();
 ```
 
 Both entrypoints resolve to the same governance pipeline; the package's `exports` field
