@@ -119,31 +119,53 @@ function resolveAuditSink(client: GatewayClient): AuditSinkDisposition {
  * it cannot become steady-state noise. It does not fail init — a caller may not
  * need SDK-side audit at all, and the proxy / eBPF layers are unaffected.
  */
-function warnAuditEventsDiscarded(mode: AssemblyMode | "auto"): void {
-  // The enforcement clause MUST branch on the mode. This warning fires for both
-  // shipped clients, and they differ on exactly this point: in
-  // CHECK_CAPABLE_MODE `createClient` returns the native client, whose `check()`
-  // routes to the runtime and can genuinely deny; in every other mode it returns
-  // the allow-all no-op. A single unconditional sentence is wrong in one
-  // direction or the other, which it has been twice (AAASM-5681).
-  const enforcementClause =
-    mode === CHECK_CAPABLE_MODE
+function warnAuditEventsDiscarded(
+  mode: AssemblyMode | "auto",
+  callerSupplied: boolean
+): void {
+  // Both clauses below branch, and on DIFFERENT facts. AAASM-5681 established
+  // the rule the hard way, twice: a claim that varies by a branch has to be
+  // expressed by that branch, not by wording placed near it.
+  //
+  // `mode` decides the enforcement clause for a SHIPPED client, because the two
+  // shipped clients differ on exactly this point: in CHECK_CAPABLE_MODE
+  // `createClient` returns the native client, whose `check()` routes to the
+  // runtime and can genuinely deny; in every other mode it returns the allow-all
+  // no-op.
+  //
+  // `callerSupplied` decides whether either sentence applies at all. Neither
+  // does for a caller's own client: this SDK did not build it, does not know
+  // what its `check()` does, and measured a real one returning a genuine deny
+  // while being told its checks route through the no-op — precisely inverted,
+  // for the most sophisticated adopter (AAASM-5743). `resolveAuditSink`
+  // collapses shipped-and-discarding with caller-supplied-and-declared-
+  // discarding into one value, so the provenance has to arrive separately.
+  const subject = callerSupplied
+    ? `the gateway client you supplied declares "auditSink": "discarded"`
+    : `the gateway client resolved here holds no native event channel`;
+  const enforcementClause = callerSupplied
+    ? `This says nothing about your enforcement posture: your client's ` +
+      `"check" is yours, and this SDK makes no claim about what it returns. `
+    : mode === CHECK_CAPABLE_MODE
       ? `This does not change the enforcement posture: policy checks in ` +
         `"${mode}" route through the native runtime, not the allow-all no-op ` +
         `client, so a policy DENY can still block a tool. `
       : `This does not change the enforcement posture — but note that ` +
         `"${mode}" routes policy checks through the allow-all no-op client, so ` +
         `a policy DENY does not block a tool call in this mode either way. `;
+  const remedy = callerSupplied
+    ? `Have your client retain the events, or declare a different "auditSink" ` +
+      `if it does. `
+    : `Run with a loaded native binding so the events reach the runtime, or ` +
+      `supply your own "gatewayClient". `;
   process.stderr.write(
     `[agent-assembly] WARNING: hook-layer audit events are DISCARDED in ` +
-      `"${mode}" mode: the gateway client resolved here holds no native event ` +
-      `channel, so record / recordResult / scanPrompts have nowhere to send to, ` +
-      `governed actions produce NO audit evidence, and nothing on this path can ` +
-      `be attributed or reviewed after the fact. ${enforcementClause}` +
-      `Run with a loaded native binding so the events reach the runtime, or ` +
-      `supply your own "gatewayClient". Inspect the "auditSink" field on the ` +
+      `"${mode}" mode: ${subject}, so record / recordResult / scanPrompts have ` +
+      `nowhere to send to, governed actions produce NO audit evidence, and ` +
+      `nothing on this path can be attributed or reviewed after the fact. ` +
+      `${enforcementClause}${remedy}Inspect the "auditSink" field on the ` +
       `returned assembly context to detect this programmatically (AAASM-5681, ` +
-      `AAASM-5750).\n`
+      `AAASM-5743, AAASM-5750).\n`
   );
 }
 
@@ -849,7 +871,14 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
   // fourth value should have to opt in to this warning rather than inherit it.
   const auditSink = resolveAuditSink(client);
   if (auditSink === "discarded") {
-    warnAuditEventsDiscarded(resolvedConfig.mode ?? "auto");
+    // Provenance is passed, not re-derived inside the warning: `resolveAuditSink`
+    // cannot tell a shipped discarding client from a caller's own client that
+    // honestly declares "discarded", and two of the sentences differ between
+    // them (AAASM-5743).
+    warnAuditEventsDiscarded(
+      resolvedConfig.mode ?? "auto",
+      resolvedConfig.gatewayClient !== undefined
+    );
   }
 
   return {
