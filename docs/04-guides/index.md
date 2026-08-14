@@ -82,7 +82,7 @@ console.log(await searchWeb.invoke({ q: "agent assembly" }));
 await ctx.shutdown();
 ```
 
-When the gateway returns a **deny**, the wrapped call throws `PolicyViolationError`. When
+When the client returns a **deny**, the wrapped call throws `PolicyViolationError`. When
 it returns **pending**, the call waits up to `approvalTimeoutMs` for a decision and then
 either proceeds or throws.
 
@@ -207,8 +207,8 @@ runs the tool body. The outcome shows up as ordinary async control flow:
 - **Allow.** The wrapped call runs the real tool and returns its result. Nothing extra
   to handle.
 - **Deny.** The wrapped call **rejects** with a `PolicyViolationError`. The tool body
-  never runs. The error message carries the tool name and the gateway's stated reason.
-- **Pending → resolved.** If the gateway needs a human, the call waits up to
+  never runs. The error message carries the tool name and the reason the client gave.
+- **Pending → resolved.** If the decision needs a human, the call waits up to
   `approvalTimeoutMs` for a decision and then either proceeds (approved) or rejects
   (denied / timed out).
 
