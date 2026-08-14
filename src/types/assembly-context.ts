@@ -88,13 +88,16 @@ export interface AssemblyContext {
    * What the resolved gateway client does with hook-layer audit events —
    * `record` / `recordResult` / `scanPrompts` (AAASM-5681).
    *
-   * `"discarded"` means this SDK is using one of the two clients it ships, both
-   * of which drop those events: governed actions are enforced but produce **no
-   * audit evidence**, so nothing on this path supports a claim of
-   * attributability or after-the-fact review. A matching stderr warning is
-   * emitted once at init; this field is the programmatic counterpart, so the
-   * gap is detectable in code rather than only by reading stderr — and without
-   * setting `AA_DEBUG=1`, which previously was the only way to learn of it.
+   * `"forwarded"` means the resolved client sends those events to the runtime
+   * over the native event channel, so they reach its audit pipeline
+   * (AAASM-5750). `"discarded"` means it holds no such channel — the no-op
+   * client, or a native client whose binding did not load: governed actions are
+   * enforced but produce **no audit evidence**, so nothing on that path supports
+   * a claim of attributability or after-the-fact review. A matching stderr
+   * warning is emitted once at init for the second case only; this field is the
+   * programmatic counterpart, so which case a run is in is detectable in code
+   * rather than only by reading stderr — and without setting `AA_DEBUG=1`, which
+   * once was the only way to learn of it.
    *
    * `"caller-supplied"` means the caller passed their own `gatewayClient`, so
    * this SDK makes no claim either way. It is the absence of a claim, **not** an
