@@ -47,7 +47,7 @@
  *     stale referent. It is a test file that documents no SDK behaviour, and the
  *     exclusion matches one exact path rather than a prefix.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -100,22 +100,55 @@ interface DeferralSite {
   text: string;
 }
 
+/**
+ * Walk the tree, tolerating entries that vanish mid-walk.
+ *
+ * `readdirSync` + a separate `statSync` leaves a window in which an entry can be
+ * removed between the two calls, and the throw takes the whole scan down —
+ * turning a gate whose verdict is "no findings" into one that produced no
+ * verdict at all. CI hit exactly that: pnpm's transient `.tmp-postinstall-*`
+ * directory disappeared between the readdir and the stat
+ * (`ENOENT: stat '.tmp-postinstall-BtTJQB'`). `withFileTypes` closes the window
+ * for the common case by getting the type from the directory entry itself, and
+ * the guards below cover the rest — a file deleted before it is read, or one
+ * whose type cannot be determined.
+ *
+ * Skipping a vanished entry is safe in a way skipping a real one would not be:
+ * a file that no longer exists carries no claim. A scan that reaches nothing at
+ * all is the dangerous failure, and that is what the positive controls catch.
+ */
 function scan(dir: string, sites: DeferralSite[]): void {
-  for (const entry of readdirSync(dir)) {
-    if (SKIPPED_DIRS.has(entry)) continue;
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return; // directory removed under us
+  }
 
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
+  for (const entry of entries) {
+    if (SKIPPED_DIRS.has(entry.name)) continue;
+
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
       scan(full, sites);
       continue;
     }
+    // Neither a plain file nor a directory (a dangling symlink, a socket): a
+    // stat would be the only way to tell, and that is the racing call.
+    if (!entry.isFile()) continue;
 
-    if (!SCANNED_SUFFIXES.some((suffix) => entry.endsWith(suffix))) continue;
+    if (!SCANNED_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) continue;
 
     const rel = relative(REPO_ROOT, full);
     if (rel === GATE_FILE) continue;
 
-    sites.push(...deferralsInLines(rel, readFileSync(full, "utf8").split("\n")));
+    let body: string;
+    try {
+      body = readFileSync(full, "utf8");
+    } catch {
+      continue; // removed between the readdir and the read
+    }
+    sites.push(...deferralsInLines(rel, body.split("\n")));
   }
 }
 
