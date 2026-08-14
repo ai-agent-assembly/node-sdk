@@ -401,8 +401,8 @@ and is re-published on every push to `main` via the `publish-docs.yml` workflow.
 
 ## Related projects
 
-`@agent-assembly/sdk` is one client of the Agent Assembly platform. The governance
-decisions it enforces are made by the core Rust runtime; the protocol it speaks is shared
+`@agent-assembly/sdk` is one client of the Agent Assembly platform. The authoritative
+governance decisions are made by the core Rust runtime; the protocol it speaks is shared
 across all SDKs.
 
 | Project                                                                                 | What it is                                                                                                                                                                        |
