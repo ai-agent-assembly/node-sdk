@@ -116,9 +116,13 @@ const BINDINGS: readonly ClaimBinding[] = [
     id: "sdk-enforces-by-talking-to-a-gateway",
     quote: "The SDK enforces policy by talking to an Agent Assembly **gateway**.",
     unprovenReason:
-      "AAASM-5663: both README entrypoints were executed and neither runs as written, so no " +
-      "control covers a reader actually reaching a gateway. The control that exists asserts " +
-      "the documented config REFUSES to init; it does not prove this sentence."
+      "AAASM-5663: no control covers a reader actually reaching a gateway. Every control " +
+      "that exists decides tool calls through a caller-supplied gatewayClient answering " +
+      "in-process, which is what the documented snippets now do — so they prove a wrapped " +
+      "call is decided before its body runs, not that the deciding party is a gateway. " +
+      "This reason previously said the README entrypoints do not run as written; they were " +
+      "fixed under this ticket and now execute, which changes nothing about this sentence, " +
+      "because running is not talking to a gateway."
   },
   {
     id: "auto-start-is-opt-in",
