@@ -164,7 +164,8 @@ function hasInvoke(
  * event channel; `createNoopGatewayClient` — the client the default `auto` mode
  * resolves — holds no transport and drops it. Neither reaches ADR 0033 §6
  * *Observed*, which needs a durable event attributed to the action; the handoff
- * is as far as this layer can see (AAASM-5750). `initAssembly` warns in the drop
+ * is as far as this layer can see (AAASM-5750), and AAASM-5783 is open on the
+ * downstream half. `initAssembly` warns in the drop
  * case and reports which one a run is in as `context.auditSink`.
  */
 async function recordDeny(

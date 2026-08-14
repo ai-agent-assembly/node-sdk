@@ -292,8 +292,11 @@ governs LangChain tools with two cooperating layers instead:
   signal), but cannot block or redact output. **Where those events go depends on the
   gateway client**: the native one hands them to the runtime's event channel, and the
   no-op one the default path resolves holds no channel and drops them. The handoff is
-  unacknowledged, so neither case is an assurance the event was retained. Read
-  `auditSink` on the assembly context to tell which you have (AAASM-5750).
+  unacknowledged, so neither case is an assurance the event was retained;
+  [AAASM-5783](https://lightning-dust-mite.atlassian.net/browse/AAASM-5783) is open
+  on the downstream half, and until it lands no SDK can claim ADR 0033 §6
+  *Observed*. Read `auditSink` on the assembly context to tell which you have
+  (AAASM-5750).
 - **Wrapper layer** (`wrapToolWithAssembly`) — the actual enforcement point: performs
   the real pre-execution allow / deny / pending check and throws
   `PolicyViolationError` before the tool runs.

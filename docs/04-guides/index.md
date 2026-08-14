@@ -174,7 +174,9 @@ See the note below.
 
 \*\* `record` / `recordResult` hand hook-layer audit events to the runtime's event
 channel on the `napi-inprocess` client, over a loaded native binding (AAASM-5750). The
-handoff is unacknowledged, so it is not an assurance the event was retained. The
+handoff is unacknowledged, so it is not an assurance the event was retained, and
+[AAASM-5783](https://lightning-dust-mite.atlassian.net/browse/AAASM-5783) is open on
+the downstream half. The
 default no-op client holds no transport and drops them outright. `auditSink` on the
 assembly context reports which case a run is in.
 

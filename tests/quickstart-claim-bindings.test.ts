@@ -177,6 +177,20 @@ const BINDINGS: readonly ClaimBinding[] = [
     ]
   },
   {
+    id: "downstream-of-the-handoff-is-tracked-not-fixed",
+    quote:
+      "Downstream, [AAASM-5783](https://lightning-dust-mite.atlassian.net/browse/AAASM-5783) is open on `report_event` payloads reaching neither the live stream nor the durable entry, so no SDK can claim ADR 0033 §6 *Observed* until it lands.",
+    // A forward pointer at work tracked in ANOTHER repository. No control in this
+    // package can decide it — the behaviour lives in aa-sdk-client and
+    // aa-runtime — so binding it to an audit-sink control would be a control
+    // measuring something adjacent and standing in for a claim it cannot reach.
+    unprovenReason:
+      "AAASM-5783: the payload gap is in aa-sdk-client / aa-runtime, outside this package's " +
+      "test boundary. The sentence points at open work rather than asserting anything about " +
+      "this SDK's behaviour, so it is deliberately unproven here.",
+    controls: []
+  },
+  {
     id: "init-warns-and-reports-the-disposition",
     quote:
       "`initAssembly` warns when the event is dropped and reports `auditSink` on the returned context (AAASM-5750).",

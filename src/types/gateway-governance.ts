@@ -16,6 +16,10 @@
  * *a durable event attributed to the action*, and the SDK cannot establish that
  * from this side — see the note on `"forwarded"`. The strongest claim available
  * to this type is about where the event was handed, not where it ended up.
+ *
+ * The downstream half of that gap is tracked as AAASM-5783 and is unfixed: today
+ * `report_event` payloads reach neither the live stream nor the durable entry.
+ * Revisit these terms when it lands — not before.
  */
 export type AuditSinkDisposition =
   /**

@@ -236,7 +236,8 @@ export function createNativeGatewayClient(
     // The handoff is the claim, and it is deliberately not stated as more than
     // that. `sendEvent` is fire-and-forget and unacknowledged, so this client
     // cannot tell whether the runtime received the event, let alone retained
-    // it — see `AuditSinkDisposition` on why none of this reaches §6 *Observed*.
+    // it — see `AuditSinkDisposition` on why none of this reaches §6 *Observed*,
+    // and AAASM-5783 for the open downstream work that would have to land first.
     //
     // This supersedes the AAASM-4847 note that said there was nowhere for these
     // to go. That was true of the *gateway* wire — there is still no HTTP audit

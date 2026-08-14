@@ -91,7 +91,8 @@ export interface AssemblyContext {
    * `"forwarded"` means the resolved client hands those events to the runtime
    * over the native event channel. It does **not** mean they were retained: the
    * send is fire-and-forget and unacknowledged, so this SDK cannot report
-   * arrival and does not (AAASM-5750). `"discarded"` means the client holds no
+   * arrival and does not (AAASM-5750); AAASM-5783 is open on the downstream half
+   * and must land before any of this could support an *Observed* claim. `"discarded"` means the client holds no
    * such channel — the no-op client `auto` resolves: governed actions are
    * enforced but produce **no audit evidence**, so nothing on that path supports
    * a claim of attributability or after-the-fact review. A matching stderr

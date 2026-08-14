@@ -33,7 +33,10 @@ produce no audit trail at all.
 
 **Neither is an audit guarantee.** The handoff is fire-and-forget and unacknowledged,
 so this SDK cannot tell you the event arrived, and does not claim it did. Treat
-`"forwarded"` as "handed to the runtime", not as evidence you can cite.
+`"forwarded"` as "handed to the runtime", not as evidence you can cite. Downstream,
+[AAASM-5783](https://lightning-dust-mite.atlassian.net/browse/AAASM-5783) is open on
+`report_event` payloads reaching neither the live stream nor the durable entry —
+until it lands, no SDK can claim ADR 0033 §6 *Observed*.
 `initAssembly` warns when the events are being dropped and reports `auditSink` on the
 returned context: `"forwarded"`, `"discarded"`, or `"caller-supplied"` (AAASM-5750).
 
