@@ -1,31 +1,36 @@
 /**
- * AAASM-5681 — a shipped gateway client must not discard hook-layer audit
- * events silently.
+ * AAASM-5681 / AAASM-5750 — what a shipped gateway client does with hook-layer
+ * audit events, and whether it says so.
  *
  * `record` / `recordResult` / `scanPrompts` all return `Promise<void>`, so a
- * client that retains the event and a client that drops it are
- * indistinguishable to the caller. Both clients this package ships drop it, and
- * before this suite the only signal was a one-shot note gated on `AA_DEBUG=1` —
- * a caller had to already suspect the problem to discover it.
+ * client that sends the event and a client that drops it are indistinguishable
+ * to the caller. Both shipped clients used to drop it; the native one now
+ * forwards it to the runtime, and the no-op one still holds no transport to send
+ * on.
  *
  * The suite pins three separate things, because any one of them alone can pass
- * while the defect is present:
+ * while a defect is present:
  *
  *  1. Every shipped client *declares* an `auditSink` disposition.
- *  2. The declaration matches what the client actually does — a client that
- *     says `"discarded"` must reach nothing, measured against a boundary that
- *     is proven reachable by a positive control.
+ *  2. The declaration matches what the client actually does — one that says
+ *     `"forwarded"` must reach the boundary with the event, one that says
+ *     `"discarded"` must reach nothing, both measured against a boundary proven
+ *     reachable by a positive control.
  *  3. `initAssembly` surfaces the drop on the DEFAULT path, with `AA_DEBUG`
- *     unset, both on stderr and programmatically as `context.auditSink`.
+ *     unset, both on stderr and programmatically as `context.auditSink` — and
+ *     stays quiet on the path that has no drop.
  *
  * Assertions here are over the real shipped clients. The `NativeClient` stub is
- * not a stand-in for the code under test — it is the downstream boundary, and
- * the point is to prove nothing crosses it.
+ * not a stand-in for the code under test — it is the downstream boundary. No
+ * test here injects a sink into the SDK's own path: a suite that supplies its
+ * own recording client proves that client records and stays green over a client
+ * wired to nothing, which is the defect AAASM-5749 found one row over.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as gatewayModule from "../src/gateway/index.js";
 import { createNativeGatewayClient, createNoopGatewayClient } from "../src/gateway/index.js";
 import { createClient, initAssembly } from "../src/core/init-assembly.js";
+import { withAssembly } from "../src/wrappers/with-assembly.js";
 import type { GatewayClient } from "../src/gateway/client.js";
 import type { NativeClient } from "../src/native/client.js";
 
@@ -37,13 +42,26 @@ const BASE = {
 
 const DISCARD_WARNING_SUBSTRING = "hook-layer audit events are DISCARDED";
 
-/** Records every crossing of the native boundary. */
+/**
+ * Records every crossing of the native boundary.
+ *
+ * `canRegister: true` because that flag *is* "the native binding loaded", which
+ * is the fact the record path and the computed disposition both key off. A
+ * boundary that reported `false` would be standing in for the fallback stub — a
+ * client with no channel — and every forwarding assertion below would then be
+ * measuring the wrong client. The stub case is covered deliberately, in
+ * `napi-audit-noop.test.ts`.
+ */
 function boundary(): { native: NativeClient; crossings: string[] } {
   const crossings: string[] = [];
   const native = {
+    canRegister: true,
     queryPolicy: async (query: unknown) => {
       crossings.push(`queryPolicy:${JSON.stringify(query)}`);
       return { denied: false, pending: false };
+    },
+    sendEvent: (event: unknown) => {
+      crossings.push(`sendEvent:${JSON.stringify(event)}`);
     },
     close: async () => {
       crossings.push("close");
@@ -156,9 +174,20 @@ describe("AAASM-5681: shipped clients declare what they do with audit events", (
   it.each(SHIPPED_CLIENTS)("$name declares an auditSink disposition", ({ build }) => {
     // An omitted disposition reads as "caller-supplied" — the absence of a
     // claim. A client this package ships must never be in that state: it would
-    // let a discarding sink present as one the SDK cannot speak for.
+    // let a dropping sink present as one the SDK cannot speak for.
     expect(build().auditSink).toBeDefined();
-    expect(build().auditSink).toBe("discarded");
+    expect(["forwarded", "discarded"]).toContain(build().auditSink);
+  });
+
+  it("the two shipped clients do NOT declare the same thing", () => {
+    // The disposition is only worth reading if it discriminates. Asserting each
+    // client against its own expected literal would pass over an implementation
+    // that returned one constant for both, which is what the field looked like
+    // before there was a channel to distinguish.
+    expect(createNativeGatewayClient("napi-inprocess", boundary().native, "agent-1").auditSink).toBe(
+      "forwarded"
+    );
+    expect(createNoopGatewayClient("auto").auditSink).toBe("discarded");
   });
 
   it("the native client's boundary IS reachable — positive control", async () => {
@@ -171,16 +200,48 @@ describe("AAASM-5681: shipped clients declare what they do with audit events", (
     expect(crossings[0]).toContain("queryPolicy");
   });
 
-  it("a client declaring \"discarded\" reaches nothing with any audit method", async () => {
+  it("a client declaring \"forwarded\" reaches the boundary with every audit method", async () => {
     const { native, crossings } = boundary();
     const client = createNativeGatewayClient("napi-inprocess", native, "agent-1");
-    expect(client.auditSink).toBe("discarded");
+    expect(client.auditSink).toBe("forwarded");
 
-    await client.record({ action: "tool_call", runId: "r1", reason: "denied" });
-    await client.recordResult({ runId: "r1", output: "SENSITIVE-RESULT" });
-    await client.scanPrompts({ prompts: ["a prompt"], runId: "r1" });
+    await client.record({ action: "tool_call_denied", runId: "r1", reason: "DENY-REASON-PROBE" });
+    await client.recordResult({ runId: "r1", output: "RESULT-PROBE" });
+    await client.scanPrompts({ prompts: ["PROMPT-PROBE"], runId: "r1" });
 
-    expect(crossings).toEqual([]);
+    // Three distinct crossings carrying three distinct payloads. A count alone
+    // would pass over three copies of the same event; the payload assertions are
+    // what make each method's own wiring falsifiable.
+    const sends = crossings.filter((crossing) => crossing.startsWith("sendEvent:"));
+    expect(sends).toHaveLength(3);
+    expect(sends[0]).toContain("DENY-REASON-PROBE");
+    expect(sends[1]).toContain("RESULT-PROBE");
+    expect(sends[2]).toContain("PROMPT-PROBE");
+  });
+
+  it("a governed tool call through withAssembly forwards the deny to the boundary", async () => {
+    // The interceptor, not the client in isolation. AC1's denied path: the SDK's
+    // own wrapper is what builds the event, and nothing here supplies a sink.
+    const { native, crossings } = boundary();
+    const denyingNative = {
+      ...(native as unknown as Record<string, unknown>),
+      queryPolicy: async (query: unknown) => {
+        crossings.push(`queryPolicy:${JSON.stringify(query)}`);
+        return { denied: true, reason: "policy forbids DENY-PROBE" };
+      }
+    } as unknown as NativeClient;
+    const client = createNativeGatewayClient("napi-inprocess", denyingNative, "agent-1");
+
+    const tools = { bash: { execute: async () => "should never run" } };
+    withAssembly(tools, { gatewayClient: client });
+    await expect(tools.bash.execute()).rejects.toThrow(/DENY-PROBE/);
+
+    // Positive control on the same boundary, kept separate from the finding: the
+    // check crossed. Without it an empty send list is indistinguishable from a
+    // probe that never ran.
+    expect(crossings.some((crossing) => crossing.startsWith("queryPolicy:"))).toBe(true);
+    const sends = crossings.filter((crossing) => crossing.startsWith("sendEvent:"));
+    expect(sends.some((crossing) => crossing.includes("DENY-PROBE"))).toBe(true);
   });
 
   it("the no-op client's audit methods resolve to undefined and retain nothing", async () => {
@@ -193,14 +254,15 @@ describe("AAASM-5681: shipped clients declare what they do with audit events", (
     ).resolves.toBeUndefined();
   });
 
-  it("createClient resolves a shipped, discarding client on the default path", () => {
+  it("createClient resolves a declared client on each path, and they differ", () => {
     // Guards the wiring: if `createClient` ever returned something undeclared,
-    // `initAssembly` would silently stop warning.
+    // `initAssembly` would silently stop warning — or start warning on the path
+    // that has nothing to warn about.
     expect(createClient({ ...BASE, mode: "auto" }).auditSink).toBe("discarded");
     expect(
       createClient({ ...BASE, mode: "napi-inprocess", enforcementMode: "observe" }, boundary().native)
         .auditSink
-    ).toBe("discarded");
+    ).toBe("forwarded");
   });
 });
 
@@ -241,7 +303,7 @@ describe("AAASM-5681: initAssembly surfaces the drop without AA_DEBUG", () => {
   // Neither would have reddened any earlier test, because the assertions only
   // looked for "gatewayClient" and "auditSink". These pin the claim per mode.
 
-  it("in napi-inprocess, does NOT call the client allow-all no-op", async () => {
+  it("in napi-inprocess with a loaded binding, does NOT warn at all", async () => {
     // The native binding is not compiled in a bare checkout, so drive the mode
     // the way `create-client-mode-routing.test.ts` does: mock the addon and
     // re-import, which exercises the real `createClient` routing rather than
@@ -270,11 +332,14 @@ describe("AAASM-5681: initAssembly surfaces the drop without AA_DEBUG", () => {
     });
     const text = stderrText(stderrSpy);
 
-    expect(text).toContain(DISCARD_WARNING_SUBSTRING);
-    // createClient returns the NATIVE client here, whose check() routes to the
-    // runtime and can genuinely deny — so the no-op clause must NOT appear.
-    expect(text).toContain("route through the native runtime");
-    expect(text).not.toContain("routes policy checks through the allow-all no-op client");
+    // The mocked addon means the binding loaded, so createClient returns a
+    // native client whose audit sinks send. There is no drop to disclose, and a
+    // warning here would be a false alarm on the one path that does record
+    // (AAASM-5750). The `auto` case below is the control: same `initAssembly`,
+    // no binding, warning present — so this silence is a decision, not a
+    // deleted warning.
+    expect(text).not.toContain(DISCARD_WARNING_SUBSTRING);
+    expect(context.auditSink).toBe("forwarded");
     await context.shutdown();
     vi.doUnmock("node:module");
     vi.resetModules();

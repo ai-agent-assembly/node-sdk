@@ -159,11 +159,14 @@ function hasInvoke(
  * the caller exits on the error. The cost is that a `record` which hangs delays
  * the deny — there is no timeout here, unlike `waitForApprovalWithTimeout`.
  *
- * What this does *not* do is make a deny observable in a released binary. Both
- * shipped clients discard the event — `createNoopGatewayClient` returns
- * undefined, `createNativeGatewayClient` fires only a one-time `AA_DEBUG` note
- * — so a deny stays Unmeasured in audit evidence (ADR 0033 §6). Supplying a
- * sink that retains it is tracked as AAASM-5750.
+ * What happens to the deny next depends on the client underneath. Over a loaded
+ * native binding `createNativeGatewayClient` hands the event to the runtime's
+ * event channel; `createNoopGatewayClient` — the client the default `auto` mode
+ * resolves — holds no transport and drops it. Neither reaches ADR 0033 §6
+ * *Observed*, which needs a durable event attributed to the action; the handoff
+ * is as far as this layer can see (AAASM-5750), and AAASM-5783 is open on the
+ * downstream half. `initAssembly` warns in the drop
+ * case and reports which one a run is in as `context.auditSink`.
  */
 async function recordDeny(
   gateway: GatewayClient,

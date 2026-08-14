@@ -161,7 +161,7 @@ console.log(ctx.unpatchedAdapters); // e.g. ["vercel-ai-sdk"] — NOT attached a
 
 | Framework     | Detected package       | Status                           | What an applied patch actually does                                                                                      |
 | ------------- | ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| LangChain     | `@langchain/core`      | Validated (test suite)           | Tools passed via `langchain.tools` are **denied before execution**.\* Callbacks are audit-only and cannot block — and they only reach a sink if your gateway client persists what they record.\*\* Requires a `langchain` config; detection alone attaches nothing. |
+| LangChain     | `@langchain/core`      | Validated (test suite)           | Tools passed via `langchain.tools` are **denied before execution**.\* Callbacks are audit-only and cannot block — and whether what they record reaches a sink depends on the gateway client.\*\* Requires a `langchain` config; detection alone attaches nothing. |
 | OpenAI Agents | `@openai/agents`       | Experimental (auto-detect patch) | Tool calls **denied before execution**.\*                                                                                  |
 | Vercel AI SDK | `ai`                   | Experimental (auto-detect patch) | Tool calls **denied before execution**.\* Frozen-ESM installs cannot be patched at all and report as unpatched.            |
 | LangGraph     | `@langchain/langgraph` | Experimental (auto-detect patch) | **Lineage tagging only** — binds the agent id around the call so other layers' evidence is attributed to it. Emits no evidence itself and runs no check, so a policy DENY never blocks a call. |
@@ -172,9 +172,13 @@ Otherwise `check()` is the allow-all no-op stub: it produces no control-plane de
 at all, so the call is not "checked and allowed", it is simply uninspected in-process.
 See the note below.
 
-\*\* `record` / `recordResult` are deliberate no-ops on both the default no-op client
-and the `napi-inprocess` client (AAASM-4847), so hook-layer audit events reach a sink
-only via a caller-supplied gateway client that persists them.
+\*\* `record` / `recordResult` hand hook-layer audit events to the runtime's event
+channel on the `napi-inprocess` client, over a loaded native binding (AAASM-5750). The
+handoff is unacknowledged, so it is not an assurance the event was retained, and
+[AAASM-5783](https://lightning-dust-mite.atlassian.net/browse/AAASM-5783) is open on
+the downstream half. The
+default no-op client holds no transport and drops them outright. `auditSink` on the
+assembly context reports which case a run is in.
 
 None of this speaks to the proxy or eBPF layers, which are independent of the SDK and
 may still see the same activity.

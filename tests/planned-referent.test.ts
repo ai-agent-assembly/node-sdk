@@ -8,24 +8,33 @@
  * for a rule the ADR does not contain sends the next reader to the wrong
  * document.
  *
- * The defect: AAASM-5681 measured that both shipped gateway clients discard the
- * hook-layer audit event. It never intended to build a sink. A forward-looking
+ * The defect: AAASM-5681 measured that both shipped gateway clients discarded
+ * the hook-layer audit event. It never intended to build a sink. A forward-looking
  * claim pointing at it will read as a live commitment while resolving to
  * finished work the moment it closes. So the invariant is narrow and permanent
  * — **AAASM-5681 may be cited as the ticket that measured the drop, never as
  * the ticket that will fix it.**
  *
- * The assertion is two-tier, because one tier alone fails in one direction or
- * the other and review caught both:
+ * **AAASM-5750 built the sink, so it joined the list it used to be the answer
+ * to.** This gate previously required a fixed set of guarded files to name
+ * AAASM-5750 as the ticket their `Planned` deferred to. Once the capability
+ * exists there is nothing left to defer: a site still calling SDK-side recording
+ * *Planned* under AAASM-5750 describes shipped behaviour as unbuilt, the same
+ * stale-pointer defect one ticket later. So the rule collapsed to a single tier
+ * — **no forward-looking claim in this repo may defer SDK-side audit recording
+ * to any of the three tickets that are done with it** — and applies repo-wide
+ * rather than to a named set.
  *
- *   - a **guarded** site (one of `EXPECTED_SITES`) must name AAASM-5750 exactly.
- *     Without this the gate stops asserting the thing the change made true —
- *     repointing a guarded site to any other live ticket passed green, which is
- *     precisely the drift the gate exists to catch.
- *   - **any other** site must merely not name a stale referent. Asserting
- *     AAASM-5750 repo-wide was the first version's defect: §6 scopes `Planned`
- *     to any decided-but-unbuilt capability with any ticket, so an unrelated
- *     roadmap row is legitimate and must not fail this gate.
+ * §6 still scopes `Planned` to any decided-but-unbuilt capability with any
+ * ticket, so an unrelated roadmap deferral naming some other ticket is
+ * legitimate and must not fail this gate. Only the three named referents are
+ * forbidden.
+ *
+ * A rule whose expected result is "no findings" needs the scan proved reachable,
+ * or a broken walk passes as loudly as a clean tree. The `can see` cases below
+ * feed the detector synthetic lines carrying exactly the shapes this file
+ * forbids and require it to find them. The empty result is meaningful only
+ * because those are green.
  *
  * Two limits are disclosed rather than fixed, both measured as currently
  * unreachable:
@@ -38,19 +47,21 @@
  *     stale referent. It is a test file that documents no SDK behaviour, and the
  *     exclusion matches one exact path rather than a prefix.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Tickets that *measured* the absence of an SDK-side audit sink. Backward
- * citations to them are correct and are left alone; what this gate forbids is
- * either one appearing as the ticket a forward-looking claim defers to.
+ * Tickets a forward-looking claim about SDK-side audit recording may no longer
+ * defer to. Backward citations to any of them are correct and are left alone;
+ * what this gate forbids is one of them appearing as the ticket a *deferral*
+ * points at. The reason differs per entry, and the failure message says which.
  */
-/** The ticket that owns building the SDK-side audit sink. Guarded sites must name it exactly. */
-const CAPABILITY_REFERENT = "AAASM-5750";
-
-const STALE_REFERENTS = new Set(["AAASM-5681", "AAASM-5731"]);
+const STALE_REFERENTS = new Map([
+  ["AAASM-5681", "measured the drop and never intended to fix it"],
+  ["AAASM-5731", "measured the drop and never intended to fix it"],
+  ["AAASM-5750", "built the sink; SDK-side recording is no longer deferred"]
+]);
 
 /**
  * The two shapes a deferral takes: the ADR 0033 §6 term, and the plain
@@ -74,17 +85,6 @@ const REPO_ROOT = resolve(__dirname, "..");
 const GATE_FILE = join("tests", "planned-referent.test.ts");
 
 /**
- * Audit-sink deferrals that must remain reachable by the scan. A fixture
- * compared against a walk of the tree, not a constant compared against another
- * constant: if a site is deleted, renamed, or reflowed out of the scan's reach,
- * the walk stops finding it and this fails.
- */
-const EXPECTED_SITES = [
-  join("src", "types", "gateway-governance.ts"),
-  join("src", "wrappers", "with-assembly.ts")
-];
-
-/**
  * Whether a comment line closes a sentence. A wrapped sentence (`… Planned
  * under ADR 0033 §6` / `(AAASM-5750) …`) does not; a complete one does.
  */
@@ -100,23 +100,71 @@ interface DeferralSite {
   text: string;
 }
 
-function scan(dir: string, sites: DeferralSite[]): void {
-  for (const entry of readdirSync(dir)) {
-    if (SKIPPED_DIRS.has(entry)) continue;
+/**
+ * Walk the tree, tolerating entries that vanish mid-walk.
+ *
+ * `readdirSync` + a separate `statSync` leaves a window in which an entry can be
+ * removed between the two calls, and the throw takes the whole scan down —
+ * turning a gate whose verdict is "no findings" into one that produced no
+ * verdict at all. CI hit exactly that: pnpm's transient `.tmp-postinstall-*`
+ * directory disappeared between the readdir and the stat
+ * (`ENOENT: stat '.tmp-postinstall-BtTJQB'`). `withFileTypes` closes the window
+ * for the common case by getting the type from the directory entry itself, and
+ * the guards below cover the rest — a file deleted before it is read, or one
+ * whose type cannot be determined.
+ *
+ * Skipping a vanished entry is safe in a way skipping a real one would not be:
+ * a file that no longer exists carries no claim. A scan that reaches nothing at
+ * all is the dangerous failure, and that is what the positive controls catch.
+ */
+/** Files the walk actually opened, for the reachability control below. */
+const scanned: string[] = [];
 
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
+function scan(dir: string, sites: DeferralSite[]): void {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return; // directory removed under us
+  }
+
+  for (const entry of entries) {
+    if (SKIPPED_DIRS.has(entry.name)) continue;
+
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
       scan(full, sites);
       continue;
     }
+    // Neither a plain file nor a directory (a dangling symlink, a socket): a
+    // stat would be the only way to tell, and that is the racing call.
+    if (!entry.isFile()) continue;
 
-    if (!SCANNED_SUFFIXES.some((suffix) => entry.endsWith(suffix))) continue;
+    if (!SCANNED_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) continue;
 
     const rel = relative(REPO_ROOT, full);
     if (rel === GATE_FILE) continue;
 
-    const lines = readFileSync(full, "utf8").split("\n");
-    lines.forEach((line, index) => {
+    let body: string;
+    try {
+      body = readFileSync(full, "utf8");
+    } catch {
+      continue; // removed between the readdir and the read
+    }
+    scanned.push(rel);
+    sites.push(...deferralsInLines(rel, body.split("\n")));
+  }
+}
+
+/**
+ * The detector, split out from the walk so a control can drive it over input it
+ * constructs rather than over whatever the tree happens to contain. A gate whose
+ * expected result is "nothing found" is only as good as the proof that it can
+ * find something.
+ */
+export function deferralsInLines(path: string, lines: string[]): DeferralSite[] {
+  const sites: DeferralSite[] = [];
+  lines.forEach((line, index) => {
       if (!FORWARD_CLAIM.test(line)) return;
 
       // The ticket is looked for on the claim's own line **and the line after
@@ -137,63 +185,99 @@ function scan(dir: string, sites: DeferralSite[]): void {
       const ticket = TICKET_REF.exec(window);
       if (ticket === null) return;
 
-      sites.push({
-        path: rel,
-        line: index + 1,
-        ticket: ticket[0],
-        text: line.trim()
-      });
+    sites.push({
+      path,
+      line: index + 1,
+      ticket: ticket[0],
+      text: line.trim()
     });
-  }
+  });
+  return sites;
 }
 
 function deferralSites(): DeferralSite[] {
   const sites: DeferralSite[] = [];
+  scanned.length = 0;
   scan(REPO_ROOT, sites);
   return sites;
 }
 
-describe("AAASM-5750: forward claims name the right ticket", () => {
-  it("holds guarded sites to the capability ticket, and everything else off the stale ones", () => {
-    const guarded = new Set(EXPECTED_SITES);
-    const problems: string[] = [];
+/** How much the walk actually covered, so a no-op walk cannot pass as a clean one. */
+function scanStats(): { files: number; sites: DeferralSite[] } {
+  const sites = deferralSites();
+  return { files: scanned.length, sites };
+}
 
-    for (const site of deferralSites()) {
-      if (guarded.has(site.path)) {
-        if (site.ticket !== CAPABILITY_REFERENT) {
-          problems.push(
-            `${site.path}:${site.line} is a guarded audit-sink deferral and ` +
-              `must name ${CAPABILITY_REFERENT}, not ${site.ticket} — this is ` +
-              `the site the referent change corrected, and letting it drift to ` +
-              `any other ticket is what this gate exists to prevent: ${site.text}`
-          );
-        }
-      } else if (STALE_REFERENTS.has(site.ticket)) {
-        problems.push(
-          `${site.path}:${site.line} defers to ${site.ticket}, which measured ` +
-            `the drop and will not fix it — use the ticket that builds the sink ` +
-            `(AAASM-5750, per its own description): ${site.text}`
-        );
-      }
-    }
+function scannedPaths(): string[] {
+  deferralSites();
+  return [...scanned];
+}
+
+describe("AAASM-5750: no forward claim defers to a finished ticket", () => {
+  it("finds no audit-sink deferral pointing at a ticket that is done with it", () => {
+    const problems = deferralSites()
+      .filter((site) => STALE_REFERENTS.has(site.ticket))
+      .map(
+        (site) =>
+          `${site.path}:${site.line} defers to ${site.ticket}, which ` +
+          `${STALE_REFERENTS.get(site.ticket)} — a forward-looking claim must ` +
+          `not point at it: ${site.text}`
+      );
 
     expect(problems).toEqual([]);
   });
 
-  it("still reaches every site it is supposed to guard", () => {
-    // Anti-vacuity, and the reason it names paths rather than counting: a count
-    // can be held up by an unrelated site appearing as a real one is deleted.
-    // Naming them makes that substitution visible.
-    const seen = new Set(deferralSites().map((site) => site.path));
-    const missing = EXPECTED_SITES.filter((path) => !seen.has(path));
-    expect(
-      missing.map(
-        (path) =>
-          `${path} carries no forward claim the scan can pair with a ticket; ` +
-          `it was deleted, renamed, or reflowed so the claim and the ticket ` +
-          `are more than one line apart — in which case a stale referent ` +
-          `there would no longer be checked`
-      )
-    ).toEqual([]);
+  it.each([
+    {
+      name: "term and ticket on one line",
+      lines: ["// recording here is Planned (AAASM-5731), not Observed."],
+      ticket: "AAASM-5731"
+    },
+    {
+      name: "term and ticket wrapped onto two lines",
+      lines: [
+        "// Under ADR 0033 section 6 SDK-side recording is Planned",
+        "// (AAASM-5750), not Observed."
+      ],
+      ticket: "AAASM-5750"
+    },
+    {
+      name: "the termless 'tracked as' shape",
+      lines: ["// Supplying a sink that retains it is tracked as AAASM-5681."],
+      ticket: "AAASM-5681"
+    }
+  ])("the scan can still see: $name", ({ lines, ticket }) => {
+    // Positive control. The assertion above expects to find nothing, and every
+    // way of breaking the scan — a regex that stops matching, a walk that reaches
+    // no files, a window that never extends across a wrapped comment — produces
+    // exactly the same green.
+    const found = deferralsInLines("synthetic.ts", lines);
+    expect(found.map((site) => site.ticket)).toEqual([ticket]);
+    expect(STALE_REFERENTS.has(ticket)).toBe(true);
+  });
+
+  it("the WALK reaches this repository's files — not just the detector", () => {
+    // The controls above drive `deferralsInLines` on synthetic strings, so they
+    // pass over a `scan()` that returns immediately: review demonstrated exactly
+    // that, mutating the walk to `return;` and watching all five tests stay
+    // green. Detector reachability and walk reachability are different claims,
+    // and only the second one makes the module-wide "no findings" mean anything.
+    //
+    // Asserted as a floor on files actually opened, plus a known-present file
+    // the walk must have reached. A count alone could be held up by any tree;
+    // naming a file that only exists here is what pins it to this repository.
+    const { files, sites } = scanStats();
+    expect(files).toBeGreaterThan(50);
+    expect(sites).toBeInstanceOf(Array);
+    expect(scannedPaths()).toContain(join("src", "types", "gateway-governance.ts"));
+  });
+
+  it("detects an unrelated open deferral and permits it", () => {
+    // The other direction: the gate must not forbid every ticket, or it would
+    // push authors to drop the reference §6 requires rather than fix the
+    // referent.
+    const found = deferralsInLines("synthetic.ts", ["// A curated example is Planned (AAASM-9999)."]);
+    expect(found).toHaveLength(1);
+    expect(STALE_REFERENTS.has(found[0]!.ticket)).toBe(false);
   });
 });

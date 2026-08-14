@@ -25,14 +25,22 @@ than route their checks through the allow-all no-op client. For a framework it
 auto-detects instead, there is no such refusal — it warns and proceeds, so that
 installing a dependency does not break a zero-config startup.
 
-Whether those events are *retained* depends on which gateway client you use. Both
-clients this SDK ships discard hook-layer audit events, so on the default path
-governed actions produce no audit trail — nothing on that path can be attributed or
-reviewed after the fact. Supply your own `gatewayClient` to retain them;
-`initAssembly` warns at startup and reports `auditSink` on the returned context when
-it knows the events are being dropped (AAASM-5681).
+Where those events go depends on which gateway client you use. The native client
+hands hook-layer audit events to the runtime over the same channel agent registration
+uses. The no-op client — the one `auto` / `sdk-only` / `grpc-sidecar` resolve, so the
+default one — holds no channel and drops them, and on that path governed actions
+produce no audit trail at all.
 
-The audit drop does not change the enforcement posture either way — but do not read
+**Neither is an audit guarantee.** The handoff is fire-and-forget and unacknowledged,
+so this SDK cannot tell you the event arrived, and does not claim it did. Treat
+`"forwarded"` as "handed to the runtime", not as evidence you can cite. Downstream,
+[AAASM-5783](https://lightning-dust-mite.atlassian.net/browse/AAASM-5783) is open on
+`report_event` payloads reaching neither the live stream nor the durable entry —
+until it lands, no SDK can claim ADR 0033 §6 *Observed*.
+`initAssembly` warns when the events are being dropped and reports `auditSink` on the
+returned context: `"forwarded"`, `"discarded"`, or `"caller-supplied"` (AAASM-5750).
+
+The audit disposition does not change the enforcement posture either way — but do not read
 that as "enforcement still applies". Whether a policy DENY can block a tool depends on
 the mode: only a check-capable run (`napi-inprocess`, or your own `gatewayClient`)
 gets an authoritative `check()`. In `auto` / `sdk-only` / `grpc-sidecar` the check is
@@ -63,9 +71,10 @@ human, the call waits for an approval decision.
     `grpc-sidecar` route through the allow-all no-op client, where a DENY does not block.
   - **Redaction** — applied by the runtime/proxy, not here. Under `enforce` this layer
     treats a `redact` verdict as allow (see [Configuration](../05-configuration/index.md)).
-  - **An audit trail** — not on the default path at all: both gateway clients this SDK
-    ships discard hook-layer audit events, so retaining them requires supplying your own
-    `gatewayClient` (AAASM-5681).
+  - **An audit trail** — not on the default path: the no-op client `auto` resolves
+    holds no event channel and drops hook-layer audit events. `napi-inprocess` hands
+    them to the runtime instead, which is a handoff and not a retention guarantee
+    (AAASM-5750).
 - Teams adopting Agent Assembly who want the fastest, in-process interception path —
   the SDK layer — rather than (or in addition to) the sidecar proxy and eBPF layers.
 

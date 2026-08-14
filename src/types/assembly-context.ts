@@ -19,10 +19,10 @@ export interface AssemblyContext {
    * - `langchain-js` — two layers with different powers (AAASM-4799). Only tools
    *   passed through `langchain.tools` and wrapped by `wrapToolWithAssembly` reach
    *   *Denied before execution*. The callback handler is audit-only and cannot
-   *   block; it reaches *Observed* only when the gateway client actually persists
-   *   what it records, which the default no-op client and the `napi-inprocess`
-   *   client both do not (`record`/`recordResult` are deliberate no-ops there,
-   *   AAASM-4847) — so in practice that requires a caller-supplied client.
+   *   block, and it does not reach *Observed* on any path this SDK ships: the
+   *   `napi-inprocess` client hands what it records to the runtime's event
+   *   channel, but a handoff is not a durable event attributed to the action
+   *   (AAASM-5750). The default no-op client holds no transport and drops it.
    * - `vercel-ai-sdk`, `openai-agents` — the governed tool factory is installed and
    *   the refusal precedes the effect, so these reach *Denied before execution*.
    *
@@ -88,13 +88,18 @@ export interface AssemblyContext {
    * What the resolved gateway client does with hook-layer audit events —
    * `record` / `recordResult` / `scanPrompts` (AAASM-5681).
    *
-   * `"discarded"` means this SDK is using one of the two clients it ships, both
-   * of which drop those events: governed actions are enforced but produce **no
-   * audit evidence**, so nothing on this path supports a claim of
-   * attributability or after-the-fact review. A matching stderr warning is
-   * emitted once at init; this field is the programmatic counterpart, so the
-   * gap is detectable in code rather than only by reading stderr — and without
-   * setting `AA_DEBUG=1`, which previously was the only way to learn of it.
+   * `"forwarded"` means the resolved client hands those events to the runtime
+   * over the native event channel. It does **not** mean they were retained: the
+   * send is fire-and-forget and unacknowledged, so this SDK cannot report
+   * arrival and does not (AAASM-5750); AAASM-5783 is open on the downstream half
+   * and must land before any of this could support an *Observed* claim. `"discarded"` means the client holds no
+   * such channel — the no-op client `auto` resolves: governed actions are
+   * enforced but produce **no audit evidence**, so nothing on that path supports
+   * a claim of attributability or after-the-fact review. A matching stderr
+   * warning is emitted once at init for the second case only; this field is the
+   * programmatic counterpart, so which case a run is in is detectable in code
+   * rather than only by reading stderr — and without setting `AA_DEBUG=1`, which
+   * once was the only way to learn of it.
    *
    * `"caller-supplied"` means the caller passed their own `gatewayClient`, so
    * this SDK makes no claim either way. It is the absence of a claim, **not** an

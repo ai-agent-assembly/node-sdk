@@ -93,7 +93,8 @@ function buildRegisterOptions(
  *
  * An omitted `auditSink` means the client did not come from this package, so
  * the honest answer is `"caller-supplied"` — the absence of a claim, not an
- * assurance. Both shipped clients declare `"discarded"` explicitly.
+ * assurance. Both shipped clients declare a disposition explicitly; the native
+ * one computes it from whether the binding loaded (AAASM-5750).
  */
 function resolveAuditSink(client: GatewayClient): AuditSinkDisposition {
   return client.auditSink ?? "caller-supplied";
@@ -107,6 +108,10 @@ function resolveAuditSink(client: GatewayClient): AuditSinkDisposition {
  * caller had to already suspect the problem in order to discover it. Enforcement
  * is genuinely unaffected, which is exactly why the drop is easy to miss: denies
  * still deny, and every audit call resolves successfully.
+ *
+ * Since AAASM-5750 a native client over a loaded binding forwards the events, so
+ * this fires only for the clients that still hold no channel: the no-op client,
+ * and a native client built over the fallback stub.
  *
  * Written straight to `process.stderr` rather than `console`/a swappable logger,
  * and at init rather than per audit call, for the same reasons as
@@ -131,13 +136,14 @@ function warnAuditEventsDiscarded(mode: AssemblyMode | "auto"): void {
         `a policy DENY does not block a tool call in this mode either way. `;
   process.stderr.write(
     `[agent-assembly] WARNING: hook-layer audit events are DISCARDED in ` +
-      `"${mode}" mode: the gateway client this SDK ships drops record / ` +
-      `recordResult / scanPrompts, so governed actions produce NO audit ` +
-      `evidence and nothing on this path can be attributed or reviewed after ` +
-      `the fact. ${enforcementClause}` +
-      `Supply your own "gatewayClient" to retain audit events. Inspect the ` +
-      `"auditSink" field on the returned assembly context to detect this ` +
-      `programmatically (AAASM-5681).\n`
+      `"${mode}" mode: the gateway client resolved here holds no native event ` +
+      `channel, so record / recordResult / scanPrompts have nowhere to send to, ` +
+      `governed actions produce NO audit evidence, and nothing on this path can ` +
+      `be attributed or reviewed after the fact. ${enforcementClause}` +
+      `Run with a loaded native binding so the events reach the runtime, or ` +
+      `supply your own "gatewayClient". Inspect the "auditSink" field on the ` +
+      `returned assembly context to detect this programmatically (AAASM-5681, ` +
+      `AAASM-5750).\n`
   );
 }
 
@@ -837,6 +843,10 @@ export async function initAssembly(config: AssemblyConfig = {}): Promise<Assembl
   // AAASM-5681 — surface a discarding audit sink on the default path. Emitted
   // after patching so it lands once the governed surface is actually in place,
   // and only when this SDK knows the events go nowhere.
+  //
+  // The condition names the one disposition that warrants it rather than
+  // excluding the caller's (AAASM-5750): "forwarded" must not warn, and a future
+  // fourth value should have to opt in to this warning rather than inherit it.
   const auditSink = resolveAuditSink(client);
   if (auditSink === "discarded") {
     warnAuditEventsDiscarded(resolvedConfig.mode ?? "auto");

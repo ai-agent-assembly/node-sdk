@@ -290,10 +290,14 @@ Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved ever
 ## 4. What to expect
 
 - **Allow.** The tool runs normally and returns its result. A governance event is
-  emitted — but with either gateway client this SDK ships it is discarded, not
-  retained, so there is no audit trail to read it back from. `initAssembly` warns
-  about this at startup and reports `auditSink: "discarded"` on the returned context;
-  supply your own `gatewayClient` to retain the event (AAASM-5681).
+  emitted, and where it goes depends on the gateway client: the native one hands it
+  to the runtime's event channel, while the no-op one has no channel and drops it.
+  Neither is an assurance the event was retained — the handoff is unacknowledged, so
+  the SDK cannot report arrival. Downstream,
+  [AAASM-5783](https://lightning-dust-mite.atlassian.net/browse/AAASM-5783) is open on
+  `report_event` payloads reaching neither the live stream nor the durable entry, so
+  no SDK can claim ADR 0033 §6 *Observed* until it lands. `initAssembly` warns when
+  the event is dropped and reports `auditSink` on the returned context (AAASM-5750).
 - **Deny.** The wrapped `invoke()` *rejects* with a `PolicyViolationError` whose
   message includes the tool name and the gateway's reason — the tool body never runs.
 - **Pending (needs approval).** The call waits up to `langchain.approvalTimeoutMs`
