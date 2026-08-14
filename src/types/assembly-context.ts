@@ -19,10 +19,10 @@ export interface AssemblyContext {
    * - `langchain-js` — two layers with different powers (AAASM-4799). Only tools
    *   passed through `langchain.tools` and wrapped by `wrapToolWithAssembly` reach
    *   *Denied before execution*. The callback handler is audit-only and cannot
-   *   block; it reaches *Observed* when the gateway client carries what it
-   *   records onward. The `napi-inprocess` client does, over a loaded binding —
-   *   `record`/`recordResult` send to the runtime's audit pipeline (AAASM-5750).
-   *   The default no-op client holds no transport and does not.
+   *   block, and it does not reach *Observed* on any path this SDK ships: the
+   *   `napi-inprocess` client hands what it records to the runtime's event
+   *   channel, but a handoff is not a durable event attributed to the action
+   *   (AAASM-5750). The default no-op client holds no transport and drops it.
    * - `vercel-ai-sdk`, `openai-agents` — the governed tool factory is installed and
    *   the refusal precedes the effect, so these reach *Denied before execution*.
    *
@@ -88,10 +88,11 @@ export interface AssemblyContext {
    * What the resolved gateway client does with hook-layer audit events —
    * `record` / `recordResult` / `scanPrompts` (AAASM-5681).
    *
-   * `"forwarded"` means the resolved client sends those events to the runtime
-   * over the native event channel, so they reach its audit pipeline
-   * (AAASM-5750). `"discarded"` means it holds no such channel — the no-op
-   * client, or a native client whose binding did not load: governed actions are
+   * `"forwarded"` means the resolved client hands those events to the runtime
+   * over the native event channel. It does **not** mean they were retained: the
+   * send is fire-and-forget and unacknowledged, so this SDK cannot report
+   * arrival and does not (AAASM-5750). `"discarded"` means the client holds no
+   * such channel — the no-op client `auto` resolves: governed actions are
    * enforced but produce **no audit evidence**, so nothing on that path supports
    * a claim of attributability or after-the-fact review. A matching stderr
    * warning is emitted once at init for the second case only; this field is the
