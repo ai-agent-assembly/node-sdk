@@ -32,11 +32,34 @@ SDK's own test suite.
 ## LangChain (validated)
 
 Install `@langchain/core` (a peer dependency). Pass your tools to `initAssembly` under
-`langchain.tools`; each tool is wrapped **in place** so every `invoke()` is checked
-against gateway policy before it runs. The callback handler is registered automatically.
+`langchain.tools`, along with the `gatewayClient` that decides them; each tool is wrapped
+**in place**, so a call that client denies is **denied before execution** — the wrapper
+throws `PolicyViolationError` and the tool body does not run. The callback handler is
+registered automatically.
+
+Wrapping tools without a client that can decide them is refused: under the default
+fail-closed posture `initAssembly` throws a `ConfigurationError` rather than route tool
+checks through the allow-all no-op client. That refusal is a startup configuration
+check, not a policy decision about a tool.
 
 ```ts
-import { initAssembly } from "@agent-assembly/sdk";
+import { initAssembly, type GatewayClient } from "@agent-assembly/sdk";
+
+// Decides every wrapped invoke(). This one is a local allow-list so the snippet
+// runs offline; point `check` at a gateway you run to source decisions from there.
+const policyClient: GatewayClient = {
+  mode: "sdk-only",
+  start: async () => undefined,
+  close: async () => undefined,
+  check: async (request) =>
+    request.toolName === "search_web"
+      ? { denied: false }
+      : { denied: true, reason: "not on the allow-list" },
+  waitForApproval: async () => ({ denied: false }),
+  record: async () => undefined,
+  recordResult: async () => undefined,
+  scanPrompts: async () => undefined
+};
 
 // A LangChain-style tool is any object with { name, invoke }.
 const searchWeb = {
@@ -47,15 +70,18 @@ const searchWeb = {
 };
 
 const ctx = await initAssembly({
+  gatewayUrl: "http://localhost:7391",
   agentId: "demo",
+  gatewayClient: policyClient,
   langchain: {
     tools: { searchWeb },
     approvalTimeoutMs: 30_000 // optional; how long to wait on a "pending" decision
   }
 });
 
-// Governed: if policy denies the call, invoke() rejects with a PolicyViolationError.
-await searchWeb.invoke({ q: "agent assembly" });
+// policyClient allows search_web, so this runs and returns. A tool it denies
+// would reject with PolicyViolationError instead.
+console.log(await searchWeb.invoke({ q: "agent assembly" }));
 
 await ctx.shutdown();
 ```
@@ -179,8 +205,8 @@ For the full list of configuration fields used above, see
 ## Handling allow / deny decisions and errors
 
 When you wrap a tool — whether through `initAssembly`'s `langchain.tools` or directly
-with `withAssembly` — the gateway is consulted on every call. The outcome shows up as
-ordinary async control flow:
+with `withAssembly` — the wrapper asks your `gatewayClient` for a decision before it
+runs the tool body. The outcome shows up as ordinary async control flow:
 
 - **Allow.** The wrapped call runs the real tool and returns its result. Nothing extra
   to handle.
@@ -196,8 +222,11 @@ Because these surface as rejected promises, you handle them with a normal
 ```ts
 import { initAssembly } from "@agent-assembly/sdk";
 
+// policyClient and searchWeb are the ones defined in the LangChain section above.
 const ctx = await initAssembly({
+  gatewayUrl: "http://localhost:7391",
   agentId: "demo",
+  gatewayClient: policyClient,
   langchain: {
     tools: { searchWeb },
     approvalTimeoutMs: 30_000 // how long to wait on a "pending" decision
