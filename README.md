@@ -206,8 +206,8 @@ binding requires Node 18.18 or newer.
 
 ## Framework compatibility
 
-`initAssembly()` auto-detects and installs governance hooks for five optional framework integrations
-(LangChain.js, LangGraph.js, Vercel AI SDK, Mastra, OpenAI Agents). The full table —
+`initAssembly()` auto-detects and installs governance hooks for five optional framework
+integrations (LangChain.js, LangGraph.js, Vercel AI SDK, Mastra, OpenAI Agents). The full table —
 each framework's optional peer dependency, supported version range, and current status
 (including the [known Vercel AI SDK caveat](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532)) —
 is the **authoritative** reference and lives on the docs site:

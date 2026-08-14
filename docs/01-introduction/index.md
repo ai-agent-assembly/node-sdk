@@ -45,10 +45,10 @@ In practice the SDK is two things working together:
   your policies and renders allow / deny / approval decisions. The SDK can even
   auto-start a local gateway for you so there is nothing to stand up by hand.
 
-You write your agent the way you normally would. The SDK wraps each tool so the
-gateway sees the call first: if policy **allows** it, the tool runs; if it **denies**
-it, the call throws instead of executing; if it needs a human, the call waits for an
-approval decision.
+You write your agent the way you normally would. The SDK wraps the tools you hand it
+so the gateway client you configured decides the call first: if it **allows**, the
+tool runs; if it **denies**, the call throws instead of executing; if it needs a
+human, the call waits for an approval decision.
 
 ## Who this is for
 
