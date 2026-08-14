@@ -71,7 +71,7 @@ during `postinstall`. No additional build step is required for typical consumers
 ## Quickstart
 
 Pass your LangChain-style tools (`{ name, invoke }`) to `initAssembly` under
-`langchain.tools`, along with the `gatewayClient` that decides them. Each tool is
+`langchain.tools`, along with the `gatewayClient` that decides them. Tools are
 wrapped **in place**: the wrapper asks that client for a decision before running the
 tool body, so a call the client denies is **denied before execution** — `invoke()`
 throws `PolicyViolationError` and the body does not run.
@@ -97,9 +97,9 @@ npm install @agent-assembly/sdk @langchain/core
 ```ts
 import { initAssembly, type GatewayClient } from "@agent-assembly/sdk";
 
-// Decides every wrapped invoke(). This one is a local allow-list so the
-// snippet runs offline; point `check` at a gateway you run to source
-// decisions from there instead.
+// The wrapper calls this before it runs a wrapped tool body. This one is a
+// local allow-list so the snippet runs offline; point `check` at a gateway
+// you run to source decisions from there instead.
 const policyClient: GatewayClient = {
   mode: "sdk-only",
   start: async () => undefined,
@@ -135,9 +135,9 @@ await ctx.shutdown();
 ```js
 const { initAssembly } = require("@agent-assembly/sdk");
 
-// Decides every wrapped invoke(). This one is a local allow-list so the
-// snippet runs offline; point `check` at a gateway you run to source
-// decisions from there instead.
+// The wrapper calls this before it runs a wrapped tool body. This one is a
+// local allow-list so the snippet runs offline; point `check` at a gateway
+// you run to source decisions from there instead.
 const policyClient = {
   mode: "sdk-only",
   start: async () => undefined,
@@ -178,7 +178,7 @@ Both entrypoints resolve to the same governance pipeline; the package's `exports
 selects ESM or CJS automatically based on how the consumer imports it.
 
 `initAssembly()` registers the LangChain callback handler and auto-wraps the configured
-tools, so each wrapped `invoke()` reaches your `gatewayClient` for a decision before the
+tools, so a wrapped `invoke()` reaches your `gatewayClient` for a decision before the
 tool body runs. What that decision is worth is whatever the client backs it with: the
 allow-list above answers locally, while a client that consults a gateway you run carries
 that gateway's verdict. For more frameworks and the lower-level `withAssembly()`

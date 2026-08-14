@@ -32,21 +32,17 @@ SDK's own test suite.
 ## LangChain (validated)
 
 Install `@langchain/core` (a peer dependency). Pass your tools to `initAssembly` under
-`langchain.tools`, along with the `gatewayClient` that decides them; each tool is wrapped
+`langchain.tools`, along with the `gatewayClient` that decides them; tools are wrapped
 **in place**, so a call that client denies is **denied before execution** — the wrapper
 throws `PolicyViolationError` and the tool body does not run. The callback handler is
-registered automatically.
-
-Wrapping tools without a client that can decide them is refused: under the default
-fail-closed posture `initAssembly` throws a `ConfigurationError` rather than route tool
-checks through the allow-all no-op client. That refusal is a startup configuration
-check, not a policy decision about a tool.
+registered automatically. Wrapping tools without such a client is refused at startup —
+see the note below the snippet.
 
 ```ts
 import { initAssembly, type GatewayClient } from "@agent-assembly/sdk";
 
-// Decides every wrapped invoke(). This one is a local allow-list so the snippet
-// runs offline; point `check` at a gateway you run to source decisions from there.
+// The wrapper calls this before it runs a wrapped tool body. This one is a local
+// allow-list so the snippet runs offline; point `check` at a gateway you run instead.
 const policyClient: GatewayClient = {
   mode: "sdk-only",
   start: async () => undefined,
