@@ -117,6 +117,9 @@ interface DeferralSite {
  * a file that no longer exists carries no claim. A scan that reaches nothing at
  * all is the dangerous failure, and that is what the positive controls catch.
  */
+/** Files the walk actually opened, for the reachability control below. */
+const scanned: string[] = [];
+
 function scan(dir: string, sites: DeferralSite[]): void {
   let entries;
   try {
@@ -148,6 +151,7 @@ function scan(dir: string, sites: DeferralSite[]): void {
     } catch {
       continue; // removed between the readdir and the read
     }
+    scanned.push(rel);
     sites.push(...deferralsInLines(rel, body.split("\n")));
   }
 }
@@ -193,8 +197,20 @@ export function deferralsInLines(path: string, lines: string[]): DeferralSite[] 
 
 function deferralSites(): DeferralSite[] {
   const sites: DeferralSite[] = [];
+  scanned.length = 0;
   scan(REPO_ROOT, sites);
   return sites;
+}
+
+/** How much the walk actually covered, so a no-op walk cannot pass as a clean one. */
+function scanStats(): { files: number; sites: DeferralSite[] } {
+  const sites = deferralSites();
+  return { files: scanned.length, sites };
+}
+
+function scannedPaths(): string[] {
+  deferralSites();
+  return [...scanned];
 }
 
 describe("AAASM-5750: no forward claim defers to a finished ticket", () => {
@@ -238,6 +254,22 @@ describe("AAASM-5750: no forward claim defers to a finished ticket", () => {
     const found = deferralsInLines("synthetic.ts", lines);
     expect(found.map((site) => site.ticket)).toEqual([ticket]);
     expect(STALE_REFERENTS.has(ticket)).toBe(true);
+  });
+
+  it("the WALK reaches this repository's files — not just the detector", () => {
+    // The controls above drive `deferralsInLines` on synthetic strings, so they
+    // pass over a `scan()` that returns immediately: review demonstrated exactly
+    // that, mutating the walk to `return;` and watching all five tests stay
+    // green. Detector reachability and walk reachability are different claims,
+    // and only the second one makes the module-wide "no findings" mean anything.
+    //
+    // Asserted as a floor on files actually opened, plus a known-present file
+    // the walk must have reached. A count alone could be held up by any tree;
+    // naming a file that only exists here is what pins it to this repository.
+    const { files, sites } = scanStats();
+    expect(files).toBeGreaterThan(50);
+    expect(sites).toBeInstanceOf(Array);
+    expect(scannedPaths()).toContain(join("src", "types", "gateway-governance.ts"));
   });
 
   it("detects an unrelated open deferral and permits it", () => {
