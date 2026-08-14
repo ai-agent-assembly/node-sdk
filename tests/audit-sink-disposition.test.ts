@@ -434,6 +434,51 @@ describe("AAASM-5681: initAssembly surfaces the drop without AA_DEBUG", () => {
     await context.shutdown();
   });
 
+  it("napi-inprocess never reports \"discarded\", which is why the warning has no native-runtime arm", async () => {
+    // The pin behind a deliberate absence. AAASM-5681 gave the enforcement
+    // clause a CHECK_CAPABLE_MODE arm; coverage under AAASM-5743 showed it had
+    // never executed, and the reason is structural: `createNativeClient` throws
+    // on an unloadable binding in this mode rather than falling back to the stub
+    // (the stub is only ever built for "grpc-sidecar"), so the client always has
+    // `canRegister: true` and declares "forwarded".
+    //
+    // Both outcomes are asserted, because "it threw" and "it reported forwarded"
+    // are the only two, and a test that accepted either without naming them
+    // would also pass if the mode started reporting "discarded" silently.
+    delete process.env.AA_DEBUG;
+    vi.resetModules();
+    vi.doMock("node:module", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:module")>();
+      return {
+        ...actual,
+        createRequire: () => () => ({
+          connect: vi.fn(async () => ({ id: "handle" })),
+          sendEvent: vi.fn(() => undefined),
+          queryPolicy: vi.fn(() => ({ decision: "deny", reason: "policy denies" })),
+          disconnect: vi.fn(async () => undefined)
+        })
+      };
+    });
+    const loaded = await import("../src/core/init-assembly.js");
+    const withBinding = await loaded.initAssembly({
+      ...BASE,
+      mode: "napi-inprocess",
+      enforcementMode: "observe"
+    });
+    expect(withBinding.auditSink).toBe("forwarded");
+    await withBinding.shutdown();
+    vi.doUnmock("node:module");
+    vi.resetModules();
+
+    // Without a binding the mode does not degrade to a discarding client — it
+    // refuses. That is the other half of why the arm is unreachable.
+    const bare = await import("../src/core/init-assembly.js");
+    await expect(
+      bare.initAssembly({ ...BASE, mode: "napi-inprocess", enforcementMode: "observe" })
+    ).rejects.toThrow(/native binding/i);
+    vi.resetModules();
+  });
+
   it("a SHIPPED discarding client still gets the shipped wording — the other direction", async () => {
     // The pin that stops the fix above from being applied unconditionally. It
     // reddens if the caller-supplied branch swallows the shipped one, exactly as

@@ -143,16 +143,22 @@ function warnAuditEventsDiscarded(
   const subject = callerSupplied
     ? `the gateway client you supplied declares "auditSink": "discarded"`
     : `the gateway client resolved here holds no native event channel`;
+  // There is deliberately no CHECK_CAPABLE_MODE arm here. AAASM-5681 added one,
+  // and coverage measurement under AAASM-5743 found it had never executed —
+  // because it cannot. Reaching it needs `discarded` in CHECK_CAPABLE_MODE, and
+  // that combination does not exist: `createNativeClient` THROWS on a binding it
+  // cannot load in that mode (it only falls back to the stub for
+  // `grpc-sidecar`), so a napi-inprocess client always has `canRegister: true`
+  // and therefore declares `forwarded`. The invariant is pinned by
+  // `napi-inprocess never reports "discarded"` in the disposition suite; if a
+  // future change lets that mode fall back, the pin reddens and this arm has to
+  // come back with it.
   const enforcementClause = callerSupplied
     ? `This says nothing about your enforcement posture: your client's ` +
       `"check" is yours, and this SDK makes no claim about what it returns. `
-    : mode === CHECK_CAPABLE_MODE
-      ? `This does not change the enforcement posture: policy checks in ` +
-        `"${mode}" route through the native runtime, not the allow-all no-op ` +
-        `client, so a policy DENY can still block a tool. `
-      : `This does not change the enforcement posture — but note that ` +
-        `"${mode}" routes policy checks through the allow-all no-op client, so ` +
-        `a policy DENY does not block a tool call in this mode either way. `;
+    : `This does not change the enforcement posture — but note that ` +
+      `"${mode}" routes policy checks through the allow-all no-op client, so ` +
+      `a policy DENY does not block a tool call in this mode either way. `;
   const remedy = callerSupplied
     ? `Have your client retain the events, or declare a different "auditSink" ` +
       `if it does. `
