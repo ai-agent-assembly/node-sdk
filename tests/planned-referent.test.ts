@@ -8,8 +8,8 @@
  * for a rule the ADR does not contain sends the next reader to the wrong
  * document.
  *
- * The defect: AAASM-5681 measured that both shipped gateway clients discard the
- * hook-layer audit event. It never intended to build a sink. A forward-looking
+ * The defect: AAASM-5681 measured that both shipped gateway clients discarded
+ * the hook-layer audit event. It never intended to build a sink. A forward-looking
  * claim pointing at it will read as a live commitment while resolving to
  * finished work the moment it closes. So the invariant is narrow and permanent
  * — **AAASM-5681 may be cited as the ticket that measured the drop, never as

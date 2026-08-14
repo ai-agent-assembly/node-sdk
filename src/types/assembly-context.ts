@@ -19,10 +19,10 @@ export interface AssemblyContext {
    * - `langchain-js` — two layers with different powers (AAASM-4799). Only tools
    *   passed through `langchain.tools` and wrapped by `wrapToolWithAssembly` reach
    *   *Denied before execution*. The callback handler is audit-only and cannot
-   *   block; it reaches *Observed* only when the gateway client actually persists
-   *   what it records, which the default no-op client and the `napi-inprocess`
-   *   client both do not (`record`/`recordResult` are deliberate no-ops there,
-   *   AAASM-4847) — so in practice that requires a caller-supplied client.
+   *   block; it reaches *Observed* when the gateway client carries what it
+   *   records onward. The `napi-inprocess` client does, over a loaded binding —
+   *   `record`/`recordResult` send to the runtime's audit pipeline (AAASM-5750).
+   *   The default no-op client holds no transport and does not.
    * - `vercel-ai-sdk`, `openai-agents` — the governed tool factory is installed and
    *   the refusal precedes the effect, so these reach *Denied before execution*.
    *

@@ -262,11 +262,12 @@ describe("quick-start negative control: a deny is handed to the gateway's record
     // `record`, so `auditEvents` stayed empty on a deny while `decisions` was
     // 1 — a deny existed only in the decision log.
     //
-    // Scope of the evidence: this is the fixture's in-process array. Both
-    // shipped GatewayClient implementations discard the event
-    // (createNoopGatewayClient, createNativeGatewayClient), so a deny is
-    // Unmeasured in audit evidence on the shipped path — AAASM-5681. What this
-    // pins is the wrapper's call.
+    // Scope of the evidence: this is the fixture's in-process array, so what
+    // this pins is the wrapper's CALL and its contents — nothing about where
+    // the event ends up. A fixture that receives what it supplied cannot decide
+    // that in either direction. That the shipped native client then forwards it
+    // across the boundary is measured where it can be, against that boundary, in
+    // tests/audit-sink-disposition.test.ts (AAASM-5750).
     expect(gateway.auditEvents).toHaveLength(1);
     const event = gateway.auditEvents[0];
     expect(event?.action).toBe("tool_call_denied");

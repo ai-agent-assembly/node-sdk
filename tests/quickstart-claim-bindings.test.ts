@@ -151,7 +151,7 @@ const BINDINGS: readonly ClaimBinding[] = [
     ]
   },
   {
-    id: "allow-event-is-discarded-not-retained",
+    id: "allow-event-goes-where-the-client-can-send-it",
     quote:
       "A governance event is emitted, and where it goes depends on the gateway client: the native one forwards it to the runtime's audit pipeline, while the no-op one has no channel and drops it.",
     // Bound to the audit-sink suite, which drives the SHIPPED clients against a
