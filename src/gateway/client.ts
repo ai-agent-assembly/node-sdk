@@ -26,8 +26,8 @@ export interface GatewayClient {
    * omitted value is read as `"caller-supplied"`, i.e. this SDK makes no claim
    * about it. Every client this package *ships* must declare its disposition
    * explicitly — `record` / `recordResult` / `scanPrompts` all return
-   * `Promise<void>`, so a discarding client is otherwise indistinguishable from
-   * a recording one, which is the defect this field closes.
+   * `Promise<void>`, so a client that sends the event and one that drops it are
+   * otherwise indistinguishable, which is the defect this field closes.
    */
   readonly auditSink?: AuditSinkDisposition;
   start: () => Promise<void>;
@@ -48,8 +48,10 @@ export function createNoopGatewayClient(mode: AssemblyMode, httpBaseUrl?: string
     mode,
     ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
     // AAASM-5681 — the three audit methods below resolve to `undefined` without
-    // retaining anything. Declared so `initAssembly` can surface the gap and so
-    // a test can catch a shipped client that discards without saying so.
+    // sending anything. This client holds no transport at all, so there is no
+    // channel for AAASM-5750's record path to run over: the gap here is
+    // structural, not unwired. Declared so `initAssembly` can surface it and so
+    // a test can catch a shipped client that drops without saying so.
     auditSink: "discarded" as AuditSinkDisposition,
     start: async () => undefined,
     close: async () => undefined,
@@ -180,10 +182,13 @@ export function createNativeGatewayClient(
   return {
     mode,
     ...(httpBaseUrl === undefined ? {} : { httpBaseUrl }),
-    // AAASM-5681 — hook-layer audit events are dropped here (see the comment on
-    // `record` below). Declared rather than left implicit so the drop reaches
-    // `initAssembly`, and through it the caller, without `AA_DEBUG=1`.
-    auditSink: "discarded" as AuditSinkDisposition,
+    // AAASM-5750 — computed, not fixed. `createNativeGatewayClient` is also
+    // handed the fallback stub returned when the native binding could not be
+    // loaded (unsupported platform / missing binary), whose `sendEvent` is a
+    // no-op; declaring "forwarded" there would be a claim about a channel this
+    // client does not hold. `canRegister` is exactly "the native binding loaded",
+    // which is the same fact the record path depends on.
+    auditSink: (nativeClient.canRegister ? "forwarded" : "discarded") as AuditSinkDisposition,
     start: async () => undefined,
     close: async () => {
       await nativeClient.close();
@@ -223,45 +228,70 @@ export function createNativeGatewayClient(
         ...(resolved.reason === undefined ? {} : { reason: resolved.reason })
       };
     },
-    // Audit/telemetry sinks are intentional no-ops in napi-inprocess mode
-    // (AAASM-4847). The native `aa-sdk-client` runtime this client wraps records
-    // its own policy-decision events in-process against the embedded runtime;
-    // there is no separate gateway wire for the SDK to POST audit events to, so
-    // hook-layer `record` / `recordResult` / `scanPrompts` calls have nowhere to
-    // go here and are dropped. This is a deliberate, accepted telemetry gap — NOT
-    // an enforcement gap: the drop does not change what `check` /
-    // `waitForApproval` above decide, consistent with this SDK's non-authoritative
-    // posture (`aa-runtime` in the monorepo is the authoritative point). If the
-    // hook layer's audit events ever need to reach a central sink from this mode,
-    // that is a new wiring task, not a bug to patch here. Emit a one-time,
-    // opt-in debug note so the drop is discoverable rather than silent.
-    record: async () => {
-      noteNativeAuditNoop();
+    // AAASM-5750 — the three audit sinks ship their event to the runtime over
+    // the native event channel, the same `sendEvent` primitive and the same
+    // connected session that already carries the boot registration event
+    // (`initAssembly`). The runtime enriches the frame, re-scans it
+    // unconditionally, and admits it to its audit pipeline.
+    //
+    // This supersedes the AAASM-4847 note that said there was nowhere for these
+    // to go. That was true of the *gateway* wire — there is still no HTTP audit
+    // route for the SDK to POST to — but not of the runtime channel, which was
+    // already open and already carrying an event.
+    //
+    // `sendEvent` never throws: the transport stashes a failure and surfaces it
+    // on the next `queryPolicy`. That is deliberate and is why these are safe to
+    // call from the hook layer — a failing audit sink must not convert a policy
+    // deny into some other error. It does mean a broken IPC channel can deny a
+    // later call under `enforce`, which is the correct fail-closed reading of an
+    // unreachable runtime rather than an audit-driven enforcement change.
+    //
+    // Redaction is not attempted here: the runtime's scanner is the
+    // unconditional gate on every inbound frame, and a weaker copy on this side
+    // would only invite the two to disagree.
+    record: async (event: GatewayRecordEvent) => {
+      nativeClient.sendEvent({
+        event_type: "tool_call_audit",
+        action: event.action,
+        run_id: event.runId,
+        ...(event.reason === undefined ? {} : { reason: event.reason }),
+        ...(event.output === undefined ? {} : { output: stringifyForAudit(event.output) })
+      });
     },
-    recordResult: async () => {
-      noteNativeAuditNoop();
+    recordResult: async (recordEntry: GatewayResultRecord) => {
+      nativeClient.sendEvent({
+        event_type: "tool_result",
+        run_id: recordEntry.runId,
+        result: stringifyForAudit(recordEntry.output)
+      });
     },
-    scanPrompts: async () => {
-      noteNativeAuditNoop();
+    scanPrompts: async (scan: GatewayPromptScan) => {
+      nativeClient.sendEvent({
+        event_type: "prompt_scan",
+        run_id: scan.runId,
+        ...(scan.modelName === undefined ? {} : { model_name: scan.modelName }),
+        prompts: scan.prompts.map((prompt) => stringifyForAudit(prompt))
+      });
     }
   };
 }
 
 /**
- * One-time, opt-in (`AA_DEBUG=1`) note that hook-layer audit events are being
- * dropped in napi-inprocess mode. Kept behind a debug flag and fired at most
- * once so it documents the accepted telemetry gap (AAASM-4847) for anyone
- * debugging "where did my audit events go" without adding steady-state noise.
+ * Render an arbitrary hook-layer value as a string for the audit payload.
+ *
+ * The native channel takes JSON, and a tool result is `unknown` — it can be a
+ * class instance, a circular structure, or a `BigInt`, none of which
+ * `JSON.stringify` handles. A throw here would propagate out of `recordResult`
+ * into the governed call, so the fallback is `String(value)`: a lossy record is
+ * strictly better than an audit sink that can fail a tool call.
  */
-let nativeAuditNoopNoted = false;
-function noteNativeAuditNoop(): void {
-  if (nativeAuditNoopNoted || process.env.AA_DEBUG !== "1") {
-    return;
+function stringifyForAudit(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
   }
-  nativeAuditNoopNoted = true;
-  process.stderr.write(
-    `[agent-assembly] DEBUG: napi-inprocess gateway client drops hook-layer ` +
-      `audit events (record/recordResult/scanPrompts) — enforcement is ` +
-      `unaffected; this is an accepted telemetry gap (AAASM-4847).\n`
-  );
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
