@@ -153,7 +153,7 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "allow-event-goes-where-the-client-can-send-it",
     quote:
-      "A governance event is emitted, and where it goes depends on the gateway client: the native one forwards it to the runtime's audit pipeline, while the no-op one has no channel and drops it.",
+      "A governance event is emitted, and where it goes depends on the gateway client: the native one hands it to the runtime's event channel, while the no-op one has no channel and drops it.",
     // Bound to the audit-sink suite, which drives the SHIPPED clients against a
     // downstream boundary probe. A control whose FIXTURE client supplies its own
     // sink cannot decide this claim in either direction, and one such binding
@@ -166,9 +166,20 @@ const BINDINGS: readonly ClaimBinding[] = [
     ]
   },
   {
+    id: "the-handoff-is-not-an-arrival",
+    quote:
+      "Neither is an assurance the event was retained — the handoff is unacknowledged, so the SDK cannot report arrival.",
+    // A statement about what the SDK CANNOT observe. Bound to the disposition
+    // suite because that is where the boundary double shows exactly how far the
+    // send goes: `sendEvent` returns void and the client returns regardless.
+    controls: [
+      `${AUDIT}shipped clients declare what they do with audit events > a client declaring "forwarded" reaches the boundary with every audit method`
+    ]
+  },
+  {
     id: "init-warns-and-reports-the-disposition",
     quote:
-      '`initAssembly` warns when the event is dropped and reports `auditSink` on the returned context — `"forwarded"` or `"discarded"` (AAASM-5750).',
+      "`initAssembly` warns when the event is dropped and reports `auditSink` on the returned context (AAASM-5750).",
     // Both directions of the warning: it must fire on the dropping path and stay
     // quiet on the forwarding one. Binding only the first would be satisfied by
     // a build that warns unconditionally, which is what it used to do.

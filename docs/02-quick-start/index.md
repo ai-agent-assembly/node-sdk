@@ -290,10 +290,11 @@ Mastra [v1](https://mastra.ai/guides/migrations/upgrade-to-v1/mastra) moved ever
 ## 4. What to expect
 
 - **Allow.** The tool runs normally and returns its result. A governance event is
-  emitted, and where it goes depends on the gateway client: the native one forwards
-  it to the runtime's audit pipeline, while the no-op one has no channel and drops
-  it. `initAssembly` warns when the event is dropped and reports `auditSink` on the
-  returned context — `"forwarded"` or `"discarded"` (AAASM-5750).
+  emitted, and where it goes depends on the gateway client: the native one hands it
+  to the runtime's event channel, while the no-op one has no channel and drops it.
+  Neither is an assurance the event was retained — the handoff is unacknowledged, so
+  the SDK cannot report arrival. `initAssembly` warns when the event is dropped and
+  reports `auditSink` on the returned context (AAASM-5750).
 - **Deny.** The wrapped `invoke()` *rejects* with a `PolicyViolationError` whose
   message includes the tool name and the gateway's reason — the tool body never runs.
 - **Pending (needs approval).** The call waits up to `langchain.approvalTimeoutMs`

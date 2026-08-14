@@ -290,8 +290,9 @@ governs LangChain tools with two cooperating layers instead:
 - **Callback layer** (`AssemblyCallbackHandler`) — emits denials and results as audit
   events (including a `policy_post_block` event if a tool ran despite an earlier deny
   signal), but cannot block or redact output. **Where those events go depends on the
-  gateway client**: the native one forwards them to the runtime's audit pipeline, and
-  the no-op one the default path resolves holds no channel and drops them. Read
+  gateway client**: the native one hands them to the runtime's event channel, and the
+  no-op one the default path resolves holds no channel and drops them. The handoff is
+  unacknowledged, so neither case is an assurance the event was retained. Read
   `auditSink` on the assembly context to tell which you have (AAASM-5750).
 - **Wrapper layer** (`wrapToolWithAssembly`) — the actual enforcement point: performs
   the real pre-execution allow / deny / pending check and throws

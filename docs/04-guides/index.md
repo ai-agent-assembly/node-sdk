@@ -172,11 +172,11 @@ Otherwise `check()` is the allow-all no-op stub: it produces no control-plane de
 at all, so the call is not "checked and allowed", it is simply uninspected in-process.
 See the note below.
 
-\*\* `record` / `recordResult` send hook-layer audit events to the runtime's audit
-pipeline on the `napi-inprocess` client, over a loaded native binding (AAASM-5750).
-The default no-op client holds no transport and drops them, so on that path they reach
-a sink only via a caller-supplied gateway client. `auditSink` on the assembly context
-reports which case a run is in.
+\*\* `record` / `recordResult` hand hook-layer audit events to the runtime's event
+channel on the `napi-inprocess` client, over a loaded native binding (AAASM-5750). The
+handoff is unacknowledged, so it is not an assurance the event was retained. The
+default no-op client holds no transport and drops them outright. `auditSink` on the
+assembly context reports which case a run is in.
 
 None of this speaks to the proxy or eBPF layers, which are independent of the SDK and
 may still see the same activity.

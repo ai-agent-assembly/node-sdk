@@ -26,13 +26,16 @@ auto-detects instead, there is no such refusal — it warns and proceeds, so tha
 installing a dependency does not break a zero-config startup.
 
 Where those events go depends on which gateway client you use. The native client
-forwards hook-layer audit events to the runtime over the same channel agent
-registration uses, so they reach the runtime's audit pipeline. The no-op client — the
-one `auto` / `sdk-only` / `grpc-sidecar` resolve — holds no channel and drops them, so
-on that path governed actions produce no audit trail and nothing on it can be
-attributed or reviewed after the fact. `initAssembly` warns when the events are being
-dropped and reports `auditSink` on the returned context: `"forwarded"`,
-`"discarded"`, or `"caller-supplied"` (AAASM-5750).
+hands hook-layer audit events to the runtime over the same channel agent registration
+uses. The no-op client — the one `auto` / `sdk-only` / `grpc-sidecar` resolve, so the
+default one — holds no channel and drops them, and on that path governed actions
+produce no audit trail at all.
+
+**Neither is an audit guarantee.** The handoff is fire-and-forget and unacknowledged,
+so this SDK cannot tell you the event arrived, and does not claim it did. Treat
+`"forwarded"` as "handed to the runtime", not as evidence you can cite.
+`initAssembly` warns when the events are being dropped and reports `auditSink` on the
+returned context: `"forwarded"`, `"discarded"`, or `"caller-supplied"` (AAASM-5750).
 
 The audit disposition does not change the enforcement posture either way — but do not read
 that as "enforcement still applies". Whether a policy DENY can block a tool depends on
@@ -66,8 +69,9 @@ human, the call waits for an approval decision.
   - **Redaction** — applied by the runtime/proxy, not here. Under `enforce` this layer
     treats a `redact` verdict as allow (see [Configuration](../05-configuration/index.md)).
   - **An audit trail** — not on the default path: the no-op client `auto` resolves
-    holds no event channel and drops hook-layer audit events. Run `napi-inprocess`
-    with a loaded native binding, or supply your own `gatewayClient` (AAASM-5750).
+    holds no event channel and drops hook-layer audit events. `napi-inprocess` hands
+    them to the runtime instead, which is a handoff and not a retention guarantee
+    (AAASM-5750).
 - Teams adopting Agent Assembly who want the fastest, in-process interception path —
   the SDK layer — rather than (or in addition to) the sidecar proxy and eBPF layers.
 
