@@ -148,6 +148,34 @@ describe("napi-inprocess gateway client audit sinks (AAASM-5750)", () => {
     expect(sent.result).toBe("undefined");
   });
 
+  it("does not let a value with no primitive conversion fail the audit call", async () => {
+    // The regression this file exists to prevent. `String()` is not a safe
+    // fallback for `JSON.stringify`: a null-prototype object has no
+    // `Symbol.toPrimitive` / `valueOf` / `toString`, so `String()` throws
+    // `TypeError: Cannot convert object to primitive value`. `querystring.parse()`
+    // returns exactly such objects, so this is not an exotic input.
+    //
+    // The blast radius is a failed TOOL CALL, not a lost record:
+    // `AssemblyCallbackHandler.handleToolEnd` awaits the sink with no
+    // `try`/`catch`, and `@langchain/core` awaits that inside the tool
+    // invocation.
+    vi.resetModules();
+    const { createNativeGatewayClient } = await import("../src/gateway/client.js");
+    const native = fakeNativeClient();
+    const client = createNativeGatewayClient("napi-inprocess", native, "agent-audit");
+
+    const hostile: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    hostile.self = hostile;
+    // Precondition: both conversions really do throw on this input, or the
+    // assertion below passes over a value that was never dangerous.
+    expect(() => JSON.stringify(hostile)).toThrow();
+    expect(() => String(hostile)).toThrow();
+
+    await expect(client.recordResult({ runId: "r1", output: hostile })).resolves.toBeUndefined();
+    const sent = vi.mocked(native.sendEvent).mock.calls[0]?.[0] as { result?: unknown };
+    expect(sent.result).toBe("[unserializable]");
+  });
+
   it("does not let a non-serializable tool result fail the audit call", async () => {
     // `recordResult` takes `unknown`, and the hook layer awaits it inside the
     // governed call. A circular structure must degrade to a lossy record, never

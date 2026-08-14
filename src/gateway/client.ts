@@ -228,11 +228,15 @@ export function createNativeGatewayClient(
         ...(resolved.reason === undefined ? {} : { reason: resolved.reason })
       };
     },
-    // AAASM-5750 — the three audit sinks ship their event to the runtime over
+    // AAASM-5750 — the three audit sinks hand their event to the runtime over
     // the native event channel, the same `sendEvent` primitive and the same
     // connected session that already carries the boot registration event
-    // (`initAssembly`). The runtime enriches the frame, re-scans it
-    // unconditionally, and admits it to its audit pipeline.
+    // (`initAssembly`).
+    //
+    // The handoff is the claim, and it is deliberately not stated as more than
+    // that. `sendEvent` is fire-and-forget and unacknowledged, so this client
+    // cannot tell whether the runtime received the event, let alone retained
+    // it — see `AuditSinkDisposition` on why none of this reaches §6 *Observed*.
     //
     // This supersedes the AAASM-4847 note that said there was nowhere for these
     // to go. That was true of the *gateway* wire — there is still no HTTP audit
@@ -282,16 +286,37 @@ export function createNativeGatewayClient(
  * The native channel takes JSON, and a tool result is `unknown` — it can be a
  * class instance, a circular structure, or a `BigInt`, none of which
  * `JSON.stringify` handles. A throw here would propagate out of `recordResult`
- * into the governed call, so the fallback is `String(value)`: a lossy record is
- * strictly better than an audit sink that can fail a tool call.
+ * into the governed call, so every conversion is guarded.
+ *
+ * **`String(value)` is not a safe fallback on its own**, which is what the first
+ * version of this function assumed. `String()` invokes `Symbol.toPrimitive` /
+ * `valueOf` / `toString`, and an object with none of them — anything from
+ * `Object.create(null)`, which is what `querystring.parse()` returns — throws
+ * `TypeError: Cannot convert object to primitive value`. So the second
+ * conversion needs its own guard, and below it a constant that cannot throw at
+ * all.
+ *
+ * This matters more than a lossy field: `AssemblyCallbackHandler.handleToolEnd`
+ * awaits this sink without a `try`/`catch`, and `@langchain/core` awaits
+ * *that* inside the tool invocation. An unguarded throw here fails the user's
+ * tool call — an audit sink must never do that, in either direction.
  */
 function stringifyForAudit(value: unknown): string {
   if (typeof value === "string") {
     return value;
   }
   try {
-    return JSON.stringify(value) ?? String(value);
+    const encoded = JSON.stringify(value);
+    if (encoded !== undefined) {
+      return encoded;
+    }
   } catch {
+    // Circular, BigInt, or a throwing `toJSON`. Fall through to `String`.
+  }
+  try {
     return String(value);
+  } catch {
+    // No primitive conversion exists. Naming the failure beats propagating it.
+    return "[unserializable]";
   }
 }
