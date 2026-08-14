@@ -289,11 +289,10 @@ governs LangChain tools with two cooperating layers instead:
 
 - **Callback layer** (`AssemblyCallbackHandler`) — emits denials and results as audit
   events (including a `policy_post_block` event if a tool ran despite an earlier deny
-  signal), but cannot block or redact output. **Whether those events are retained
-  depends on the gateway client**: both clients this SDK ships discard them, so on the
-  default path they reach no audit trail. Supply your own `gatewayClient` to retain
-  them, and read `auditSink` on the assembly context to tell which you have
-  (AAASM-5681).
+  signal), but cannot block or redact output. **Where those events go depends on the
+  gateway client**: the native one forwards them to the runtime's audit pipeline, and
+  the no-op one the default path resolves holds no channel and drops them. Read
+  `auditSink` on the assembly context to tell which you have (AAASM-5750).
 - **Wrapper layer** (`wrapToolWithAssembly`) — the actual enforcement point: performs
   the real pre-execution allow / deny / pending check and throws
   `PolicyViolationError` before the tool runs.
@@ -302,7 +301,7 @@ governs LangChain tools with two cooperating layers instead:
 for you, so you do not wire either layer by hand. If you attach `AssemblyCallbackHandler`
 without wrapping the tool (e.g. a tool from a library you don't construct yourself),
 denies are still **emitted as audit events** but **not enforced** — and on the default
-path those events are discarded rather than recorded, so there is nothing to read back
+path those events are dropped rather than sent, so there is nothing to read back
 (see the callback-layer bullet above). Wrap the tool with `wrapToolWithAssembly`
 (or pass it through `initAssembly`'s `langchain.tools`) to actually block it.
 
