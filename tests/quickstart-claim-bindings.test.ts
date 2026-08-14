@@ -153,21 +153,28 @@ const BINDINGS: readonly ClaimBinding[] = [
   {
     id: "allow-event-is-discarded-not-retained",
     quote:
-      "A governance event is emitted — but with either gateway client this SDK ships it is discarded, not retained, so there is no audit trail to read it back from.",
-    // Bound to the audit-sink suite, which drives the SHIPPED client against a
-    // downstream boundary probe. It was previously bound to a negative control
-    // whose FIXTURE client retains the record, so that control stayed green
-    // when the claim became false.
+      "A governance event is emitted, and where it goes depends on the gateway client: the native one forwards it to the runtime's audit pipeline, while the no-op one has no channel and drops it.",
+    // Bound to the audit-sink suite, which drives the SHIPPED clients against a
+    // downstream boundary probe. A control whose FIXTURE client supplies its own
+    // sink cannot decide this claim in either direction, and one such binding
+    // did previously stay green while the claim was false. The sentence names
+    // both clients, so both branches need a control.
     controls: [
-      `${AUDIT}shipped clients declare what they do with audit events > a client declaring "discarded" reaches nothing with any audit method`
+      `${AUDIT}shipped clients declare what they do with audit events > a client declaring "forwarded" reaches the boundary with every audit method`,
+      `${AUDIT}shipped clients declare what they do with audit events > the two shipped clients do NOT declare the same thing`,
+      `${AUDIT}shipped clients declare what they do with audit events > the no-op client's audit methods resolve to undefined and retain nothing`
     ]
   },
   {
-    id: "init-warns-and-reports-the-discard",
+    id: "init-warns-and-reports-the-disposition",
     quote:
-      '`initAssembly` warns about this at startup and reports `auditSink: "discarded"` on the returned context; supply your own `gatewayClient` to retain the event (AAASM-5681).',
+      '`initAssembly` warns when the event is dropped and reports `auditSink` on the returned context — `"forwarded"` or `"discarded"` (AAASM-5750).',
+    // Both directions of the warning: it must fire on the dropping path and stay
+    // quiet on the forwarding one. Binding only the first would be satisfied by
+    // a build that warns unconditionally, which is what it used to do.
     controls: [
-      `${AUDIT}initAssembly surfaces the drop without AA_DEBUG > WARNS on stderr and reports auditSink="discarded" with AA_DEBUG unset`
+      `${AUDIT}initAssembly surfaces the drop without AA_DEBUG > WARNS on stderr and reports auditSink="discarded" with AA_DEBUG unset`,
+      `${AUDIT}initAssembly surfaces the drop without AA_DEBUG > in napi-inprocess with a loaded binding, does NOT warn at all`
     ]
   },
   {
