@@ -63,8 +63,9 @@ agent under the wrong governance posture. See [Configuration](../05-configuratio
 
 ## `PolicyViolationError` at tool call time
 
-This is expected behavior, not a bug: the gateway **denied** the tool call (or an approval
-request timed out). The message includes the tool name and the gateway's reason. To run an
+This is expected behavior, not a bug: the gateway client deciding the call **denied** it
+(or an approval request timed out). The message includes the tool name and the reason that
+client gave. To run an
 agent without blocking while you tune policy, register it with `enforcementMode: "observe"`
 — actions proceed and would-be violations are recorded as shadow audit events.
 

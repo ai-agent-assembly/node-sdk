@@ -20,7 +20,9 @@ flowchart LR
 ```
 
 You call `initAssembly(...)` once. From then on, the tools you handed it are wrapped
-so the gateway evaluates each call before it executes.
+so the gateway client you configured decides a call before it executes. The path drawn
+above is the one a client that reaches the gateway takes; the client this SDK falls back
+to when you supply none answers in-process and allows everything.
 
 The gateway, the policy engine, and the audit trail live in the core runtime. For the
 platform-level picture — how the gateway renders decisions and how this SDK relates to

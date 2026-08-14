@@ -71,8 +71,16 @@ during `postinstall`. No additional build step is required for typical consumers
 ## Quickstart
 
 Pass your LangChain-style tools (`{ name, invoke }`) to `initAssembly` under
-`langchain.tools`. Each tool is wrapped **in place** so every `invoke()` is checked
-against gateway policy before it runs.
+`langchain.tools`, along with the `gatewayClient` that decides them. Tools are
+wrapped **in place**: the wrapper asks that client for a decision before running the
+tool body, so a call the client denies is **denied before execution** — `invoke()`
+throws `PolicyViolationError` and the body does not run.
+
+The `gatewayClient` is what makes that decision real. Wrap tools without one and
+`initAssembly` throws a `ConfigurationError` under its default fail-closed posture,
+rather than route tool checks through the allow-all no-op client it would otherwise
+use. That refusal is a startup configuration check — it is not a policy decision about
+any tool, and nothing is inspected when it fires.
 
 The snippets below take the LangChain adapter path, which needs `@langchain/core`.
 It is an **optional** peer dependency, so `pnpm add @agent-assembly/sdk` does not
@@ -87,7 +95,24 @@ npm install @agent-assembly/sdk @langchain/core
 ### ESM (`import`)
 
 ```ts
-import { initAssembly } from "@agent-assembly/sdk";
+import { initAssembly, type GatewayClient } from "@agent-assembly/sdk";
+
+// The wrapper calls this before it runs a wrapped tool body. This one is a
+// local allow-list so the snippet runs offline; point `check` at a gateway
+// you run to source decisions from there instead.
+const policyClient: GatewayClient = {
+  mode: "sdk-only",
+  start: async () => undefined,
+  close: async () => undefined,
+  check: async (request) =>
+    request.toolName === "search_web"
+      ? { denied: false }
+      : { denied: true, reason: "not on the allow-list" },
+  waitForApproval: async () => ({ denied: false }),
+  record: async () => undefined,
+  recordResult: async () => undefined,
+  scanPrompts: async () => undefined
+};
 
 const searchWeb = {
   name: "search_web",
@@ -97,10 +122,11 @@ const searchWeb = {
 const ctx = await initAssembly({
   gatewayUrl: "http://localhost:7391",
   agentId: "demo",
+  gatewayClient: policyClient,
   langchain: { tools: { searchWeb } }
 });
 
-await searchWeb.invoke({ q: "agent assembly" }); // governed; throws on policy deny
+console.log(await searchWeb.invoke({ q: "agent assembly" }));
 await ctx.shutdown();
 ```
 
@@ -109,27 +135,54 @@ await ctx.shutdown();
 ```js
 const { initAssembly } = require("@agent-assembly/sdk");
 
+// The wrapper calls this before it runs a wrapped tool body. This one is a
+// local allow-list so the snippet runs offline; point `check` at a gateway
+// you run to source decisions from there instead.
+const policyClient = {
+  mode: "sdk-only",
+  start: async () => undefined,
+  close: async () => undefined,
+  check: async (request) =>
+    request.toolName === "search_web"
+      ? { denied: false }
+      : { denied: true, reason: "not on the allow-list" },
+  waitForApproval: async () => ({ denied: false }),
+  record: async () => undefined,
+  recordResult: async () => undefined,
+  scanPrompts: async () => undefined
+};
+
 const searchWeb = {
   name: "search_web",
   invoke: async (input) => `results for ${input.q}`
 };
 
-const ctx = await initAssembly({
-  gatewayUrl: "http://localhost:7391",
-  agentId: "demo",
-  langchain: { tools: { searchWeb } }
-});
+// CommonJS has no top-level await, so the init/shutdown sequence runs
+// inside an async function.
+async function main() {
+  const ctx = await initAssembly({
+    gatewayUrl: "http://localhost:7391",
+    agentId: "demo",
+    gatewayClient: policyClient,
+    langchain: { tools: { searchWeb } }
+  });
 
-await searchWeb.invoke({ q: "agent assembly" });
-await ctx.shutdown();
+  console.log(await searchWeb.invoke({ q: "agent assembly" }));
+  await ctx.shutdown();
+}
+
+main();
 ```
 
 Both entrypoints resolve to the same governance pipeline; the package's `exports` field
 selects ESM or CJS automatically based on how the consumer imports it.
 
 `initAssembly()` registers the LangChain callback handler and auto-wraps the configured
-tools, so each is checked against gateway policy before invocation. For more frameworks
-and the lower-level `withAssembly()` wrapper, see the **Examples** guide on the
+tools, so a wrapped `invoke()` reaches your `gatewayClient` for a decision before the
+tool body runs. What that decision is worth is whatever the client backs it with: the
+allow-list above answers locally, while a client that consults a gateway you run carries
+that gateway's verdict. For more frameworks and the lower-level `withAssembly()`
+wrapper, see the **Examples** guide on the
 [documentation site](https://docs.agent-assembly.com/node-sdk/).
 
 ## Supported Node.js versions
@@ -153,8 +206,8 @@ binding requires Node 18.18 or newer.
 
 ## Framework compatibility
 
-`initAssembly()` auto-detects and governs five optional framework integrations
-(LangChain.js, LangGraph.js, Vercel AI SDK, Mastra, OpenAI Agents). The full table —
+`initAssembly()` auto-detects and installs governance hooks for five optional framework
+integrations (LangChain.js, LangGraph.js, Vercel AI SDK, Mastra, OpenAI Agents). The full table —
 each framework's optional peer dependency, supported version range, and current status
 (including the [known Vercel AI SDK caveat](https://lightning-dust-mite.atlassian.net/browse/AAASM-3532)) —
 is the **authoritative** reference and lives on the docs site:
@@ -174,8 +227,10 @@ the runtime over one of two transports:
 - a **native in-process** binding built with napi-rs.
 
 `initAssembly()` is the primary entrypoint. It resolves the gateway, registers the agent,
-and installs governance hooks for whichever supported framework it detects, so every tool
-call is checked against policy before it runs.
+and installs governance hooks for whichever supported framework it detects. What a hook
+can do to a call depends on the gateway client deciding it — see
+[How LangChain tools are blocked](#how-langchain-tools-are-blocked) for which layer
+blocks and which only observes.
 
 ## What the package exports
 
@@ -346,8 +401,8 @@ and is re-published on every push to `main` via the `publish-docs.yml` workflow.
 
 ## Related projects
 
-`@agent-assembly/sdk` is one client of the Agent Assembly platform. The governance
-decisions it enforces are made by the core Rust runtime; the protocol it speaks is shared
+`@agent-assembly/sdk` is one client of the Agent Assembly platform. The authoritative
+governance decisions are made by the core Rust runtime; the protocol it speaks is shared
 across all SDKs.
 
 | Project                                                                                 | What it is                                                                                                                                                                        |

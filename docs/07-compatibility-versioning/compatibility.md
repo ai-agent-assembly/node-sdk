@@ -29,7 +29,8 @@ requires a Rust toolchain. See [Troubleshooting](../08-troubleshooting/index.md)
 
 ## Frameworks
 
-`initAssembly()` auto-detects and governs the agent frameworks below. Each is an
+`initAssembly()` auto-detects and installs governance hooks for the agent frameworks
+below. Each is an
 **optional** peer dependency — the SDK works without any of them installed, and only
 hooks into the ones it finds at runtime. The version floors are the major lines the
 governance hooks are built against and verified in the cross-repo live smokes; newer

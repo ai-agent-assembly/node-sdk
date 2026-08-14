@@ -6,16 +6,24 @@ sidebar_position: 1
 # Introduction
 
 **In plain terms:** AI agents take actions on their own — searching the web, calling
-APIs, reading files. This SDK puts a checkpoint in front of those actions so an agent
-can only do what your rules allow, and so there's a record of everything it did. You add
-it to an agent built in Node.js with a few lines of code; you don't have to rewrite the
-agent.
+APIs, reading files. This SDK puts a checkpoint in front of those actions, so a tool you
+wrap is decided by a policy client before its body runs. How much that checkpoint is
+worth depends on how you configure it: the client the SDK falls back to allows
+everything and keeps no record, which the two sections below spell out. You add it to an
+agent built in Node.js with a few lines of code; you don't have to rewrite the agent.
 
 **`@agent-assembly/sdk`** is the TypeScript and Node.js SDK for
 [Agent Assembly](https://github.com/ai-agent-assembly). It lets you put a
-governance layer in front of the AI agents you build in Node — so every tool an
-agent calls is checked against policy *before* it runs, and every governance-relevant
-action is emitted as an audit event.
+governance layer in front of the AI agents you build in Node — so a tool you wrap
+reaches the gateway client you configure for a decision *before* its body runs, and
+governance-relevant actions are emitted as audit events.
+
+What that buys depends on the client. Tools decided by a client that can answer
+authoritatively are **denied before execution** when it denies them. Pass explicit
+`langchain.tools` without such a client and `initAssembly` refuses to start, rather
+than route their checks through the allow-all no-op client. For a framework it
+auto-detects instead, there is no such refusal — it warns and proceeds, so that
+installing a dependency does not break a zero-config startup.
 
 Whether those events are *retained* depends on which gateway client you use. Both
 clients this SDK ships discard hook-layer audit events, so on the default path
@@ -40,10 +48,10 @@ In practice the SDK is two things working together:
   your policies and renders allow / deny / approval decisions. The SDK can even
   auto-start a local gateway for you so there is nothing to stand up by hand.
 
-You write your agent the way you normally would. The SDK wraps each tool so the
-gateway sees the call first: if policy **allows** it, the tool runs; if it **denies**
-it, the call throws instead of executing; if it needs a human, the call waits for an
-approval decision.
+You write your agent the way you normally would. The SDK wraps the tools you hand it
+so the gateway client you configured decides the call first: if it **allows**, the
+tool runs; if it **denies**, the call throws instead of executing; if it needs a
+human, the call waits for an approval decision.
 
 ## Who this is for
 
