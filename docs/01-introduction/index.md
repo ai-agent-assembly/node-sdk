@@ -13,9 +13,14 @@ agent.
 
 **`@agent-assembly/sdk`** is the TypeScript and Node.js SDK for
 [Agent Assembly](https://github.com/ai-agent-assembly). It lets you put a
-governance layer in front of the AI agents you build in Node — so every tool an
-agent calls is checked against policy *before* it runs, and every governance-relevant
-action is emitted as an audit event.
+governance layer in front of the AI agents you build in Node — so a tool you wrap
+reaches the gateway client you configure for a decision *before* its body runs, and
+governance-relevant actions are emitted as audit events.
+
+What that buys depends on the client. Wrapped tools decided by a client that can
+answer authoritatively are **denied before execution** when it denies them; wrap
+tools without such a client and `initAssembly` refuses to start rather than route
+checks through the allow-all no-op client.
 
 Whether those events are *retained* depends on which gateway client you use. Both
 clients this SDK ships discard hook-layer audit events, so on the default path
