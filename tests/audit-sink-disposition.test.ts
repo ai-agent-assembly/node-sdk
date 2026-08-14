@@ -383,4 +383,72 @@ describe("AAASM-5681: initAssembly surfaces the drop without AA_DEBUG", () => {
     expect(context.auditSink).toBe("caller-supplied");
     await context.shutdown();
   });
+
+  it("a caller's client declaring \"discarded\" is told nothing that is false for it", async () => {
+    // AAASM-5743. The disposition is honest and the warning is right to fire —
+    // this SDK genuinely knows the events go nowhere. What was wrong is WHOSE
+    // client it described. `resolveAuditSink` collapses shipped-and-discarding
+    // with caller-supplied-and-declared-discarding into one value, so the
+    // warning, told only the mode, said the caller's checks route through the
+    // allow-all no-op. Measured against a client whose `check` genuinely denies:
+    // precisely inverted, for the most sophisticated adopter.
+    delete process.env.AA_DEBUG;
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    let checked = false;
+    const own: GatewayClient = {
+      mode: "auto",
+      auditSink: "discarded",
+      start: async () => undefined,
+      close: async () => undefined,
+      check: async () => {
+        checked = true;
+        return { denied: true, pending: false, reason: "MY OWN POLICY DENIES" };
+      },
+      waitForApproval: async () => ({ denied: true }),
+      record: async () => undefined,
+      recordResult: async () => undefined,
+      scanPrompts: async () => undefined
+    };
+
+    const context = await initAssembly({ ...BASE, mode: "auto", gatewayClient: own });
+    const text = stderrText(stderrSpy);
+
+    // It still warns — the caller declared the events are dropped.
+    expect(text).toContain(DISCARD_WARNING_SUBSTRING);
+    expect(context.auditSink).toBe("discarded");
+
+    // Positive control on the client itself: a `check` that is never called
+    // cannot falsify a claim about what `check` does, so the deny is driven and
+    // observed before the wording is judged.
+    await expect(own.check({ toolName: "t", args: {} } as never)).resolves.toMatchObject({
+      denied: true
+    });
+    expect(checked).toBe(true);
+
+    // Neither false sentence may appear.
+    expect(text).not.toContain("routes policy checks through the allow-all no-op client");
+    expect(text).not.toContain("route through the native runtime");
+    expect(text).not.toContain("the gateway client resolved here holds no native event channel");
+    expect(text).toContain('the gateway client you supplied declares "auditSink": "discarded"');
+    await context.shutdown();
+  });
+
+  it("a SHIPPED discarding client still gets the shipped wording — the other direction", async () => {
+    // The pin that stops the fix above from being applied unconditionally. It
+    // reddens if the caller-supplied branch swallows the shipped one, exactly as
+    // the test above reddens if the shipped branch swallows the caller's.
+    // Neither passes on the other's coverage (AAASM-5743 AC2).
+    delete process.env.AA_DEBUG;
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    const context = await initAssembly({ ...BASE, mode: "auto" });
+    const text = stderrText(stderrSpy);
+
+    expect(text).toContain("the gateway client resolved here holds no native event channel");
+    expect(text).toContain("routes policy checks through the allow-all no-op client");
+    expect(text).not.toContain("the gateway client you supplied declares");
+    expect(context.auditSink).toBe("discarded");
+    await context.shutdown();
+  });
 });
