@@ -96,6 +96,58 @@ describe("napi-inprocess gateway client audit sinks (AAASM-5750)", () => {
     );
   });
 
+  it("omits optional fields rather than sending them empty", async () => {
+    // The payload's shape is what a reader downstream distinguishes on: a
+    // deny with no output and a call that returned nothing must not encode
+    // identically. Both sides of each optional field are driven, because a
+    // spread that always fired and one that never fired would look the same
+    // if only one side were exercised.
+    vi.resetModules();
+    const { createNativeGatewayClient } = await import("../src/gateway/client.js");
+    const native = fakeNativeClient();
+    const client = createNativeGatewayClient("napi-inprocess", native, "agent-audit");
+
+    await client.record({ action: "tool_call_denied", runId: "r1" });
+    await client.record({ action: "llm_response", runId: "r2", reason: "why", output: { a: 1 } });
+    await client.scanPrompts({ prompts: ["p"], runId: "r3" });
+    await client.scanPrompts({ prompts: ["p"], runId: "r4", modelName: "gpt-x" });
+
+    const sent = vi.mocked(native.sendEvent).mock.calls.map((call) => call[0] as Record<string, unknown>);
+    expect(sent[0]).toEqual({ event_type: "tool_call_audit", action: "tool_call_denied", run_id: "r1" });
+    expect(sent[1]).toEqual({
+      event_type: "tool_call_audit",
+      action: "llm_response",
+      run_id: "r2",
+      reason: "why",
+      output: '{"a":1}'
+    });
+    expect(sent[2]).toEqual({ event_type: "prompt_scan", run_id: "r3", prompts: ["p"] });
+    expect(sent[3]).toEqual({
+      event_type: "prompt_scan",
+      run_id: "r4",
+      model_name: "gpt-x",
+      prompts: ["p"]
+    });
+  });
+
+  it("renders a value JSON.stringify drops rather than sending undefined", async () => {
+    // `JSON.stringify` returns `undefined` — not a string, and not a throw —
+    // for a function, a symbol, or `undefined` itself. Without the `??` those
+    // land on the wire as a missing field, so a recorded outcome would silently
+    // become no outcome. The catch branch below covers the throwing case; this
+    // covers the quieter one.
+    vi.resetModules();
+    const { createNativeGatewayClient } = await import("../src/gateway/client.js");
+    const native = fakeNativeClient();
+    const client = createNativeGatewayClient("napi-inprocess", native, "agent-audit");
+
+    await client.recordResult({ runId: "r1", output: undefined });
+
+    const sent = vi.mocked(native.sendEvent).mock.calls[0]?.[0] as { result?: unknown };
+    expect(typeof sent.result).toBe("string");
+    expect(sent.result).toBe("undefined");
+  });
+
   it("does not let a non-serializable tool result fail the audit call", async () => {
     // `recordResult` takes `unknown`, and the hook layer awaits it inside the
     // governed call. A circular structure must degrade to a lossy record, never
