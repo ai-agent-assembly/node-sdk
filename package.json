@@ -73,7 +73,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@napi-rs/cli": "3.7.2",
+    "@napi-rs/cli": "3.8.6",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
