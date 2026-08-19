@@ -8,14 +8,14 @@ Source: [`node/langchain-js-basic-agent`](https://github.com/ai-agent-assembly/e
 
 ## What this example demonstrates
 
-A LangChain.js-style agent that integrates Agent Assembly for tool governance. Every
+A LangChain.js-style agent that integrates Agent Assembly for tool governance. Each
 tool call is routed through a local policy before execution:
 
 - `get_weather` is **allowed** — it executes and logs output.
 - `delete_file` is **denied** — it is blocked at the policy layer.
 
 The governance point: wrapping an agent's tools with `withAssembly()` enforces policy
-on every tool call the agent makes.
+on each tool call the agent makes.
 
 ## The framework / library
 
