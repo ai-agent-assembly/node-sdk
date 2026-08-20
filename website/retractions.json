@@ -1,0 +1,12 @@
+{
+  "$comment": "AAASM-5676/AAASM-5689. Retracted-claim registry: a claim listed here was factually incorrect and is retracted org-wide (per the one-product-truth programme), but frozen Docusaurus version snapshots are never rewritten -- see docs/src/development/content-ownership.md in agent-assembly for the ownership model this obeys. `pattern` is matched literally (not a regex) against each page's raw Markdown source, case-sensitive, by scripts/generate-retraction-map.mjs, which finds every (version, page) pair containing it and writes website/src/generated/retraction-map.ts. retractionBanner.ts (a Docusaurus clientModule) reads that generated map at runtime and renders `notice` + a link to `canonical` on any matching page, on every kind of page load (direct URL, search result, or version-picker navigation), without touching the frozen page's own committed content. A retraction here does not, by itself, prove coverage -- the generated map only knows about a page if this file names the exact substring; adding a phrase to CI (see check_claim_vocabulary in the docs repo) does not retroactively register history the way this file does.",
+  "retractions": [
+    {
+      "id": "AAASM-5528-activation-claim",
+      "pattern": "all that is required to activate governance",
+      "notice": "This statement is factually incorrect and has been retracted: enabling an adapter alone does not activate governance -- in-process enforcement additionally needs a check-capable mode. See the corrected explanation for what activation actually requires.",
+      "canonical": "https://docs.agent-assembly.com/node-sdk/next/guides#other-frameworks-experimental-auto-detected",
+      "retracted_on": "2026-08-20"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+/**
+ * Retraction/errata banner (AAASM-5676 / AAASM-5689).
+ *
+ * Styling mirrors consentBanner.css: self-contained, Infima theme variables
+ * with hard fallbacks, no dependency on the docs theme bundle having loaded.
+ * Placed at the TOP of the viewport (not the bottom, like the consent
+ * banner) so it reads before the page content it is warning about, and it is
+ * not dismissible -- a retraction notice is a property of the page/version
+ * being viewed, not a one-time interstitial.
+ */
+.aa-retraction-banner {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.65rem 1rem;
+  background: var(--ifm-color-warning-contrast-background, #fff3cd);
+  color: var(--ifm-color-warning-contrast-foreground, #4d3800);
+  border-bottom: 1px solid var(--ifm-color-warning-dark, #d9a900);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.aa-retraction-banner__icon {
+  flex-shrink: 0;
+}
+
+.aa-retraction-banner__text {
+  flex: 1 1 auto;
+}
+
+.aa-retraction-banner__link {
+  font-weight: 600;
+  white-space: nowrap;
+}
