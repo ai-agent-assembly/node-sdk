@@ -41,6 +41,7 @@
     "format": "prettier --write .",
     "gen:proto": "node ./scripts/gen-proto.mjs",
     "generate:docs-metadata": "node ./scripts/generate-docs-metadata.mjs",
+    "generate:retraction-map": "node ./scripts/generate-retraction-map.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text",
     "build:esm": "tsc -p tsconfig.build.json",
