@@ -9,6 +9,13 @@ import { describe, expect, it } from "vitest";
 // pnpm project from the SDK root (see this repo's CLAUDE.md), so the
 // generator's own regenerate-and-git-diff drift check (publish-docs.yml)
 // exercises the generation path; this suite pins the shipped shape.
+//
+// AC checks 3 and 4's negative-case validators (validateRetractions,
+// validateVersionChannels) are exercised by the generator's own
+// `--selftest` mode instead of a direct import here -- importing a `.mjs`
+// file from a `.ts` test broke on windows-latest CI (a parse-time
+// SyntaxError with no useful location, not reproducible on macOS/Linux);
+// see generate-retraction-map.mjs's own selftest() for those assertions.
 
 const mapPath = path.resolve(
   fileURLToPath(import.meta.url),
