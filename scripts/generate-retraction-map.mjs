@@ -248,10 +248,73 @@ function main() {
   );
 }
 
+// AAASM-5689 clause 8, checks 3 and 4, proven falsifiable in-process rather
+// than only by hand at review time -- same `--selftest` convention as
+// check_claim_vocabulary.py in the docs repo. Kept in this file (not the .ts
+// test suite) so calling it never needs a cross-module-system import of a
+// `.mjs` file from a `.ts` test, which is the whole reason this repo's other
+// generator tests (generate-docs-metadata.test.ts) assert on committed
+// output instead of importing the generator directly.
+function selftest() {
+  const wellFormed = () => ({
+    id: "R1",
+    pattern: "x",
+    notice: "y",
+    canonical: "https://example.com",
+    retracted_on: "2026-08-20",
+  });
+  const failures = [];
+
+  if (validateRetractions([wellFormed()]).length !== 0) {
+    failures.push("validateRetractions rejected a well-formed retraction");
+  }
+  {
+    const missingField = wellFormed();
+    delete missingField.canonical;
+    const errors = validateRetractions([missingField]);
+    if (!errors.some((e) => e.includes("canonical"))) {
+      failures.push("validateRetractions did not catch a missing required field");
+    }
+  }
+  if (!validateRetractions([wellFormed(), wellFormed()]).some((e) => e.includes("duplicate"))) {
+    failures.push("validateRetractions did not catch a duplicate id");
+  }
+
+  if (
+    validateVersionChannels({
+      lastVersion: "0.0.1-rc.6",
+      versions: { current: { banner: "unreleased" }, "0.0.1-rc.6": { banner: "none" } },
+    }).length !== 0
+  ) {
+    failures.push("validateVersionChannels rejected a safe configuration");
+  }
+  if (
+    validateVersionChannels({ lastVersion: "current", versions: { current: { banner: "unreleased" } } }).length === 0
+  ) {
+    failures.push('validateVersionChannels did not catch lastVersion === "current"');
+  }
+  if (
+    validateVersionChannels({
+      lastVersion: "0.0.1-rc.7",
+      versions: { "0.0.1-rc.7": { banner: "unreleased" } },
+    }).length === 0
+  ) {
+    failures.push("validateVersionChannels did not catch an unreleased-banner default version");
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`generate-retraction-map --selftest failed:\n${failures.map((f) => `  - ${f}`).join("\n")}`);
+  }
+  console.log("generate-retraction-map --selftest: 6/6 assertions passed");
+}
+
 // Only run when this file is the ESM entry point, not when it's imported for
-// its exported functions (as tests/scripts/generate-retraction-map.test.ts
-// does for validateRetractions/validateVersionChannels) -- an import should
-// never have the side effect of rewriting the generated map on disk.
+// its exported functions -- an import should never have the side effect of
+// rewriting the generated map on disk.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main();
+  if (process.argv.includes("--selftest")) {
+    selftest();
+  } else {
+    main();
+  }
 }
