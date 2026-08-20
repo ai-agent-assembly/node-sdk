@@ -104,6 +104,9 @@ const config: Config = {
     // wrap-swizzling that internal component as unsafe (`--danger` required).
     // The widget reuses the self-managed `window.gtag` from AAASM-3552/3554.
     require.resolve("./src/analytics/feedbackWidget.ts"),
+    // Retracted-claim errata banner (AAASM-5676 / AAASM-5689). Same
+    // client-module-not-swizzle rationale as the feedback widget above.
+    require.resolve("./src/analytics/retractionBanner.ts"),
   ],
 
   markdown: {
