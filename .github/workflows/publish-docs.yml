@@ -117,8 +117,9 @@ jobs:
       # newly matching a registered pattern, in any version, changes the
       # generated output, so a stale committed map (one that doesn't yet know
       # about it) fails here.
-      - name: Check the retraction map is not stale
+      - name: Retraction map — selftest, then check it is not stale
         run: |
+          node scripts/generate-retraction-map.mjs --selftest
           pnpm run generate:retraction-map
           git diff --exit-code -- website/src/generated/retraction-map.ts
 
