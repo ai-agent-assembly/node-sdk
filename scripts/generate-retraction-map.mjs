@@ -34,7 +34,7 @@
 // CI check:                node scripts/generate-retraction-map.mjs && git diff --exit-code
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve, relative, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -248,4 +248,10 @@ function main() {
   );
 }
 
-main();
+// Only run when this file is the ESM entry point, not when it's imported for
+// its exported functions (as tests/scripts/generate-retraction-map.test.ts
+// does for validateRetractions/validateVersionChannels) -- an import should
+// never have the side effect of rewriting the generated map on disk.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main();
+}
