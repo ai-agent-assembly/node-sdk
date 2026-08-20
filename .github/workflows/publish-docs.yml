@@ -17,6 +17,11 @@ on:
       - "src/generated/**"
       - "metadata/**"
       - "scripts/generate-docs-metadata.mjs"
+      # AAASM-5676 / AAASM-5689: the retraction map generator/registry, and its
+      # generated output — same drift-retrigger reasoning as the block above.
+      - "website/retractions.json"
+      - "scripts/generate-retraction-map.mjs"
+      - "website/src/generated/**"
       # AAASM-5529: the claim-binding gate below reads the control files and the
       # deny path. Without these, a PR that only WEAKENS the gate — renaming a
       # control, or changing which error the deny throws — would not re-run it.
@@ -103,6 +108,19 @@ jobs:
       # not by itself block a merge. Closing that gap is AAASM-5677's scope.
       - name: Every documented enforcement claim names the control that proves it
         run: pnpm exec vitest run tests/quickstart-claim-bindings.test.ts
+
+      # AAASM-5676 / AAASM-5689. Regenerates website/src/generated/retraction-map.ts
+      # from website/retractions.json against every frozen version snapshot plus
+      # `current`, and fails if the committed map has drifted — the same shape as
+      # the docs-metadata check above. This is what "a retracted claim on a
+      # default-served page cannot silently recur" means mechanically: a page
+      # newly matching a registered pattern, in any version, changes the
+      # generated output, so a stale committed map (one that doesn't yet know
+      # about it) fails here.
+      - name: Check the retraction map is not stale
+        run: |
+          pnpm run generate:retraction-map
+          git diff --exit-code -- website/src/generated/retraction-map.ts
 
       - name: Install website dependencies
         # `--ignore-workspace` tells pnpm to skip the parent
