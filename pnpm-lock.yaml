@@ -45,7 +45,7 @@ importers:
         version: 10.0.1(eslint@10.9.1)
       '@napi-rs/cli':
         specifier: 3.8.6
-        version: 3.8.6(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.4.0)(emnapi@1.11.2)
+        version: 3.8.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.4.0)(emnapi@1.11.2)
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -57,7 +57,7 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       ai:
         specifier: ^7.0.22
-        version: 7.0.84(zod@4.4.3)
+        version: 7.0.85(zod@4.4.3)
       blocked-at:
         specifier: ^1.2.0
         version: 1.2.0
@@ -112,20 +112,20 @@ importers:
 
 packages:
 
-  '@ai-sdk/gateway@4.0.68':
-    resolution: {integrity: sha512-XKvZv6HFoMOWK64zXMaQatk4SxBzBDkGg7enXPWsCkxqPP4zDhFewOoBKasf3FPnZP9ceE+Yj3BgW925blAWtw==}
+  '@ai-sdk/gateway@4.0.69':
+    resolution: {integrity: sha512-W5MMdyqsaziQy/A4kxlK74iEQ+NuO6OaszH32cEQpUgBW0o15S2fAdP0aYSH2/5lrVZSMXLQLCzuMkRGHBua3A==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@5.0.33':
-    resolution: {integrity: sha512-TfjJqJmRsQyxAlb+3hGmP1o1xLUIT79yhOgtJuTF4hqsB37IC3CufGsuFhU04EeTOg7R9iptQ6Bzm0MW0n/c3g==}
+  '@ai-sdk/provider-utils@5.0.34':
+    resolution: {integrity: sha512-tRBdgRcys/4d8wyQdOdyYScq1AxfMdMd0hIlwolxJKVIbBwXUgClZuQT0VIsz4e7pylY8FE6utYCCZ494UAMJQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider@4.0.8':
-    resolution: {integrity: sha512-aWO7iwhFUGf347tCwNGggggfmZigaSu7TF739IZSrWWABUp7zkb4Cr3fMqvBe5EIS7ABJJu3Cadn0g/zs1G0QQ==}
+  '@ai-sdk/provider@4.0.9':
+    resolution: {integrity: sha512-XnGXPWiBIfqjsVEud5pOaVneRByJQOu2sYNwlSVJTPCvakdCDkVuYKKfNuStkIpMUYl7JIkBZGBx+B5YfNeVjA==}
     engines: {node: '>=22'}
 
   '@babel/helper-string-parser@7.29.7':
@@ -1376,8 +1376,8 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@7.0.84:
-    resolution: {integrity: sha512-znHNBWADOy79k8EK7636kDm5LmnjF4tMzegC2TfmlLDobDZbs0z0OXD2sxtH3eDTp5Re+pJQESvjinWJ6+kadQ==}
+  ai@7.0.85:
+    resolution: {integrity: sha512-HVtPz0qLbTUad+QBnWWReIUmwk+U4PcRENMx+9PsHGVoinoc5CLDiVjNR+VBXTKOSaNgce8kSU/Rtbb4kjZsSw==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2580,23 +2580,23 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/gateway@4.0.68(zod@4.4.3)':
+  '@ai-sdk/gateway@4.0.69(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/provider': 4.0.8
-      '@ai-sdk/provider-utils': 5.0.33(zod@4.4.3)
+      '@ai-sdk/provider': 4.0.9
+      '@ai-sdk/provider-utils': 5.0.34(zod@4.4.3)
       '@vercel/oidc': 3.2.0
       zod: 4.4.3
 
-  '@ai-sdk/provider-utils@5.0.33(zod@4.4.3)':
+  '@ai-sdk/provider-utils@5.0.34(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/provider': 4.0.8
+      '@ai-sdk/provider': 4.0.9
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
       undici: 7.29.0
       zod: 4.4.3
 
-  '@ai-sdk/provider@4.0.8':
+  '@ai-sdk/provider@4.0.9':
     dependencies:
       json-schema: 0.4.0
 
@@ -3012,7 +3012,7 @@ snapshots:
       - supports-color
     optional: true
 
-  '@napi-rs/cli@3.8.6(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.4.0)(emnapi@1.11.2)':
+  '@napi-rs/cli@3.8.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.4.0)(emnapi@1.11.2)':
     dependencies:
       '@inquirer/prompts': 8.5.2(@types/node@26.4.0)
       '@napi-rs/cross-toolchain': 1.0.3
@@ -3027,8 +3027,8 @@ snapshots:
       typanion: 3.14.0
       typescript: 6.0.3
     optionalDependencies:
-      '@emnapi/core': 1.9.2
-      '@emnapi/runtime': 1.9.2
+      '@emnapi/core': 1.11.2
+      '@emnapi/runtime': 1.11.2
       emnapi: 1.11.2
     transitivePeerDependencies:
       - '@napi-rs/cross-toolchain-arm64-target-aarch64'
@@ -3689,11 +3689,11 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.84(zod@4.4.3):
+  ai@7.0.85(zod@4.4.3):
     dependencies:
-      '@ai-sdk/gateway': 4.0.68(zod@4.4.3)
-      '@ai-sdk/provider': 4.0.8
-      '@ai-sdk/provider-utils': 5.0.33(zod@4.4.3)
+      '@ai-sdk/gateway': 4.0.69(zod@4.4.3)
+      '@ai-sdk/provider': 4.0.9
+      '@ai-sdk/provider-utils': 5.0.34(zod@4.4.3)
       zod: 4.4.3
 
   ajv-formats@3.0.1(ajv@8.20.0):
