@@ -41,7 +41,15 @@ export type AuditSinkDisposition =
    * The client is known to drop hook-layer audit events, because it holds no
    * channel to send them on. `createNoopGatewayClient` declares this, and it is
    * the client `auto` / `sdk-only` / `grpc-sidecar` resolve — so this is the
-   * default path. §6: *Unsupported*, since no sink exists in that configuration.
+   * default path. The §6 term follows the subject. For the **action**: no durable
+   * event attributed to it exists on this path, so it is *Unmeasured* — the term
+   * the capability manifest already carries for this exact configuration (row S7,
+   * "Node default mode routes every policy check through an allow-all no-op
+   * client"). "No sink in this configuration" is a statement about the
+   * capability's availability, a different question, and ADR 0034 §2.5 declares
+   * the two incomparable — so a block stating one must not be read as stating the
+   * other. This block states the action term. Measuring precisely where the record
+   * stops is evidence about the observer, not about the action (ADR 0033 §4).
    *
    * `createNativeGatewayClient` also reports it when handed a `NativeClient`
    * whose binding never loaded. `initAssembly` cannot reach that state —
