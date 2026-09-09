@@ -5,7 +5,7 @@ import { REDACTED } from "../src/core/redact.js";
 afterEach(() => {
   return resetPatchState().finally(() => {
     vi.resetModules();
-    vi.unmock("@langchain/langgraph");
+    vi.doUnmock("@langchain/langgraph");
   });
 });
 

@@ -31,7 +31,7 @@ function createGatewayClientMock(): GatewayClient {
 afterEach(() => {
   return resetPatchState().finally(() => {
     vi.resetModules();
-    vi.unmock("@openai/agents");
+    vi.doUnmock("@openai/agents");
   });
 });
 
