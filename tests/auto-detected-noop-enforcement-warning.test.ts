@@ -50,9 +50,9 @@ function stderrMessages(spy: ReturnType<typeof vi.spyOn>): string {
 describe("AAASM-4769: warn when an auto-detected framework's tools route through the no-op client", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unmock("@openai/agents");
-    vi.unmock("ai");
-    vi.unmock("node:module");
+    vi.doUnmock("@openai/agents");
+    vi.doUnmock("ai");
+    vi.doUnmock("node:module");
     vi.resetModules();
   });
 
