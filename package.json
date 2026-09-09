@@ -77,7 +77,7 @@
     "@napi-rs/cli": "3.9.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.1.1",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.0.0",
     "ai": "^7.0.22",
     "blocked-at": "^1.2.0",
     "eslint": "^10.7.0",
