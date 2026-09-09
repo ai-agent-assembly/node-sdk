@@ -5,7 +5,7 @@ import { REDACTED } from "../src/core/redact.js";
 afterEach(() => {
   return resetPatchState().finally(() => {
     vi.resetModules();
-    vi.unmock("@mastra/core");
+    vi.doUnmock("@mastra/core");
   });
 });
 
