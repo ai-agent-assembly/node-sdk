@@ -61,6 +61,7 @@ function buildBanner(ids: string[]): HTMLElement {
 
   const icon = document.createElement("span");
   icon.className = "aa-retraction-banner__icon";
+  icon.setAttribute("aria-hidden", "true");
   icon.textContent = "⚠";
   banner.appendChild(icon);
 
@@ -70,7 +71,11 @@ function buildBanner(ids: string[]): HTMLElement {
 
     const text = document.createElement("span");
     text.className = "aa-retraction-banner__text";
-    text.textContent = `${info.notice} `;
+    const title = document.createElement("strong");
+    title.className = "aa-retraction-banner__title";
+    title.textContent = info.title;
+    text.appendChild(title);
+    text.appendChild(document.createTextNode(`${info.notice} `));
 
     const link = document.createElement("a");
     link.className = "aa-retraction-banner__link";

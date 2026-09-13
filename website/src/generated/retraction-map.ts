@@ -3,6 +3,7 @@
 // AAASM-5676 / AAASM-5689. See that script for what this maps and why.
 
 export interface RetractionNotice {
+  title: string;
   notice: string;
   canonical: string;
 }
@@ -165,7 +166,8 @@ export const retractionsByVersion: Record<string, string[]> = {
 
 export const retractionNoticesById: Record<string, RetractionNotice> = {
   "AAASM-5528-activation-claim": {
-    "notice": "This statement is factually incorrect and has been retracted: enabling an adapter alone does not activate governance -- in-process enforcement additionally needs a check-capable mode. See the corrected explanation for what activation actually requires.",
+    "title": "Governance activation correction",
+    "notice": "The claim that enabling an adapter alone activates governance is retracted. In-process enforcement also requires a check-capable mode.",
     "canonical": "https://docs.agent-assembly.com/node-sdk/next/guides#other-frameworks-experimental-auto-detected"
   }
 };

@@ -3,6 +3,8 @@
 
 # Production
 /build
+/test-results
+/playwright-report
 
 # Generated files
 .docusaurus

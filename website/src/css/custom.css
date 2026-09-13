@@ -32,6 +32,25 @@
 /* tighter tab-title font size — sitewide <Tabs>, noticeably smaller than body text */
 .tabs__item { font-size: 0.85rem; }
 
+/* Mobile search is positioned absolutely by the native navbar. Reserve its
+   actual 2rem trigger plus inset, and keep the SDK identity whole at <=360px. */
+@media (max-width: 360px) {
+  .navbar__items:not(.navbar__items--right) {
+    padding-inline-end: calc(2rem + var(--ifm-navbar-padding-horizontal));
+  }
+  .aa-node-navbar-brand { flex: 0 0 auto; }
+  .aa-node-navbar-title {
+    flex: 0 0 auto;
+    font-size: 0;
+    overflow: visible;
+    white-space: nowrap;
+  }
+  .aa-node-navbar-title::after {
+    content: "Node SDK";
+    font-size: 1rem;
+  }
+}
+
 [data-theme='dark'] {
   --ifm-color-primary: #818cf8;
   --ifm-color-primary-dark: #6366f1;
