@@ -1,18 +1,18 @@
 {
   "theme.docs.versions.unreleasedVersionLabel": {
-    "message": "This is in-development documentation for {siteTitle} {versionLabel}. It tracks main and is not the latest stable release.",
+    "message": "This is in-development documentation for {siteTitle} {versionLabel}. It tracks main rather than a release snapshot.",
     "description": "The label used to tell the user that he's browsing an unreleased doc version"
   },
   "theme.docs.versions.unmaintainedVersionLabel": {
-    "message": "This is documentation for {siteTitle} {versionLabel}, which is not the latest stable release.",
+    "message": "This is archived documentation for {siteTitle} {versionLabel}.",
     "description": "The label used to tell the user that he's browsing an unmaintained doc version"
   },
   "theme.docs.versions.latestVersionSuggestionLabel": {
-    "message": "For the latest stable docs, see the {latestVersionLink} ({versionLabel}).",
+    "message": "For current documentation, see the {latestVersionLink} ({versionLabel}).",
     "description": "The label used to tell the user to check the latest version"
   },
   "theme.docs.versions.latestVersionLinkLabel": {
-    "message": "stable version",
+    "message": "recommended version",
     "description": "The label used for the latest version suggestion link label"
   }
 }

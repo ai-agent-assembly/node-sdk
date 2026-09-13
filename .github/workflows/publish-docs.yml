@@ -31,6 +31,7 @@ on:
   push:
     branches:
       - main
+      - uiux/visual-experience-overhaul
   workflow_dispatch:
 
 # Default to read-only. Only the deploy job (push to main) needs write to
