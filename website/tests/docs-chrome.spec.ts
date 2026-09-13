@@ -7,17 +7,17 @@ test("narrow native brand stays whole and clear of menu/search", async ({ browse
     try {
       await page.route(/google-analytics|googletagmanager/, (route) => route.abort());
       await page.goto("/node-sdk/quick-start/");
-      const brand = page.locator("a.navbar__brand");
+      const brand = page.locator(".navbar__inner a.navbar__brand");
       await expect(brand).toHaveAttribute("href", "/node-sdk/");
       await expect(brand).toHaveAttribute("aria-label", "@agent-assembly/sdk");
-      await expect(brand.locator("img")).toBeVisible();
+      await expect(brand.locator("img:visible")).toBeVisible();
       const title = brand.locator(".navbar__title");
       await expect(title).toHaveText("@agent-assembly/sdk");
       const layout = await page.evaluate(() => {
-        const brand = document.querySelector("a.navbar__brand")?.getBoundingClientRect();
+        const brand = document.querySelector(".navbar__inner a.navbar__brand")?.getBoundingClientRect();
         const toggle = document.querySelector(".navbar__toggle")?.getBoundingClientRect();
         const search = document.querySelector(".navbar__search-input")?.getBoundingClientRect();
-        const title = document.querySelector("a.navbar__brand .navbar__title");
+        const title = document.querySelector(".navbar__inner a.navbar__brand .navbar__title");
         if (!brand || !toggle || !search || !title) throw new Error("Native navbar region missing");
         return {
           brandLeft: brand.left,
