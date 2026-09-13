@@ -1,5 +1,48 @@
 import { expect, test } from "@playwright/test";
 
+test("narrow native brand stays whole and clear of menu/search", async ({ browser, baseURL }) => {
+  for (const width of [320, 360, 390]) {
+    const context = await browser.newContext({ baseURL, viewport: { width, height: 900 } });
+    const page = await context.newPage();
+    try {
+      await page.route(/google-analytics|googletagmanager/, (route) => route.abort());
+      await page.goto("/node-sdk/quick-start/");
+      const brand = page.locator("a.navbar__brand");
+      await expect(brand).toHaveAttribute("href", "/node-sdk/");
+      await expect(brand).toHaveAttribute("aria-label", "@agent-assembly/sdk");
+      await expect(brand.locator("img")).toBeVisible();
+      const title = brand.locator(".navbar__title");
+      await expect(title).toHaveText("@agent-assembly/sdk");
+      const layout = await page.evaluate(() => {
+        const brand = document.querySelector("a.navbar__brand")?.getBoundingClientRect();
+        const toggle = document.querySelector(".navbar__toggle")?.getBoundingClientRect();
+        const search = document.querySelector(".navbar__search-input")?.getBoundingClientRect();
+        const title = document.querySelector("a.navbar__brand .navbar__title");
+        if (!brand || !toggle || !search || !title) throw new Error("Native navbar region missing");
+        return {
+          brandLeft: brand.left,
+          brandRight: brand.right,
+          toggleRight: toggle.right,
+          searchLeft: search.left,
+          shortLabel: getComputedStyle(title, "::after").content,
+          titleFontSize: getComputedStyle(title).fontSize,
+        };
+      });
+      expect(layout.brandLeft).toBeGreaterThanOrEqual(layout.toggleRight);
+      expect(layout.brandRight).toBeLessThanOrEqual(layout.searchLeft);
+      if (width <= 360) {
+        expect(layout.shortLabel).toContain("Node SDK");
+        expect(layout.titleFontSize).toBe("0px");
+      } else {
+        expect(layout.shortLabel).not.toContain("Node SDK");
+        expect(layout.titleFontSize).not.toBe("0px");
+      }
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test("native mobile drawer remains usable above the correction", async ({ browser, baseURL }) => {
   for (const width of [390, 320])
     for (const colorScheme of ["light", "dark"] as const) {
