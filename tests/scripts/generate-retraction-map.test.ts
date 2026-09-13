@@ -61,6 +61,13 @@ describe("retraction map (generated)", () => {
     for (const { id } of registry.retractions) {
       expect(source).toContain(`"${id}"`);
     }
-    expect(source).toMatch(/"notice": "This statement is factually incorrect and has been retracted/);
+    expect(source).toContain('"title": "Governance activation correction"');
+    expect(source).toContain(
+      "The claim that enabling an adapter alone activates governance is retracted."
+    );
+    expect(source).toContain("In-process enforcement also requires a check-capable mode.");
+    expect(source).toContain(
+      "https://docs.agent-assembly.com/node-sdk/next/guides#other-frameworks-experimental-auto-detected"
+    );
   });
 });

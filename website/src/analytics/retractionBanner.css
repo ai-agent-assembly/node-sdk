@@ -11,7 +11,8 @@
 .aa-retraction-banner {
   position: sticky;
   top: 0;
-  z-index: 999;
+  /* Native navigation/drawers must remain above this non-dismissible note. */
+  z-index: calc(var(--ifm-z-index-fixed, 201) - 1);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -30,9 +31,12 @@
 
 .aa-retraction-banner__text {
   flex: 1 1 auto;
+  min-width: 0;
 }
+
+.aa-retraction-banner__title { display: block; }
 
 .aa-retraction-banner__link {
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
 }

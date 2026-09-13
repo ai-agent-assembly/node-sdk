@@ -105,7 +105,9 @@ export function validateRetractions(retractions) {
 export function validateVersionChannels(versionChannels) {
   const errors = [];
   if (versionChannels.lastVersion === "current") {
-    errors.push('versionChannels.lastVersion must not be "current" -- the default channel cannot point at the unreleased tree');
+    errors.push(
+      'versionChannels.lastVersion must not be "current" -- the default channel cannot point at the unreleased tree'
+    );
   }
   const lastVersionEntry = versionChannels.versions?.[versionChannels.lastVersion];
   if (lastVersionEntry?.banner === "unreleased") {
@@ -120,7 +122,9 @@ function loadRetractions() {
   const raw = JSON.parse(readFileSync(RETRACTIONS_PATH, "utf8"));
   const errors = validateRetractions(raw.retractions);
   if (errors.length > 0) {
-    throw new Error(`retractions.json failed validation:\n${errors.map((e) => `  - ${e}`).join("\n")}`);
+    throw new Error(
+      `retractions.json failed validation:\n${errors.map((e) => `  - ${e}`).join("\n")}`
+    );
   }
   return raw.retractions;
 }
@@ -129,7 +133,9 @@ function loadVersionChannels() {
   const raw = JSON.parse(readFileSync(resolve(WEBSITE_DIR, "versionChannels.json"), "utf8"));
   const errors = validateVersionChannels(raw);
   if (errors.length > 0) {
-    throw new Error(`versionChannels.json failed validation:\n${errors.map((e) => `  - ${e}`).join("\n")}`);
+    throw new Error(
+      `versionChannels.json failed validation:\n${errors.map((e) => `  - ${e}`).join("\n")}`
+    );
   }
   return raw;
 }
@@ -193,7 +199,10 @@ function versionRollup(map) {
 
 function render(map, retractions) {
   const noticesById = Object.fromEntries(
-    retractions.map((r) => [r.id, { notice: r.notice, canonical: r.canonical }])
+    retractions.map((r) => [
+      r.id,
+      { title: r.title ?? "Correction", notice: r.notice, canonical: r.canonical }
+    ])
   );
   const byVersion = versionRollup(map);
   return `// GENERATED FILE -- do not hand-edit.
@@ -201,6 +210,7 @@ function render(map, retractions) {
 // AAASM-5676 / AAASM-5689. See that script for what this maps and why.
 
 export interface RetractionNotice {
+  title: string;
   notice: string;
   canonical: string;
 }
@@ -233,15 +243,17 @@ function main() {
   // entry), independent of whether any of them matched a pattern -- so a
   // scan that silently found zero directories (e.g. a moved/renamed
   // versioned_docs) prints "0 versions scanned", not just "0 flagged".
-  const versionsScanned = 1 + (() => {
-    try {
-      return readdirSync(VERSIONED_DOCS_DIR).filter(
-        (e) => statSync(join(VERSIONED_DOCS_DIR, e)).isDirectory() && e.startsWith("version-")
-      ).length;
-    } catch {
-      return 0;
-    }
-  })();
+  const versionsScanned =
+    1 +
+    (() => {
+      try {
+        return readdirSync(VERSIONED_DOCS_DIR).filter(
+          (e) => statSync(join(VERSIONED_DOCS_DIR, e)).isDirectory() && e.startsWith("version-")
+        ).length;
+      } catch {
+        return 0;
+      }
+    })();
   console.log(
     `generate-retraction-map: ${retractions.length} registered retraction(s), ` +
       `${versionsScanned} version(s) scanned, ${versionCount} version(s) with a match, ${pageCount} page(s) flagged`
@@ -261,7 +273,7 @@ function selftest() {
     pattern: "x",
     notice: "y",
     canonical: "https://example.com",
-    retracted_on: "2026-08-20",
+    retracted_on: "2026-08-20"
   });
   const failures = [];
 
@@ -283,27 +295,32 @@ function selftest() {
   if (
     validateVersionChannels({
       lastVersion: "0.0.1-rc.6",
-      versions: { current: { banner: "unreleased" }, "0.0.1-rc.6": { banner: "none" } },
+      versions: { current: { banner: "unreleased" }, "0.0.1-rc.6": { banner: "none" } }
     }).length !== 0
   ) {
     failures.push("validateVersionChannels rejected a safe configuration");
   }
   if (
-    validateVersionChannels({ lastVersion: "current", versions: { current: { banner: "unreleased" } } }).length === 0
+    validateVersionChannels({
+      lastVersion: "current",
+      versions: { current: { banner: "unreleased" } }
+    }).length === 0
   ) {
     failures.push('validateVersionChannels did not catch lastVersion === "current"');
   }
   if (
     validateVersionChannels({
       lastVersion: "0.0.1-rc.7",
-      versions: { "0.0.1-rc.7": { banner: "unreleased" } },
+      versions: { "0.0.1-rc.7": { banner: "unreleased" } }
     }).length === 0
   ) {
     failures.push("validateVersionChannels did not catch an unreleased-banner default version");
   }
 
   if (failures.length > 0) {
-    throw new Error(`generate-retraction-map --selftest failed:\n${failures.map((f) => `  - ${f}`).join("\n")}`);
+    throw new Error(
+      `generate-retraction-map --selftest failed:\n${failures.map((f) => `  - ${f}`).join("\n")}`
+    );
   }
   console.log("generate-retraction-map --selftest: 6/6 assertions passed");
 }
