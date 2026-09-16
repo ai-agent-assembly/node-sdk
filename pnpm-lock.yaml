@@ -69,7 +69,7 @@ importers:
         version: 1.13.1
       js-yaml:
         specifier: ^5.2.2
-        version: 5.4.1
+        version: 5.4.2
       langchain:
         specifier: ^1.5.3
         version: 1.5.11(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.2))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.2))(ws@8.21.0)
@@ -1866,8 +1866,8 @@ packages:
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
 
-  js-yaml@5.4.1:
-    resolution: {integrity: sha512-28R/k+NAjeuf7+CKlTxWZVExJGwVVLwY06DgEnOMz2gEpfNkDcD7QvyiVPT0xy0XXhU8vHsd4Ot42OOPdJG7dQ==}
+  js-yaml@5.4.2:
+    resolution: {integrity: sha512-m+aqu+LwO1O6sIopafj8HUVl5aawITwZQe/yHpMCKjaWBaA/d07B/QdMb3529REftiU+RMMHL3Vlsw3hON7vWg==}
     hasBin: true
 
   json-schema-traverse@0.4.1:
@@ -3012,7 +3012,7 @@ snapshots:
       clipanion: 4.0.0-rc.4(typanion@3.14.0)
       colorette: 2.0.20
       es-toolkit: 1.51.0
-      js-yaml: 5.4.1
+      js-yaml: 5.4.2
       obug: 2.2.1
       semver: 7.8.5
       typanion: 3.14.0
@@ -4199,7 +4199,7 @@ snapshots:
 
   js-tokens@10.0.0: {}
 
-  js-yaml@5.4.1:
+  js-yaml@5.4.2:
     dependencies:
       argparse: 2.0.1
 
