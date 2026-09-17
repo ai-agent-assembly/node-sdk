@@ -35,8 +35,9 @@ freezing `latest` at whatever predates the first pre-release would revive the
 exact bug this policy exists to prevent (`npm install @agent-assembly/sdk`
 resolving to an ancient alpha — AAASM-3840/4730/4994, three recurrences).
 **Once a GA `X.Y.Z` version is published, this policy converges naturally to
-the standard convention** (see below) — no code change is needed for that
-transition, only a decision that no *earlier* code change should force it.
+the standard convention** (see below) — that transition needs only the GA
+publish itself, not a separate workflow edit, and this doc's purpose is to
+record the decision that nothing earlier should force one prematurely.
 
 SemVer precedence (`alpha < beta < rc < GA`) makes this rule self-correcting
 and monotonic:
