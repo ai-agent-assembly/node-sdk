@@ -46,6 +46,15 @@ jobs:
           # `.claude/skills/`. Unanalysed until AAASM-6120.
           - language: python
             build-mode: none
+          # 19,893 bytes of first-party Rust: the `native/aa-ffi-node` napi-rs
+          # shim (`src/lib.rs` + `build.rs`) that bridges Node to the shared
+          # aa-sdk-client runtime client. `rust` cannot be enabled through
+          # CodeQL *default* setup (PATCH code-scanning/default-setup rejects it
+          # with HTTP 422) -- advanced setup with `build-mode: none` is the only
+          # route, and is the same configuration already proven on the horonomy
+          # Rust repos (eltanin, libra-governor, fornax-core).
+          - language: rust
+            build-mode: none
 
     steps:
       - name: Checkout
