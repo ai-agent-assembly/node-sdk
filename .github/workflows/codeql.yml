@@ -23,8 +23,18 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze (javascript-typescript)
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # build-mode: none -- CodeQL extracts source directly without a full
+          # workspace build, keeping each analysis cheap on the free standard
+          # hosted runners.
+          - language: javascript-typescript
+            build-mode: none
 
     steps:
       - name: Checkout
@@ -35,10 +45,10 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@65216971a11ded447a6b76263d5a144519e5eee1 # codeql-bundle-v2.25.2
         with:
-          languages: javascript-typescript
-          build-mode: none
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
 
       - name: Analyze
         uses: github/codeql-action/analyze@65216971a11ded447a6b76263d5a144519e5eee1 # codeql-bundle-v2.25.2
         with:
-          category: "/language:javascript-typescript"
+          category: "/language:${{ matrix.language }}"
