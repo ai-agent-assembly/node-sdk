@@ -557,54 +557,90 @@ jobs:
         # granular automation token limited to @agent-assembly/* dist-tag
         # management (see PR body); drop this step's token entirely once npm
         # extends OIDC to dist-tag (npm/cli#8547).
+        #
+        # AAASM-4994: this step previously covered only `@agent-assembly/sdk`.
+        # The 4 `runtime-*` sub-packages' `latest` was never advanced by any
+        # automation and drifted to `0.0.1-alpha.4` while `sdk` moved through
+        # rc.5/rc.6/rc.7 — discovered and manually corrected during the rc.7
+        # post-release campaign. Loop over all 5 packages so this can't
+        # recur. The runtime sub-packages are only published in
+        # `publish_mode=all`, so skip them (but still repair `sdk`) in
+        # `main-only` mode.
+        #
+        # AAASM-4994 (recurrence root cause): the reason this required manual
+        # intervention three release cycles running (AAASM-3840/4730/4994) is
+        # NOT that this step's logic is wrong — it's that `NPM_TOKEN` itself
+        # either expired or (once rotated) required an interactive OTP that
+        # this unattended job cannot supply. `npm dist-tag add` is authored
+        # for exactly this unattended case: an npm **Automation**-type access
+        # token is exempt from the 2FA-on-write prompt by design. `NPM_TOKEN`
+        # should be an Automation token scoped to `@agent-assembly/*`, not a
+        # classic Read-and-Publish token — that is the durable fix for this
+        # recurring failure mode, not a change to this step's logic.
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           # AAASM-4730: the version this run just published, taken from the
           # workflow's own resolved output rather than read back from the
           # registry — see the seed rationale below.
           PUBLISHED_VERSION: ${{ steps.tag.outputs.npm_version }}
+          PUBLISH_MODE: ${{ steps.tag.outputs.publish_mode }}
         run: |
           set -euo pipefail
-          PKG="@agent-assembly/sdk"
-          # All versions on npm. `npm view versions --json` returns an array,
-          # or a bare string if exactly one version exists — normalize both to
-          # newline-delimited output.
-          mapfile -t VERSIONS < <(npm view "$PKG" versions --json | node -e '
-            const raw = require("fs").readFileSync(0, "utf8").trim();
-            const data = JSON.parse(raw);
-            for (const v of Array.isArray(data) ? data : [data]) console.log(v);
-          ')
-          # AAASM-4730: seed the candidate set with the version we just
-          # published. `npm view` is NOT read-your-writes consistent: for a few
-          # seconds after `npm publish`, the registry read replica can return a
-          # version list that still omits the just-published version. On the
-          # rc.6 release this step read back a list whose max was rc.5 ~8s after
-          # publishing rc.6, computed newest=rc.5==current, and no-op'd — leaving
-          # `latest` frozen at rc.5 (the bug this fixes). Including the locally
-          # known published version makes the newest-version computation
-          # independent of registry propagation lag, while the semver-max below
-          # still defers to SemVer precedence — so an out-of-band hotfix to an
-          # older channel published later never regresses `latest`.
-          VERSIONS+=("$PUBLISHED_VERSION")
-          if [[ ${#VERSIONS[@]} -eq 0 ]]; then
-            echo "::error::no published versions found for $PKG"
-            exit 1
+          PKGS=("@agent-assembly/sdk")
+          if [[ "$PUBLISH_MODE" == "all" ]]; then
+            PKGS+=(
+              "@agent-assembly/runtime-linux-x64"
+              "@agent-assembly/runtime-linux-arm64"
+              "@agent-assembly/runtime-darwin-x64"
+              "@agent-assembly/runtime-darwin-arm64"
+            )
           fi
-          # `semver` sorts ascending and includes pre-releases when passed
-          # explicitly, so the last line is the highest by SemVer precedence.
-          NEWEST=$(pnpm dlx semver "${VERSIONS[@]}" | tail -n1)
-          CURRENT=$(npm view "$PKG" dist-tags.latest 2>/dev/null || echo "")
-          echo "newest published=$NEWEST  current latest=$CURRENT"
-          if [[ -z "$NEWEST" ]]; then
-            echo "::error::could not determine newest version for $PKG"
-            exit 1
-          fi
-          if [[ "$NEWEST" == "$CURRENT" ]]; then
-            echo "latest already points at $NEWEST — nothing to do"
-          else
-            npm dist-tag add "${PKG}@${NEWEST}" latest
-            echo "moved latest: ${CURRENT:-<unset>} -> $NEWEST"
-          fi
+          for PKG in "${PKGS[@]}"; do
+            echo "::group::latest dist-tag repair for ${PKG}"
+            # All versions on npm. `npm view versions --json` returns an
+            # array, or a bare string if exactly one version exists —
+            # normalize both to newline-delimited output.
+            mapfile -t VERSIONS < <(npm view "$PKG" versions --json | node -e '
+              const raw = require("fs").readFileSync(0, "utf8").trim();
+              const data = JSON.parse(raw);
+              for (const v of Array.isArray(data) ? data : [data]) console.log(v);
+            ')
+            # AAASM-4730: seed the candidate set with the version we just
+            # published. `npm view` is NOT read-your-writes consistent: for a
+            # few seconds after `npm publish`, the registry read replica can
+            # return a version list that still omits the just-published
+            # version. On the rc.6 release this step read back a list whose
+            # max was rc.5 ~8s after publishing rc.6, computed
+            # newest=rc.5==current, and no-op'd — leaving `latest` frozen at
+            # rc.5 (the bug this fixes). Including the locally known
+            # published version makes the newest-version computation
+            # independent of registry propagation lag, while the semver-max
+            # below still defers to SemVer precedence — so an out-of-band
+            # hotfix to an older channel published later never regresses
+            # `latest`.
+            VERSIONS+=("$PUBLISHED_VERSION")
+            if [[ ${#VERSIONS[@]} -eq 0 ]]; then
+              echo "::error::no published versions found for $PKG"
+              exit 1
+            fi
+            # `semver` sorts ascending and includes pre-releases when passed
+            # explicitly, so the last line is the highest by SemVer
+            # precedence.
+            NEWEST=$(pnpm dlx semver "${VERSIONS[@]}" | tail -n1)
+            CURRENT=$(npm view "$PKG" dist-tags.latest 2>/dev/null || echo "")
+            echo "newest published=$NEWEST  current latest=$CURRENT"
+            if [[ -z "$NEWEST" ]]; then
+              echo "::error::could not determine newest version for $PKG"
+              exit 1
+            fi
+            if [[ "$NEWEST" == "$CURRENT" ]]; then
+              echo "latest already points at $NEWEST — nothing to do"
+            else
+              npm dist-tag add "${PKG}@${NEWEST}" latest
+              echo "moved latest: ${CURRENT:-<unset>} -> $NEWEST"
+            fi
+            echo "::endgroup::"
+          done
 
       # AAASM-2955: cut a git tag + GitHub Release at the published npm
       # version so the README "GitHub release" badge tracks the current
