@@ -35,6 +35,11 @@ jobs:
           # hosted runners.
           - language: javascript-typescript
             build-mode: none
+          # The repo's own GitHub Actions workflows. Never analysed before
+          # AAASM-6120 -- enabling this language on the sibling `horonomy` org
+          # immediately surfaced 11 real medium-severity findings.
+          - language: actions
+            build-mode: none
 
     steps:
       - name: Checkout
