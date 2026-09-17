@@ -40,6 +40,12 @@ jobs:
           # immediately surfaced 11 real medium-severity findings.
           - language: actions
             build-mode: none
+          # 95,910 bytes of first-party Python: the repo's own metadata /
+          # docs-vocabulary drift checkers under `scripts/` (which CI executes)
+          # and the credential-operations + repo-scaffold skill helpers under
+          # `.claude/skills/`. Unanalysed until AAASM-6120.
+          - language: python
+            build-mode: none
 
     steps:
       - name: Checkout
