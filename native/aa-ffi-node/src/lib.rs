@@ -73,6 +73,7 @@ pub async fn connect(
     team_id: None,
     parent_agent_id: None,
     sdk_version,
+    identity_dir: None,
   };
   let resolved = config.resolve_socket_path();
 
@@ -132,6 +133,7 @@ pub async fn register(handle: &ClientHandle, options: RegisterOptions) -> Result
     // The version is signed at IPC-handshake time (`connect`), not on the
     // gateway register, so it is not needed for this config.
     sdk_version: None,
+    identity_dir: None,
   };
 
   handle
