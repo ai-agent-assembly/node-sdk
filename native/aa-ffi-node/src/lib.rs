@@ -24,6 +24,11 @@ use serde_json::Value;
 
 const ERR_CONNECT: &str = "AA_ERR_CONNECT";
 const ERR_REGISTER: &str = "AA_ERR_REGISTER";
+// AAASM-6119: distinct from ERR_REGISTER so a caller can branch on the error
+// code (not just parse the message) between "this agent has no identity to
+// register with" (prompt for key provisioning) and any other registration
+// failure (gateway unreachable / gateway rejected — arguably worth retrying).
+const ERR_IDENTITY_UNAVAILABLE: &str = "AA_ERR_IDENTITY_UNAVAILABLE";
 const ERR_SEND_EVENT: &str = "AA_ERR_SEND_EVENT";
 const ERR_DISCONNECT: &str = "AA_ERR_DISCONNECT";
 const ERR_QUERY_POLICY: &str = "AA_ERR_QUERY_POLICY";
@@ -140,7 +145,20 @@ pub async fn register(handle: &ClientHandle, options: RegisterOptions) -> Result
     .inner
     .register(&config, options.name, options.framework)
     .await
-    .map_err(|err| typed_error(ERR_REGISTER, &err.to_string()))
+    .map_err(|err| typed_error(register_error_code(&err), &err.to_string()))
+}
+
+/// Map a [`SdkClientError`] from [`AssemblyClient::register`] onto its typed
+/// error code. IdentityUnavailable gets its own code (AAASM-6119) — it's a
+/// different failure class (refused before the gateway was ever contacted)
+/// from every other registration outcome, which all still share ERR_REGISTER
+/// unchanged. Factored out from [`register`] so the mapping is unit-testable
+/// without a live `ClientHandle`.
+fn register_error_code(err: &SdkClientError) -> &'static str {
+  match err {
+    SdkClientError::IdentityUnavailable(_) => ERR_IDENTITY_UNAVAILABLE,
+    _ => ERR_REGISTER,
+  }
 }
 
 /// Ship a captured event to the runtime.
@@ -341,6 +359,31 @@ mod tests {
   use tokio::net::UnixListener;
 
   use super::*;
+
+  /// AAASM-6119: IdentityUnavailable must map to its own error code, distinct
+  /// from every other registration outcome (which all keep sharing
+  /// ERR_REGISTER unchanged) — the whole point of this change.
+  #[test]
+  fn register_error_code_distinguishes_identity_unavailable() {
+    assert_eq!(
+      register_error_code(&SdkClientError::IdentityUnavailable("no key".to_string())),
+      ERR_IDENTITY_UNAVAILABLE
+    );
+    for other in [
+      SdkClientError::GatewayUnreachable,
+      SdkClientError::RegisterFailed("invalid did:key".to_string()),
+      SdkClientError::Shutdown,
+      SdkClientError::QueryFailed,
+      SdkClientError::ChannelClosed,
+      SdkClientError::LockPoisoned,
+    ] {
+      assert_eq!(
+        register_error_code(&other),
+        ERR_REGISTER,
+        "{other:?} unexpectedly did not map to ERR_REGISTER"
+      );
+    }
+  }
 
   /// The agent id the mock-server tests handshake as.
   const TEST_AGENT_ID: &str = "agent-1";
