@@ -124,14 +124,19 @@ jobs:
           git diff --exit-code -- website/src/generated/retraction-map.ts
 
       - name: Install website dependencies
-        # `--ignore-workspace` tells pnpm to skip the parent
-        # `pnpm-workspace.yaml` (added under AAASM-1220) when installing
-        # in `website/`. Without this flag, pnpm 10 inherits the parent
-        # workspace context, sees website/ isn't a listed workspace
-        # member, and produces no website/node_modules — so the
-        # follow-up `pnpm build` then fails with `docusaurus: not found`.
-        # See AAASM-1221 / PR #43 CI diagnosis.
-        run: pnpm install --no-frozen-lockfile --ignore-workspace
+        # `--ignore-workspace` used to be required here: without it, pnpm 10
+        # inherited the parent `pnpm-workspace.yaml` (added under AAASM-1220),
+        # saw that website/ is not a listed member, and produced no
+        # website/node_modules — so `pnpm build` failed with
+        # `docusaurus: not found`. See AAASM-1221 / PR #43 CI diagnosis.
+        #
+        # It has been removed because website/pnpm-workspace.yaml now exists, so
+        # pnpm stops walking up and treats website/ as its own workspace root —
+        # which fixes the original problem at the source. Keeping the flag would
+        # be actively harmful now: `--ignore-workspace` makes pnpm skip the local
+        # pnpm-workspace.yaml too, which would silently drop all 31 security
+        # version floors that file holds. See AAASM-6106.
+        run: pnpm install --no-frozen-lockfile
         working-directory: website
 
       - name: Build Docusaurus site
