@@ -9,15 +9,11 @@ dependencies = [
  "aa-ffi-node-core",
  "aa-proto",
  "aa-sdk-client",
- "ed25519-dalek",
- "hex",
  "napi",
  "napi-build",
  "napi-derive",
  "prost",
- "rand",
  "serde_json",
- "sha2",
  "tokio",
 ]
 
@@ -27,7 +23,12 @@ version = "0.0.0"
 dependencies = [
  "aa-proto",
  "aa-sdk-client",
+ "ed25519-dalek",
+ "hex",
+ "prost",
+ "rand",
  "serde_json",
+ "sha2",
  "tokio",
 ]
 

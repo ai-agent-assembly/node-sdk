@@ -72,17 +72,6 @@ tokio = { workspace = true }
 [build-dependencies]
 napi-build = "2"
 
-[dev-dependencies]
-# A Rust integration test drives `query_policy` against a mock `aa-runtime`
-# Unix-domain-socket server that answers `PolicyQuery` over the shared wire
-# codec, so it needs the async net/io stack and prost to encode the response.
-prost = { workspace = true }
-tokio = { version = "1", features = ["rt", "macros", "net", "io-util", "time"] }
-# The mock server now performs the AAASM-3587 session handshake (the client
-# signs `nonce || sdk_version` before any heartbeat), so the test verifies the
-# Ed25519 proof. `rand` is value-returning for the nonce (no `[0u8; N]` literal
-# in the signing data-flow → CodeQL-clean).
-ed25519-dalek = "3"
-sha2 = "0.11"
-hex = "0.4"
-rand = "0.10"
+# Deliberately NO [dev-dependencies]: this package's `lib test` target cannot
+# link (see the header), so any test here would be dead weight. The unit tests
+# and their dev-dependencies live in core/ (AAASM-6182).
