@@ -134,8 +134,8 @@ jobs:
         # pnpm stops walking up and treats website/ as its own workspace root —
         # which fixes the original problem at the source. Keeping the flag would
         # be actively harmful now: `--ignore-workspace` makes pnpm skip the local
-        # pnpm-workspace.yaml too, which would silently drop all 31 security
-        # version floors that file holds. See AAASM-6106.
+        # pnpm-workspace.yaml too, which would silently drop all 32 security
+        # version floors that file holds. See AAASM-6106 / AAASM-6184.
         run: pnpm install --no-frozen-lockfile
         working-directory: website
 
