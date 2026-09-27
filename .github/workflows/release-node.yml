@@ -719,10 +719,20 @@ jobs:
           cache: pnpm
 
       - name: Install website dependencies
-        # `--ignore-workspace` mirrors publish-docs.yml: without it pnpm 10
-        # inherits the parent workspace and produces no website/node_modules,
-        # so the docusaurus CLI is unavailable.
-        run: pnpm install --no-frozen-lockfile --ignore-workspace
+        # AAASM-6184: `--ignore-workspace` was here to make the docusaurus CLI
+        # resolvable — without it, pnpm 10 inherited the parent
+        # `pnpm-workspace.yaml` (AAASM-1220), saw website/ is not a listed
+        # member, and produced no website/node_modules. See AAASM-1221 / PR #43.
+        #
+        # It is removed because website/pnpm-workspace.yaml now exists, so pnpm
+        # stops walking up and treats website/ as its own workspace root — the
+        # original problem is fixed at the source. Keeping the flag was actively
+        # harmful: `--ignore-workspace` makes pnpm skip that local
+        # pnpm-workspace.yaml too, so this job resolved and installed a tree
+        # with ZERO of the 32 security version floors in force (AAASM-6106).
+        # publish-docs.yml dropped the flag for exactly this reason; this job
+        # was missed. scripts/check_no_ignore_workspace.sh now keeps it out.
+        run: pnpm install --no-frozen-lockfile
         working-directory: website
 
       - name: Cut docs snapshot for the release tag

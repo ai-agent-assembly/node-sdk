@@ -68,10 +68,17 @@ pnpm native:build:release     # napi-rs release build (per-platform artifact)
 ## Repo-specific gotchas
 
 - **Standalone Docusaurus `website/`** is a *separate* pnpm project from the SDK. Run
-  `cd website && pnpm install --ignore-workspace` — without `--ignore-workspace` it
-  resolves against the root workspace and its dependency `overrides` silently don't
-  apply (this matters for security pins). Docs content lives in `docs/`; the app
-  (config/theme/sidebars) lives in `website/`, intentionally split.
+  a plain `cd website && pnpm install`. `website/pnpm-workspace.yaml` already makes
+  `website/` its own pnpm workspace root, so pnpm does **not** walk up to the
+  repo-root workspace, and that same file holds the website's 32 security version
+  floors. Docs content lives in `docs/`; the app (config/theme/sidebars) lives in
+  `website/`, intentionally split.
+  > Never pass the workspace-ignoring install flag (`--ignore-workspace`) here. It
+  > makes pnpm skip `website/pnpm-workspace.yaml` too, so every security floor is
+  > silently dropped and the tree re-resolves below the pinned minimums — measured:
+  > `serialize-javascript` 7.0.5 → 6.0.2, `http-proxy-middleware` 3.0.7 → 2.0.10,
+  > `ws` 7.5.13 reintroduced. See AAASM-6106 / AAASM-6184;
+  > `scripts/check_no_ignore_workspace.sh` fails CI if the flag reappears anywhere.
 - **Push remote is `remote`** (→ `ai-agent-assembly/node-sdk`, canonical), **not**
   `origin` (a personal fork). Detect it with `git remote -v`; scope changes against
   `remote/main`, which is often far ahead of a fork checkout. The "repository moved"

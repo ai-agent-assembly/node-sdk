@@ -1,0 +1,62 @@
+name: Workspace Floor Guard
+
+# AAASM-6184: keeps pnpm's `--ignore-workspace` flag out of the repository.
+#
+# The flag makes pnpm skip `website/pnpm-workspace.yaml`, which is the only
+# place the website's 32 security version floors can live (pnpm 11 ignores
+# package.json's `pnpm.overrides` outright — AAASM-5876 / HORO-377). An install
+# carrying the flag resolves a tree with zero floors in force and still exits 0,
+# so nothing about the failure is visible: measured on pnpm 10, adding it drops
+# the lockfile's `overrides:` block from 32 entries to 0 and pulls
+# serialize-javascript back to 6.0.2, http-proxy-middleware to 2.0.10 and ws
+# 7.5.13 alongside 8.21.0.
+#
+# The flag was removed from publish-docs.yml under AAASM-6106 and from
+# release-node.yml's docs-version job under AAASM-6184; nothing stopped it
+# returning, in those workflows or a new one, until this gate.
+#
+# Deliberately NO `paths:` filter. Every other guard workflow in this repo
+# narrows to the files it owns, but a reintroduction can land in any file — a
+# new workflow, a package.json script, a helper script, or a README that tells
+# the next contributor to pass it. Path-filtering this gate would be the one
+# thing that makes it miss the case it exists for. The scan is a fixed-string
+# grep over the tree and needs no toolchain, so running it unconditionally costs
+# a few seconds.
+#
+# Not added to ci-success.yml's workflow_run aggregator, matching the standing
+# precedent of claim-vocabulary-check.yml and contact-metadata-check.yml, which
+# both sit outside it.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  no-ignore-workspace:
+    name: pnpm workspace floors are not bypassed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Runs first, deliberately: it proves the checker below actually turns red
+      # rather than passing everything, so a green tick on the next step means
+      # something. Same ordering as contact-metadata-check.yml (AAASM-5756).
+      - name: Run the negative control (proves the gate can actually fail)
+        run: bash scripts/check_no_ignore_workspace_negative_control.sh
+
+      # Step name deliberately avoids spelling the flag out: the checker treats
+      # any non-comment line carrying the literal as a call site, and it is
+      # right to — loosening it so this label could pass would put a hole in the
+      # gate for the sake of a nicer step title.
+      - name: Assert the banned workspace-ignoring flag has no call site
+        run: bash scripts/check_no_ignore_workspace.sh
