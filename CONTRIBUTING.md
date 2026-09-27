@@ -33,6 +33,25 @@ pnpm native:build:release       # release build, per-platform artifact
 pnpm native:check-types         # validate generated index.d.ts
 ```
 
+The crate is a two-member cargo workspace, and **which member you put code in
+decides whether it can be tested** (AAASM-6182):
+
+```bash
+cd native/aa-ffi-node
+cargo test -p aa-ffi-node-core --locked   # the Rust unit tests; runs in CI
+```
+
+`aa-ffi-node` is the napi shim. It is a `cdylib`, and the `napi_*` C symbols it
+references are supplied by the Node host process when Node loads the `.node`
+addon — so a `cargo test` binary, which has no host, cannot link. `cargo test`
+on that package fails with `Undefined symbols ... _napi_*` on every platform.
+There is intentionally no test and no `[dev-dependencies]` there.
+
+Keep each `#[napi]` function a pure delegation: convert arguments, call
+`aa-ffi-node-core`, convert the result back. Real logic belongs in
+`core/src/lib.rs`, which has no napi dependency and is covered by the tests
+above. Logic added to the shim instead is logic that cannot be tested.
+
 ## Adding a framework adapter
 
 Framework adapters are the integration points between Agent Assembly and a third-party
