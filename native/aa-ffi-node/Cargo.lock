@@ -6,13 +6,23 @@ version = 4
 name = "aa-ffi-node"
 version = "0.0.0"
 dependencies = [
+ "aa-ffi-node-core",
+ "aa-sdk-client",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "aa-ffi-node-core"
+version = "0.0.0"
+dependencies = [
  "aa-proto",
  "aa-sdk-client",
  "ed25519-dalek",
  "hex",
- "napi",
- "napi-build",
- "napi-derive",
  "prost",
  "rand",
  "serde_json",
