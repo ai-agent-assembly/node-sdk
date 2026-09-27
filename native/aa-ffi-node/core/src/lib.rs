@@ -294,6 +294,23 @@ mod tests {
     }
   }
 
+  /// AAASM-6182: the napi shim renders a [`TypedError`] into napi's single
+  /// reason string via `Display`, so the `CODE:message` shape the JS layer
+  /// parses to recover the error code is pinned here. Without this, moving the
+  /// formatting off the FFI boundary would be untested.
+  #[test]
+  fn typed_error_renders_code_colon_message() {
+    assert_eq!(
+      TypedError::new(ERR_IDENTITY_UNAVAILABLE, "no signing key on disk").to_string(),
+      "AA_ERR_IDENTITY_UNAVAILABLE:no signing key on disk"
+    );
+    // An empty message still keeps the separator, so a JS `split(':')` never
+    // silently reads the code as the message.
+    assert_eq!(
+      TypedError::new(ERR_QUERY_POLICY, "").to_string(),
+      "AA_ERR_QUERY_POLICY:"
+    );
+  }
 
   /// The agent id the mock-server tests handshake as.
   const TEST_AGENT_ID: &str = "agent-1";
