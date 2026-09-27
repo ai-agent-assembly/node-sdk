@@ -6,6 +6,7 @@ version = 4
 name = "aa-ffi-node"
 version = "0.0.0"
 dependencies = [
+ "aa-ffi-node-core",
  "aa-proto",
  "aa-sdk-client",
  "ed25519-dalek",
@@ -17,6 +18,16 @@ dependencies = [
  "rand",
  "serde_json",
  "sha2",
+ "tokio",
+]
+
+[[package]]
+name = "aa-ffi-node-core"
+version = "0.0.0"
+dependencies = [
+ "aa-proto",
+ "aa-sdk-client",
+ "serde_json",
  "tokio",
 ]
 
