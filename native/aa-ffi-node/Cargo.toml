@@ -61,11 +61,11 @@ crate-type = ["cdylib"]
 # translation, and the query_policy fail-open contract — lives here, in a crate
 # with no napi dependency so it is unit-testable without a Node host.
 aa-ffi-node-core = { path = "core" }
+# Still direct: `connect` builds the `AssemblyConfig` and owns the
+# `AssemblyClient` the core functions are handed.
 aa-sdk-client = { workspace = true }
-aa-proto = { workspace = true }
 napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "3"
-prost = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 

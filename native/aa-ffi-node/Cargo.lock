@@ -7,12 +7,10 @@ name = "aa-ffi-node"
 version = "0.0.0"
 dependencies = [
  "aa-ffi-node-core",
- "aa-proto",
  "aa-sdk-client",
  "napi",
  "napi-build",
  "napi-derive",
- "prost",
  "serde_json",
  "tokio",
 ]
