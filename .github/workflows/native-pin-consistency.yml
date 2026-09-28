@@ -3,14 +3,21 @@ name: Native pin consistency
 # Guards the ADR 0003 lockstep invariant: every `agent-assembly` git dependency
 # in the native binding must be pinned to ONE git rev, so cargo resolves a single
 # checkout and aa-proto / aa-sdk-client can never skew.
+#
+# AAASM-6182 widened the scope from the single root manifest to EVERY manifest
+# under native/. The binding is now a cargo workspace (aa-ffi-node plus
+# aa-ffi-node-core), and while both members consume the pins with
+# `{ workspace = true }` from the root `[workspace.dependencies]` today, a member
+# manifest is free to declare its own `git = ... rev = ...` — which would skew
+# the invariant somewhere this job never looked.
 on:
   pull_request:
     paths:
-      - "native/aa-ffi-node/Cargo.toml"
+      - "native/**/Cargo.toml"
   push:
     branches: [main]
     paths:
-      - "native/aa-ffi-node/Cargo.toml"
+      - "native/**/Cargo.toml"
 
 permissions:
   contents: read
@@ -23,17 +30,38 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Assert all agent-assembly git deps share one rev
         run: |
-          manifest="native/aa-ffi-node/Cargo.toml"
-          revs=$(grep -E 'git *= *"https://github\.com/ai-agent-assembly/agent-assembly' "$manifest" \
-                 | grep -oE 'rev *= *"[0-9a-f]{7,40}"' | grep -oE '[0-9a-f]{7,40}' | sort -u)
-          n=$(printf '%s\n' "$revs" | grep -c . || true)
-          if [ "$n" -eq 0 ]; then
-            echo "No agent-assembly git-rev dependencies found in $manifest — nothing to check."
+          set -euo pipefail
+          pattern='git *= *"https://github\.com/ai-agent-assembly/agent-assembly'
+          # Every manifest in the native workspace, not just the root one, so a
+          # member crate cannot introduce a second rev unobserved.
+          mapfile -t manifests < <(find native -name Cargo.toml -not -path '*/target/*' | sort)
+          echo "Scanning ${#manifests[@]} manifest(s): ${manifests[*]}"
+
+          urls=$(grep -hE "$pattern" "${manifests[@]}" || true)
+          n_urls=$(printf '%s\n' "$urls" | grep -c . || true)
+          if [ "$n_urls" -eq 0 ]; then
+            echo "No agent-assembly git dependencies found under native/ — nothing to check."
             exit 0
           fi
-          if [ "$n" -ne 1 ]; then
-            echo "::error file=$manifest::agent-assembly git deps pin $n distinct revs (must be exactly 1 — ADR 0003 lockstep invariant). Offending lines:"
-            grep -nE 'git *= *"https://github\.com/ai-agent-assembly/agent-assembly' "$manifest" || true
+
+          # This scan reads a `rev` only from the SAME line as the git URL, which
+          # is the inline-table form every dependency here uses. A dependency
+          # written as a `[dependencies.x]` section, with `git` and `rev` on
+          # separate lines, would otherwise slip past with its rev never compared
+          # — so require the inline form rather than silently not checking it.
+          n_revs=$(printf '%s\n' "$urls" | grep -cE 'rev *= *"[0-9a-f]{7,40}"' || true)
+          if [ "$n_revs" -ne "$n_urls" ]; then
+            echo "::error::$((n_urls - n_revs)) of $n_urls agent-assembly git dependencies do not pin a rev on the same line as the git URL. This guard cannot compare such a rev, so use the inline-table form: dep = { git = \"...\", rev = \"...\" }. Offending lines:"
+            grep -nE "$pattern" "${manifests[@]}" | grep -vE 'rev *= *"[0-9a-f]{7,40}"' || true
             exit 1
           fi
-          echo "OK: all agent-assembly git deps in $manifest pinned to ${revs}"
+
+          revs=$(printf '%s\n' "$urls" | grep -oE 'rev *= *"[0-9a-f]{7,40}"' \
+                 | grep -oE '[0-9a-f]{7,40}' | sort -u)
+          n=$(printf '%s\n' "$revs" | grep -c . || true)
+          if [ "$n" -ne 1 ]; then
+            echo "::error::agent-assembly git deps pin $n distinct revs (must be exactly 1 — ADR 0003 lockstep invariant). Offending lines:"
+            grep -nE "$pattern" "${manifests[@]}" || true
+            exit 1
+          fi
+          echo "OK: all $n_urls agent-assembly git deps under native/ pinned to ${revs}"

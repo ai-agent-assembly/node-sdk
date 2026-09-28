@@ -2,8 +2,20 @@
 
 ## Reporting a vulnerability
 
-Please do **not** file a public issue for a security vulnerability. Report it
-privately via the repository's
+Please do **not** file a public issue for a security vulnerability.
+
+<!-- BEGIN GENERATED: security_contact -->
+Report security vulnerabilities privately to **security@agent-assembly.com**. Do not open a public issue or discussion for a security report.
+
+| Response stage | Target |
+| --- | --- |
+| Acknowledgement | Within 2 business days |
+| Initial assessment | Within 5 business days |
+
+> **Legacy address.** `security@agent-assembly.dev` remains a legacy compatibility alias. During the in-progress migration to the canonical `security@agent-assembly.com` identity, the legacy address continues to receive mail via Cloudflare Email Routing, so a report sent there still reaches us. The canonical mailbox is not yet live-sending.
+<!-- END GENERATED: security_contact -->
+
+You can also report privately via the repository's
 [security advisories](https://github.com/ai-agent-assembly/node-sdk/security/advisories)
 page so a fix can be coordinated before disclosure.
 

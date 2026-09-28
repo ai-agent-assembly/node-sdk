@@ -1,14 +1,27 @@
-[package]
-name = "aa-ffi-node"
-version = "0.0.0"
-edition = "2021"
-description = "Thin napi-rs shim over aa-sdk-client for the Agent Assembly Node SDK"
-license = "Apache-2.0"
+# AAASM-6182: this manifest is both the `aa-ffi-node` package and the workspace
+# root for it plus `core/` (`aa-ffi-node-core`).
+#
+# Why the split: `aa-ffi-node` is a cdylib whose `napi_*` C symbols are supplied
+# by the Node host process at addon load time. A `cargo test` harness is a
+# standalone executable with no Node host, so those symbols are undefined at link
+# time and the `lib test` target cannot link — which made three tests pinning the
+# runtime-Deny mapping and the no-runtime fail-open path unrunnable on any
+# machine. All of that logic now lives in `core/`, a plain rlib with no napi
+# dependency, where `cargo test -p aa-ffi-node-core` links and runs everywhere.
+#
+# The workspace root stays HERE rather than at native/ so Cargo.lock stays at
+# native/aa-ffi-node/Cargo.lock: that is the path Dependabot's cargo ecosystem
+# is pointed at (.github/dependabot.yml) and the path `napi build
+# --manifest-path` uses.
+[workspace]
+members = [".", "core"]
 
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
+# The agent-assembly git pins live here, in ONE place, and both packages consume
+# them with `{ workspace = true }`. That is what keeps the ADR 0003 lockstep
+# invariant enforceable by .github/workflows/native-pin-consistency.yml, which
+# greps this file for distinct revs: adding a second crate could otherwise have
+# introduced a second place for the revs to skew.
+#
 # Shared, FFI-agnostic SDK runtime-client: UDS transport, IPC wire codec,
 # AssemblyClient lifecycle, and advisory (non-authoritative) preflight. Pinned
 # by git SHA, mirroring the python-sdk precedent (which pins aa-core/aa-proto by
@@ -22,32 +35,43 @@ crate-type = ["cdylib"]
 #
 # Pinned at agent-assembly AAASM-3683, which adds the `sdk_version` field to
 # `AssemblyConfig` and threads it through `spawn_ipc_thread` into the signed IPC
-# handshake — the version this shim now forwards from the npm package version so
+# handshake — the version this shim forwards from the npm package version so
 # downgrade detection reflects the installed @agent-assembly/sdk release.
 # Re-pin to the squash-merge commit once PR #1226 lands on master. (Prior pin
 # ebc4d7dc / AAASM-3415 added `team_id` / `parent_agent_id`, still forwarded.)
-aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "670e0a1dd82a5c3cc9628e27702668eb824b4811", package = "aa-sdk-client" }
-aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "670e0a1dd82a5c3cc9628e27702668eb824b4811", package = "aa-proto" }
-napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
-napi-derive = "3"
+[workspace.dependencies]
+aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "0044d515d020863767d8011e18e266ec37344e5c", package = "aa-sdk-client" }
+aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "0044d515d020863767d8011e18e266ec37344e5c", package = "aa-proto" }
 prost = "0.14"
 serde_json = "1"
 tokio = { version = "1", features = ["rt"] }
 
+[package]
+name = "aa-ffi-node"
+version = "0.0.0"
+edition = "2021"
+description = "Thin napi-rs shim over aa-sdk-client for the Agent Assembly Node SDK"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# All non-napi logic — the typed error-code vocabulary, the JS<->proto
+# translation, and the query_policy fail-open contract — lives here, in a crate
+# with no napi dependency so it is unit-testable without a Node host.
+aa-ffi-node-core = { path = "core" }
+# Still direct: `connect` builds the `AssemblyConfig` and owns the
+# `AssemblyClient` the core functions are handed.
+aa-sdk-client = { workspace = true }
+napi = { version = "3", default-features = false, features = ["napi8", "tokio_rt", "serde-json"] }
+napi-derive = "3"
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
 [build-dependencies]
 napi-build = "2"
 
-[dev-dependencies]
-# A Rust integration test drives `query_policy` against a mock `aa-runtime`
-# Unix-domain-socket server that answers `PolicyQuery` over the shared wire
-# codec, so it needs the async net/io stack and prost to encode the response.
-prost = "0.14"
-tokio = { version = "1", features = ["rt", "macros", "net", "io-util", "time"] }
-# The mock server now performs the AAASM-3587 session handshake (the client
-# signs `nonce || sdk_version` before any heartbeat), so the test verifies the
-# Ed25519 proof. `rand` is value-returning for the nonce (no `[0u8; N]` literal
-# in the signing data-flow → CodeQL-clean).
-ed25519-dalek = "3"
-sha2 = "0.11"
-hex = "0.4"
-rand = "0.10"
+# Deliberately NO [dev-dependencies]: this package's `lib test` target cannot
+# link (see the header), so any test here would be dead weight. The unit tests
+# and their dev-dependencies live in core/ (AAASM-6182).

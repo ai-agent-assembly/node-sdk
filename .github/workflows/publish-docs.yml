@@ -17,6 +17,11 @@ on:
       - "src/generated/**"
       - "metadata/**"
       - "scripts/generate-docs-metadata.mjs"
+      # AAASM-5676 / AAASM-5689: the retraction map generator/registry, and its
+      # generated output — same drift-retrigger reasoning as the block above.
+      - "website/retractions.json"
+      - "scripts/generate-retraction-map.mjs"
+      - "website/src/generated/**"
       # AAASM-5529: the claim-binding gate below reads the control files and the
       # deny path. Without these, a PR that only WEAKENS the gate — renaming a
       # control, or changing which error the deny throws — would not re-run it.
@@ -52,7 +57,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 10.33.2
 
@@ -104,15 +109,34 @@ jobs:
       - name: Every documented enforcement claim names the control that proves it
         run: pnpm exec vitest run tests/quickstart-claim-bindings.test.ts
 
+      # AAASM-5676 / AAASM-5689. Regenerates website/src/generated/retraction-map.ts
+      # from website/retractions.json against every frozen version snapshot plus
+      # `current`, and fails if the committed map has drifted — the same shape as
+      # the docs-metadata check above. This is what "a retracted claim on a
+      # default-served page cannot silently recur" means mechanically: a page
+      # newly matching a registered pattern, in any version, changes the
+      # generated output, so a stale committed map (one that doesn't yet know
+      # about it) fails here.
+      - name: Retraction map — selftest, then check it is not stale
+        run: |
+          node scripts/generate-retraction-map.mjs --selftest
+          pnpm run generate:retraction-map
+          git diff --exit-code -- website/src/generated/retraction-map.ts
+
       - name: Install website dependencies
-        # `--ignore-workspace` tells pnpm to skip the parent
-        # `pnpm-workspace.yaml` (added under AAASM-1220) when installing
-        # in `website/`. Without this flag, pnpm 10 inherits the parent
-        # workspace context, sees website/ isn't a listed workspace
-        # member, and produces no website/node_modules — so the
-        # follow-up `pnpm build` then fails with `docusaurus: not found`.
-        # See AAASM-1221 / PR #43 CI diagnosis.
-        run: pnpm install --no-frozen-lockfile --ignore-workspace
+        # `--ignore-workspace` used to be required here: without it, pnpm 10
+        # inherited the parent `pnpm-workspace.yaml` (added under AAASM-1220),
+        # saw that website/ is not a listed member, and produced no
+        # website/node_modules — so `pnpm build` failed with
+        # `docusaurus: not found`. See AAASM-1221 / PR #43 CI diagnosis.
+        #
+        # It has been removed because website/pnpm-workspace.yaml now exists, so
+        # pnpm stops walking up and treats website/ as its own workspace root —
+        # which fixes the original problem at the source. Keeping the flag would
+        # be actively harmful now: `--ignore-workspace` makes pnpm skip the local
+        # pnpm-workspace.yaml too, which would silently drop all 32 security
+        # version floors that file holds. See AAASM-6106 / AAASM-6184.
+        run: pnpm install --no-frozen-lockfile
         working-directory: website
 
       - name: Build Docusaurus site

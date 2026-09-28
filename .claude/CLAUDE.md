@@ -27,8 +27,10 @@ catch anything the SDK misses. The SDK is **not** the authoritative enforcement 
   `withAssembly`), `core/init-assembly.ts` (lifecycle), `adapters/` (framework
   integrations, e.g. `langchain/`), `gateway/`, `hooks/`, `wrappers/`, `errors/`,
   `types/`, and `native/` (binding to the native module).
-- `native/aa-ffi-node/` — the napi-rs Rust crate; generated `index.cjs` / `index.d.ts`
-  are **checked in** (tracked artifacts) and ESLint-ignored.
+- `native/aa-ffi-node/` — a two-member cargo workspace: the napi-rs shim itself, and
+  `core/` (`aa-ffi-node-core`), a napi-free rlib holding all of the binding's actual
+  logic. Generated `index.cjs` / `index.d.ts` are **checked in** (tracked artifacts)
+  and ESLint-ignored.
 - `tests/` — vitest suites. `docs/` — long-form Markdown. `website/` — Docusaurus app
   (kept separate from `docs/`, see gotchas).
 
@@ -68,10 +70,17 @@ pnpm native:build:release     # napi-rs release build (per-platform artifact)
 ## Repo-specific gotchas
 
 - **Standalone Docusaurus `website/`** is a *separate* pnpm project from the SDK. Run
-  `cd website && pnpm install --ignore-workspace` — without `--ignore-workspace` it
-  resolves against the root workspace and its dependency `overrides` silently don't
-  apply (this matters for security pins). Docs content lives in `docs/`; the app
-  (config/theme/sidebars) lives in `website/`, intentionally split.
+  a plain `cd website && pnpm install`. `website/pnpm-workspace.yaml` already makes
+  `website/` its own pnpm workspace root, so pnpm does **not** walk up to the
+  repo-root workspace, and that same file holds the website's 32 security version
+  floors. Docs content lives in `docs/`; the app (config/theme/sidebars) lives in
+  `website/`, intentionally split.
+  > Never pass the workspace-ignoring install flag (`--ignore-workspace`) here. It
+  > makes pnpm skip `website/pnpm-workspace.yaml` too, so every security floor is
+  > silently dropped and the tree re-resolves below the pinned minimums — measured:
+  > `serialize-javascript` 7.0.5 → 6.0.2, `http-proxy-middleware` 3.0.7 → 2.0.10,
+  > `ws` 7.5.13 reintroduced. See AAASM-6106 / AAASM-6184;
+  > `scripts/check_no_ignore_workspace.sh` fails CI if the flag reappears anywhere.
 - **Push remote is `remote`** (→ `ai-agent-assembly/node-sdk`, canonical), **not**
   `origin` (a personal fork). Detect it with `git remote -v`; scope changes against
   `remote/main`, which is often far ahead of a fork checkout. The "repository moved"
@@ -79,9 +88,17 @@ pnpm native:build:release     # napi-rs release build (per-platform artifact)
 - **npm security fixes:** pin with a `^` floor or a precise version — **never a bare
   `>=`**. A bare `>=` lets the resolver pull an unwanted major and breaks the build.
 - **napi-rs shim pins `aa-sdk-client` by git `rev`** in
-  `native/aa-ffi-node/Cargo.toml`. Bumping it means re-pinning the monorepo SHA and
-  rebuilding the native binding; the advisory (non-authoritative) preflight arrives
-  transitively via that crate's default `preflight` feature.
+  `native/aa-ffi-node/Cargo.toml`, under `[workspace.dependencies]` so both members
+  share one rev. Bumping it means re-pinning the monorepo SHA and rebuilding the
+  native binding; the advisory (non-authoritative) preflight arrives transitively via
+  that crate's default `preflight` feature.
+- **`aa-ffi-node` itself cannot be unit-tested; `aa-ffi-node-core` can.** The shim is a
+  `cdylib` whose `napi_*` C symbols come from the Node host process at addon load time,
+  so a `cargo test` binary has no host and fails to link (`Undefined symbols …
+  _napi_*`) on every platform — it has no tests and no `[dev-dependencies]` on purpose.
+  Run `cargo test -p aa-ffi-node-core --locked` from `native/aa-ffi-node/`. Keep each
+  `#[napi]` function a pure delegation into `core/`; logic put in the shim is logic
+  that cannot be tested. (AAASM-6182)
 - **LangChain two-layer enforcement:** `handleToolStart` cannot preempt by return value,
   and `@langchain/core` discards a callback handler's `handleToolEnd` return value too
   (confirmed in `@langchain/core/dist/tools/index.cjs`), so the callback layer is
