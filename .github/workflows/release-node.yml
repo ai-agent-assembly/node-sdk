@@ -99,10 +99,12 @@ jobs:
 
       - name: Setup protoc
         # aa-ffi-node depends transitively (via aa-sdk-client) on aa-proto, whose
-        # build script compiles .proto sources with protoc.
-        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        # build script compiles .proto sources with protoc. AAASM-6215: the
+        # release must not be able to fail on an unretried release-API lookup,
+        # and the compiler that produced a published .node must be a declared
+        # version — this matrix is ubuntu + two macOS legs, so the installer has
+        # to be cross-platform.
+        uses: ./.github/actions/setup-protoc
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
         with:
