@@ -1,0 +1,128 @@
+name: Setup protoc
+description: >-
+  Install an explicitly declared, checksum-pinned protoc release. Makes no
+  version-resolution API call at run time.
+
+# AAASM-6215. This replaces `arduino/setup-protoc`, which was invoked here
+# with no `version:` input. Two defects came out of that:
+#
+#  1. Availability. The action's resolver calls the GitHub Releases API on
+#     EVERY run — `getProtoc()` calls `computeVersion()` unconditionally, so
+#     passing an exact version would not have skipped it. A truncated,
+#     rate-limited or empty response does not surface as an HTTP error; it
+#     surfaces as zero matching versions and the job dies on
+#     `unable to get latest version`, which reads like a configuration
+#     mistake. There is no retry on that path. Observed: a sibling matrix
+#     leg completed the identical step in the same run, and re-running the
+#     failed leg went green with no repo change.
+#
+#  2. Reproducibility. The action's default is the floating range `23.x`,
+#     prefix-matched against the release list, so the effective compiler
+#     was whatever `23.*` release happened to be newest — 23.4, the last of
+#     a closed line — and no file in this repo said so.
+#
+# Both are fixed by fetching one fixed release-asset URL with a retrying
+# curl and verifying the bytes against a recorded SHA-256. Retrying the
+# upstream action's lookup was considered and rejected: a `uses:` step
+# cannot be wrapped in a retry, and the lookup is inherent to the action,
+# so the only way to retry it is to re-run the job. Distro `apt-get install
+# protobuf-compiler` (what `agent-assembly` does in its Rust lanes) was
+# also considered and rejected here: it is Linux-only — two of the five
+# call sites this replaces run on macOS runners — and it would pin the
+# compiler to whatever the runner image ships (3.21.12 today), swapping one
+# undeclared, image-drifting version for another. See AAASM-6215 AC 3/4.
+#
+# The version is deliberately unchanged from what was already in effect
+# (23.4), so this is a declaration of current behaviour, not a toolchain
+# upgrade. Moving to a current major changes three repos at once and is
+# tracked separately.
+
+inputs:
+  version:
+    description: >-
+      Exact protoc release version, e.g. "23.4". Ranges are not accepted —
+      a version with no recorded checksum below fails the step.
+    required: false
+    default: "23.4"
+
+runs:
+  using: composite
+  steps:
+    - name: Download and verify protoc ${{ inputs.version }}
+      shell: bash
+      env:
+        PROTOC_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        case "${RUNNER_OS}/${RUNNER_ARCH}" in
+          Linux/X64)   asset="linux-x86_64" ;;
+          Linux/ARM64) asset="linux-aarch_64" ;;
+          macOS/X64)   asset="osx-x86_64" ;;
+          macOS/ARM64) asset="osx-aarch_64" ;;
+          *)
+            echo "::error::AAASM-6215: no protoc asset recorded for ${RUNNER_OS}/${RUNNER_ARCH}." >&2
+            echo "Add the asset name and its SHA-256 to .github/actions/setup-protoc before using that runner." >&2
+            exit 1
+            ;;
+        esac
+
+        # Recorded from the published v23.4 assets. A retag or a mirror
+        # serving different bytes fails the check below rather than
+        # silently changing the compiler.
+        case "${PROTOC_VERSION}/${asset}" in
+          23.4/linux-x86_64)   want_sha="0502f286ac9ed860b629a7965a14527b1f2dd131e4283fa23c2d7f184672aa9a" ;;
+          23.4/linux-aarch_64) want_sha="1c7750b6e038305b5a7fc3d0cda1ebefdf106a4f30a787bf826ed2fc47c3967d" ;;
+          23.4/osx-x86_64)     want_sha="07e5fdcf1b0708d3367dc5e6eb8d135de7e407d75316c93155cfd8ab362eec80" ;;
+          23.4/osx-aarch_64)   want_sha="8c7afae8626b6811e7b5897d16d940c2dbf50b1e135ed958a01db6566bdda726" ;;
+          *)
+            echo "::error::AAASM-6215: no SHA-256 recorded for protoc ${PROTOC_VERSION} (${asset})." >&2
+            echo "Changing the protoc version is deliberate: record the checksum here first (AAASM-6215 AC 1)." >&2
+            exit 1
+            ;;
+        esac
+
+        zip="${RUNNER_TEMP}/protoc-${PROTOC_VERSION}-${asset}.zip"
+        dest="${RUNNER_TEMP}/protoc-${PROTOC_VERSION}"
+        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${asset}.zip"
+
+        # A fixed asset URL: no release listing, nothing to prefix-match,
+        # nothing that can resolve differently tomorrow. --retry-all-errors
+        # so a reset or a 5xx costs seconds instead of a red required check.
+        curl --fail --location --silent --show-error \
+             --proto '=https' --tlsv1.2 \
+             --connect-timeout 15 \
+             --retry 5 --retry-delay 3 --retry-all-errors \
+             --output "${zip}" "${url}"
+
+        if command -v sha256sum >/dev/null 2>&1; then
+          echo "${want_sha}  ${zip}" | sha256sum --check --strict -
+        else
+          echo "${want_sha}  ${zip}" | shasum -a 256 --check --strict -
+        fi
+
+        rm -rf "${dest}"
+        # bin/ and include/ both matter: include/ carries the well-known
+        # .proto files, the same layout arduino/setup-protoc produced.
+        unzip -q "${zip}" -d "${dest}"
+        chmod +x "${dest}/bin/protoc"
+        echo "${dest}/bin" >> "${GITHUB_PATH}"
+
+    - name: Assert protoc on PATH is exactly ${{ inputs.version }}
+      shell: bash
+      env:
+        PROTOC_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        # Deliberately a separate step: GITHUB_PATH applies from the next
+        # step onward, so this asserts what the build steps will actually
+        # resolve, not what the previous step extracted. Remove the pin and
+        # this fails; leave it and it can only pass for one version.
+        got="$(protoc --version)"
+        want="libprotoc ${PROTOC_VERSION}"
+        if [ "${got}" != "${want}" ]; then
+          echo "::error::AAASM-6215: protoc on PATH is '${got}', expected '${want}'." >&2
+          echo "which protoc: $(command -v protoc)" >&2
+          exit 1
+        fi
+        echo "protoc: ${got} (declared version, checksum-verified)"
