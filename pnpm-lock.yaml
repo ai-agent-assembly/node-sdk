@@ -45,7 +45,7 @@ importers:
         version: 10.0.1(eslint@10.11.0)
       '@napi-rs/cli':
         specifier: 3.10.5
-        version: 3.10.5(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.6.2)(emnapi@1.11.2)
+        version: 3.10.5(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.6.2)(emnapi@1.11.2)
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -72,7 +72,7 @@ importers:
         version: 5.4.2
       langchain:
         specifier: ^1.5.3
-        version: 1.5.12(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
+        version: 1.5.14(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       prettier:
         specifier: ^3.9.5
         version: 3.9.9
@@ -579,8 +579,8 @@ packages:
     peerDependencies:
       '@langchain/core': ^1.2.1
 
-  '@langchain/langgraph-sdk@1.11.2':
-    resolution: {integrity: sha512-b2s4qdFKePgZudPJZfDCtQOmVfHoiKCTgSSdOxXtMYZzg9A+g2kI/ll1ZPMYIydGE3QIgGLIhyFCz5ULedi5Nw==}
+  '@langchain/langgraph-sdk@1.12.0':
+    resolution: {integrity: sha512-F3AOZjKZRUGmE3FzY+RaVZI6WzXOkwnuF7jqgto6rDPSnO9OdVdYGvwGDi3jjRGf5xLoDtX2dpsR9z5KptU+5A==}
     peerDependencies:
       '@langchain/core': ^1.2.1
       react: ^18 || ^19
@@ -591,8 +591,8 @@ packages:
       react-dom:
         optional: true
 
-  '@langchain/langgraph@1.4.17':
-    resolution: {integrity: sha512-gkd34M42D5SdRaaHS6NSD+zTuZBgmEqecld3BenVlql11WshvarKH/2ZQbNmQQ0knbHgtaQEg3VeH0bUFt2B1Q==}
+  '@langchain/langgraph@1.4.18':
+    resolution: {integrity: sha512-yrMMJ9hk2NVMD2xU2WoVrgFawAU6s/RzEl/dX9BhlyxZHazo1wHY35z4K2BIBzTUh4z3giCzrUoqRAqW2CWpWg==}
     engines: {node: '>=18'}
     peerDependencies:
       '@langchain/core': ^1.2.1
@@ -1895,8 +1895,8 @@ packages:
   keyv@5.6.0:
     resolution: {integrity: sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==}
 
-  langchain@1.5.12:
-    resolution: {integrity: sha512-cWNsKiRLyv0NN1e9IR+0CUyS4cBn1LSJ7OhqTa0RQGK735cb4l1+wd4/lQJz4imJ4sojOl+VfHw6kKZwWFNYlQ==}
+  langchain@1.5.14:
+    resolution: {integrity: sha512-/orHDk5xbNSIJc9UhwmxFYHXbr/3RaBeQ3zX0xovEWfPg7Lmj8EJCMOXIUTCe2UtsFgfbyWtlwh51NM562LnZQ==}
     engines: {node: '>=20'}
     peerDependencies:
       '@langchain/core': ^1.2.1
@@ -2948,7 +2948,7 @@ snapshots:
     dependencies:
       '@langchain/core': 1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
 
-  '@langchain/langgraph-sdk@1.11.2(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))':
+  '@langchain/langgraph-sdk@1.12.0(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))':
     dependencies:
       '@langchain/core': 1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       '@langchain/protocol': 0.0.19
@@ -2956,11 +2956,11 @@ snapshots:
       p-queue: 9.3.3
       p-retry: 7.1.1
 
-  '@langchain/langgraph@1.4.17(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(zod@4.6.5)':
+  '@langchain/langgraph@1.4.18(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(zod@4.6.5)':
     dependencies:
       '@langchain/core': 1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       '@langchain/langgraph-checkpoint': 1.1.5(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))
-      '@langchain/langgraph-sdk': 1.11.2(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))
+      '@langchain/langgraph-sdk': 1.12.0(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))
       '@langchain/protocol': 0.0.19
       '@standard-schema/spec': 1.1.0
       zod: 4.6.5
@@ -3008,7 +3008,7 @@ snapshots:
       - supports-color
     optional: true
 
-  '@napi-rs/cli@3.10.5(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.6.2)(emnapi@1.11.2)':
+  '@napi-rs/cli@3.10.5(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.6.2)(emnapi@1.11.2)':
     dependencies:
       '@inquirer/prompts': 8.7.2(@types/node@26.6.2)
       '@napi-rs/cross-toolchain': 1.0.3
@@ -3023,8 +3023,8 @@ snapshots:
       typanion: 3.14.0
       typescript: 6.0.3
     optionalDependencies:
-      '@emnapi/core': 1.11.2
-      '@emnapi/runtime': 1.11.2
+      '@emnapi/core': 1.9.2
+      '@emnapi/runtime': 1.9.2
       emnapi: 1.11.2
     transitivePeerDependencies:
       - '@napi-rs/cross-toolchain-arm64-target-aarch64'
@@ -4229,10 +4229,10 @@ snapshots:
     dependencies:
       '@keyv/serialize': 1.1.1
 
-  langchain@1.5.12(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0):
+  langchain@1.5.14(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0):
     dependencies:
       '@langchain/core': 1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
-      '@langchain/langgraph': 1.4.17(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(zod@4.6.5)
+      '@langchain/langgraph': 1.4.18(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(zod@4.6.5)
       '@langchain/langgraph-checkpoint': 1.1.5(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))
       langsmith: 0.10.5(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       zod: 4.6.5
