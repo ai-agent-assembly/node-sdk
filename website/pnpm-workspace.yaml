@@ -20,19 +20,53 @@
 overrides:
   shell-quote: ^1.9.0
   '@babel/plugin-transform-modules-systemjs': ^7.29.4
-  fast-uri: ^3.1.6
+  # GHSA-hrr3-gc8f-f4qj, vulnerable `>= 3.0.0, < 3.1.8`: the ^3.1.6 floor was
+  # stale by two patches. Arrives via ajv@8.20.0, which declares
+  # `fast-uri: ^3.0.1`, so 3.1.8 is a semver-compatible resolution. Kept inside
+  # 3.x on purpose - fast-uri 4.x is published but ^3.0.1 does not admit it.
+  fast-uri: ^3.1.8
   http-proxy-middleware: ^3.0.6
   serialize-javascript: '>=7.0.3'
   ws: '>=8.21.0'
-  undici: ^7.29.0
-  dompurify: ^3.4.13
+  # Six advisories at one fix level (7.29.1): GHSA-w293-vg96-wgc3 (high),
+  # GHSA-2jfj-6hjv-fm6j, GHSA-pmjh-fq2x-6v4x, GHSA-8436-99hf-9mmv,
+  # GHSA-2gqq-gqf2-x968, GHSA-r53p-7pc4-xj5r. The ^7.29.0 floor was stale by a
+  # single patch, so all six fired against a floor that already existed.
+  # Arrives via cheerio@1.2.0, which declares `undici: ^7.19.0` - a range, so
+  # this is an ordinary floor raise. Kept inside 7.x: undici 8.x is published
+  # but ^7.19.0 does not admit it.
+  undici: ^7.29.1
+  # GHSA-p98j-92pf-mc4p, vulnerable `>= 3.4.13, <= 3.4.15`, fixed in 3.4.16.
+  # Arrives via mermaid@11.16.1, which declares `dompurify: ^3.3.3` - a range.
+  # Unlike the sibling entry in ai-agent-assembly/cloud, this is NOT an override
+  # of an upstream exact pin: there is no monaco-editor here, and the declared
+  # range admits the patched version, so it is a plain floor raise.
+  dompurify: ^3.4.16
   joi: ^17.13.6
   js-yaml@^4.0.0: ^4.3.2
   js-yaml@3: ^3.15.0
-  brace-expansion@1: ^1.1.18
-  brace-expansion@5: ^5.0.9
+  # Four advisories across the two lines. The 1.x line takes three at three
+  # separate fix levels - GHSA-6j4f-fj2g-mc7p (high, < 1.1.19),
+  # GHSA-qhr7-859c-m2p7 (high, < 1.1.20) and GHSA-q2hr-2g5m-vwhr (< 1.1.21) -
+  # so ^1.1.21 is the single floor that clears all three. The 5.x line takes
+  # GHSA-q2hr-2g5m-vwhr (`>= 4.0.0, < 5.0.12`). Both previous floors were stale.
+  # These arrive via minimatch 3.1.5 (`brace-expansion: ^1.1.7`) and minimatch
+  # 10.2.5 (`^5.0.5`); both ranges admit the patched versions, so both are
+  # ordinary floor raises rather than overrides of an upstream pin.
+  brace-expansion@1: ^1.1.21
+  brace-expansion@5: ^5.0.12
   launch-editor: ^2.14.1
-  markdown-it: ^14.2.0
+  # GHSA-253c-mchw-3w2r, vulnerable `< 14.3.1`.
+  #
+  # This floor was not merely stale, it was inverted: the only dependent is
+  # typedoc@0.28.20, which declares `markdown-it: ^14.3.0`, so a ^14.2.0
+  # override held the package BELOW its dependent's declared minimum. An
+  # override can silently downgrade as well as upgrade, and nothing in the
+  # install warns about it - typedoc asked for >= 14.3.0 and got 14.2.0.
+  # ^14.3.1 both clears the advisory and puts the resolution back inside the
+  # declared range. Kept inside 14.x: markdown-it 15.x is published but
+  # ^14.3.0 does not admit it.
+  markdown-it: ^14.3.1
   linkify-it: ^5.0.2
   svgo: ^3.3.5
   mermaid: ^11.16.1
