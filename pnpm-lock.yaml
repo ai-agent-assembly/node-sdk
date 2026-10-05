@@ -45,7 +45,7 @@ importers:
         version: 10.0.1(eslint@10.11.0)
       '@napi-rs/cli':
         specifier: 3.10.6
-        version: 3.10.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.6.3)(emnapi@1.11.2)
+        version: 3.10.6(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.6.3)(emnapi@1.11.2)
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -72,7 +72,7 @@ importers:
         version: 5.4.2
       langchain:
         specifier: ^1.5.3
-        version: 1.5.14(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
+        version: 1.5.15(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       prettier:
         specifier: ^3.9.5
         version: 3.9.9
@@ -1895,14 +1895,14 @@ packages:
   keyv@5.6.0:
     resolution: {integrity: sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==}
 
-  langchain@1.5.14:
-    resolution: {integrity: sha512-/orHDk5xbNSIJc9UhwmxFYHXbr/3RaBeQ3zX0xovEWfPg7Lmj8EJCMOXIUTCe2UtsFgfbyWtlwh51NM562LnZQ==}
+  langchain@1.5.15:
+    resolution: {integrity: sha512-AlXdwsNf9e3e9QbGkW+qgII3QNdr/tntQPijobQAt5rNG/4O6ggOpVkH79+CegFDPFpR0/8LYAJbP54jCHaqmA==}
     engines: {node: '>=20'}
     peerDependencies:
       '@langchain/core': ^1.2.1
 
-  langsmith@0.10.5:
-    resolution: {integrity: sha512-VUh6LQYGb+wjmMz5Ulazqx1rUHLbWi2XZvVkSHfxDjz6V7u9TJOB6jW5CC84xcpffu7Jr1MZpBbEz3gg972HbA==}
+  langsmith@0.10.7:
+    resolution: {integrity: sha512-fJNo7sUXJESn6t02gxm+9yAWOaJqSRsqzl/t8FA3dngrTYvJ4Z14w4r6HtrATVw/Kv/l88/DvcYDIRGBupfg0w==}
     peerDependencies:
       '@opentelemetry/api': '*'
       '@opentelemetry/exporter-trace-otlp-proto': '*'
@@ -2937,7 +2937,7 @@ snapshots:
       '@cfworker/json-schema': 4.1.1
       '@standard-schema/spec': 1.1.0
       js-tiktoken: 1.0.21
-      langsmith: 0.10.5(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
+      langsmith: 0.10.7(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       mustache: 4.2.0
       p-queue: 6.6.2
       zod: 4.6.5
@@ -3012,7 +3012,7 @@ snapshots:
       - supports-color
     optional: true
 
-  '@napi-rs/cli@3.10.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.6.3)(emnapi@1.11.2)':
+  '@napi-rs/cli@3.10.6(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.6.3)(emnapi@1.11.2)':
     dependencies:
       '@inquirer/prompts': 8.7.2(@types/node@26.6.3)
       '@napi-rs/cross-toolchain': 1.0.3
@@ -3027,8 +3027,8 @@ snapshots:
       typanion: 3.14.0
       typescript: 6.0.3
     optionalDependencies:
-      '@emnapi/core': 1.11.2
-      '@emnapi/runtime': 1.11.2
+      '@emnapi/core': 1.9.2
+      '@emnapi/runtime': 1.9.2
       emnapi: 1.11.2
     transitivePeerDependencies:
       - '@napi-rs/cross-toolchain-arm64-target-aarch64'
@@ -4233,12 +4233,12 @@ snapshots:
     dependencies:
       '@keyv/serialize': 1.1.1
 
-  langchain@1.5.14(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0):
+  langchain@1.5.15(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0):
     dependencies:
       '@langchain/core': 1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       '@langchain/langgraph': 1.4.18(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))(zod@4.6.5)
       '@langchain/langgraph-checkpoint': 1.1.5(@langchain/core@1.2.2(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0))
-      langsmith: 0.10.5(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
+      langsmith: 0.10.7(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0)
       zod: 4.6.5
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -4249,7 +4249,7 @@ snapshots:
       - react-dom
       - ws
 
-  langsmith@0.10.5(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0):
+  langsmith@0.10.7(@opentelemetry/api@1.9.1)(openai@6.35.0(ws@8.21.0)(zod@4.6.5))(ws@8.21.0):
     dependencies:
       p-queue: 6.6.2
     optionalDependencies:
