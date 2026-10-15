@@ -131,9 +131,7 @@ describe("createNativeClient", () => {
 
     expect(client.mode).toBe("grpc-sidecar");
     expect(client.canRegister).toBe(false);
-    await expect(client.register({ agentId: "a", name: "a", framework: "none" })).resolves.toBe(
-      ""
-    );
+    await expect(client.register({ agentId: "a", name: "a", framework: "none" })).resolves.toBe("");
     await expect(client.queryPolicy({ action: "check" })).resolves.toEqual({
       denied: false,
       pending: false
@@ -319,11 +317,11 @@ describe("createNativeClient", () => {
       await client.close();
     });
 
-    it("napi-inprocess + failClosed: a REDACT verdict is authoritative and proceeds", async () => {
-      // `redact` is a real runtime verdict (the tool runs, with output
-      // redaction applied downstream), NOT a "no verdict" sentinel — so it must
-      // proceed even under enforce. Only the fail-open sentinel / unknown
-      // decision deny under failClosed.
+    it("napi-inprocess + failClosed: a REDACT verdict denies (SDK cannot apply redaction)", async () => {
+      // AAASM-6352: previously pinned as redact -> allow, which let the tool run
+      // with the ORIGINAL (secret-bearing) args. No redacted payload crosses the
+      // native ABI (AAASM-1920), so under enforce the verdict cannot be honoured
+      // and must deny.
       const mod = await loadNativeClientWithBinding(() => ({
         connect: vi.fn(async () => ({ id: "handle-redact" })),
         sendEvent: vi.fn(() => undefined),
@@ -336,6 +334,28 @@ describe("createNativeClient", () => {
         apiKey: "test-key",
         mode: "napi-inprocess",
         failClosed: true
+      });
+
+      await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
+        denied: true,
+        pending: false,
+        reason: mod.REDACT_UNHONOURABLE_REASON
+      });
+      await client.close();
+    });
+
+    it("napi-inprocess without failClosed: a REDACT verdict proceeds (observe/disabled stay advisory)", async () => {
+      const mod = await loadNativeClientWithBinding(() => ({
+        connect: vi.fn(async () => ({ id: "handle-redact-observe" })),
+        sendEvent: vi.fn(() => undefined),
+        queryPolicy: vi.fn(() => ({ decision: "redact", reason: "secrets stripped" })),
+        disconnect: vi.fn(async () => undefined)
+      }));
+
+      const client = mod.createNativeClient({
+        gateway: "/tmp/aa.sock",
+        apiKey: "test-key",
+        mode: "napi-inprocess"
       });
 
       await expect(client.queryPolicy({ action_type: "tool_call" })).resolves.toEqual({
