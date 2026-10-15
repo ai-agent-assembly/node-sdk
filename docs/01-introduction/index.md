@@ -70,7 +70,7 @@ human, the call waits for an approval decision.
     own `gatewayClient`, routes checks to the runtime; `auto` / `sdk-only` /
     `grpc-sidecar` route through the allow-all no-op client, where a DENY does not block.
   - **Redaction** — applied by the runtime/proxy, not here. Under `enforce` this layer
-    treats a `redact` verdict as allow (see [Configuration](../05-configuration/index.md)).
+    denies on a `redact` verdict because it cannot apply the redaction itself (see [Configuration](../05-configuration/index.md)).
   - **An audit trail** — not on the default path: the no-op client `auto` resolves
     holds no event channel and drops hook-layer audit events. `napi-inprocess` hands
     them to the runtime instead, which is a handoff and not a retention guarantee
