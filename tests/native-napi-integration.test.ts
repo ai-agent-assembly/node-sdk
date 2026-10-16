@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import blockedAt from "blocked-at";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { NativeConnectError, createNativeClient } from "../src/native/client.js";
+import {
+  NativeConnectError,
+  REDACT_UNHONOURABLE_REASON,
+  createNativeClient
+} from "../src/native/client.js";
 
 const NATIVE_ADDON_DIR = resolve(process.cwd(), "native/aa-ffi-node");
 const RUN_NATIVE_TESTS =
@@ -60,6 +64,10 @@ const POLICY_RESPONSE_ALLOW_FRAME = Buffer.from([
   0x01
 ]);
 
+// A `CheckActionResponse { decision: REDACT }` — proto field 1 (varint) = 4
+// (common.proto `Decision.REDACT`). Same framing as the allow frame above.
+const POLICY_RESPONSE_REDACT_FRAME = Buffer.from([TAG_POLICY_RESPONSE, 0x02, 0x08, 0x04]);
+
 /**
  * Read a prost varint starting at `start`. Returns the decoded value and the
  * number of bytes consumed, or null if the buffer does not yet hold a complete
@@ -99,7 +107,10 @@ interface MockRuntime {
  * it receives. It performs no scanning, redaction, or proof verification; that
  * is the authoritative runtime's job, not the SDK's.
  */
-function startMockRuntime(socketPath: string): Promise<MockRuntime> {
+function startMockRuntime(
+  socketPath: string,
+  policyResponseFrame: Buffer = POLICY_RESPONSE_ALLOW_FRAME
+): Promise<MockRuntime> {
   let events = 0;
   const server = net.createServer((sock) => {
     let buf = Buffer.alloc(0);
@@ -138,7 +149,7 @@ function startMockRuntime(socketPath: string): Promise<MockRuntime> {
             sock.write(ACK_FRAME);
           } else {
             // A policy-query is answered with a PolicyResponse, not an Ack.
-            sock.write(POLICY_RESPONSE_ALLOW_FRAME);
+            sock.write(policyResponseFrame);
           }
           continue;
         }
@@ -229,6 +240,64 @@ describeNative("native napi integration", () => {
       .poll(() => runtime!.eventCount(), { timeout: 5_000 })
       .toBe(totalEvents);
 
+    await client.close();
+  });
+  // AAASM-6352: the unit tests inject a fake binding that returns
+  // `decision: "redact"`. These drive the REAL napi addon, so they prove the
+  // codec actually surfaces a runtime REDACT verdict as "redact" and that the
+  // SDK then refuses to run the tool under enforce. The ALLOW case is the paired
+  // control: same socket, same call, only the runtime's verdict differs.
+  it("real addon: a runtime REDACT verdict denies the tool under failClosed", async () => {
+    const socketPath = join(socketDir, "aa-runtime-redact.sock");
+    runtime = await startMockRuntime(socketPath, POLICY_RESPONSE_REDACT_FRAME);
+
+    const client = createNativeClient({
+      gateway: socketPath,
+      apiKey: "test-key",
+      mode: "napi-inprocess",
+      failClosed: true
+    });
+
+    await expect(client.queryPolicy({ action_type: "tool_call", tool: "search" })).resolves.toEqual({
+      denied: true,
+      pending: false,
+      reason: REDACT_UNHONOURABLE_REASON
+    });
+    await client.close();
+  });
+
+  it("real addon: the same query is allowed when the runtime answers ALLOW (control)", async () => {
+    const socketPath = join(socketDir, "aa-runtime-allow.sock");
+    runtime = await startMockRuntime(socketPath);
+
+    const client = createNativeClient({
+      gateway: socketPath,
+      apiKey: "test-key",
+      mode: "napi-inprocess",
+      failClosed: true
+    });
+
+    await expect(client.queryPolicy({ action_type: "tool_call", tool: "search" })).resolves.toEqual({
+      denied: false,
+      pending: false
+    });
+    await client.close();
+  });
+
+  it("real addon: a runtime REDACT verdict stays advisory without failClosed", async () => {
+    const socketPath = join(socketDir, "aa-runtime-redact-observe.sock");
+    runtime = await startMockRuntime(socketPath, POLICY_RESPONSE_REDACT_FRAME);
+
+    const client = createNativeClient({
+      gateway: socketPath,
+      apiKey: "test-key",
+      mode: "napi-inprocess"
+    });
+
+    await expect(client.queryPolicy({ action_type: "tool_call", tool: "search" })).resolves.toEqual({
+      denied: false,
+      pending: false
+    });
     await client.close();
   });
 });
