@@ -152,7 +152,10 @@ export function resolveVerdict(
  * native `queryPolicy` primitive and maps it onto a `GatewayDecision`:
  *   - `deny`    → `{ denied: true }`  (the wrapper throws `PolicyViolationError`)
  *   - `pending` → `{ pending: true }` (routes to the approval path)
- *   - allow / redact / unspecified → `{ denied: false }`
+ *   - allow → `{ denied: false }`
+ *   - redact → `{ denied: true }` under enforce (the SDK cannot apply the
+ *     redaction client-side, AAASM-6352); `{ denied: false }` otherwise
+ *   - unspecified → `{ denied: true }` under enforce, else `{ denied: false }`
  *
  * **Enforcement posture (AAASM-3996 — py/go parity, AAASM-3920):** under
  * `enforce` the SDK is a fail-closed control: a caught local fault or an

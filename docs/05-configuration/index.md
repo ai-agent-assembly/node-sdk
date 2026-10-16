@@ -56,7 +56,7 @@ Both `gatewayUrl` and `apiKey` are resolved with the same four-step precedence
 | Priority | Source                            | URL key                                                  | API-key key                                      |
 | -------- | --------------------------------- | -------------------------------------------------------- | ------------------------------------------------ |
 | 1        | Explicit field on `config`        | `gatewayUrl`                                             | `apiKey`                                         |
-| 2        | Environment variable              | `AA_GATEWAY_URL`                                      | `AA_API_KEY`                                  |
+| 2        | Environment variable              | `AA_GATEWAY_URL`                                         | `AA_API_KEY`                                     |
 | 3        | Config file `~/.aasm/config.yaml` | `agent.gateway_url`                                      | `agent.api_key`                                  |
 | 4        | Local default                     | `http://localhost:7391` (probed; auto-started if absent) | `""` (local mode accepts unauthenticated agents) |
 
@@ -125,15 +125,16 @@ preserving the pre-feature wire shape.
 
 | Value        | Behavior                                                                                                                  |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `"enforce"`  | Default. Deny blocks the action; redact strips secrets.                                                                   |
+| `"enforce"`  | Default. Deny blocks the action; redact also blocks (see below).                                                          |
 | `"observe"`  | Dry-run. Every action proceeds; would-be violations are recorded as shadow audit events (`aa audit list --dry-run-only`). |
 | `"disabled"` | Policy evaluation skipped entirely. Hermetic tests only.                                                                  |
 
-> **Redaction is applied by the runtime/proxy, not the in-process SDK.** Under `"enforce"`
-> a `redact` verdict is treated as allow by this SDK layer — the event is emitted, but no
-> client-side redaction happens here. Secret-stripping is performed by the authoritative
-> `aa-runtime` / `aa-proxy` layers, which see the full tool I/O this advisory SDK seam does
-> not. (Parallels the Go SDK, AAASM-4788.)
+> **This SDK cannot apply redaction.** Under `"enforce"` a `redact` verdict is treated as a
+> deny: no redacted payload crosses the native ABI (AAASM-1920), so running the tool would
+> hand it the original, secret-bearing arguments. The denial reason is "gateway required
+> redaction the SDK cannot apply client-side" (AAASM-6352). Under `"observe"` / `"disabled"`
+> the tool still runs unmodified. Secret-stripping itself is performed by the authoritative
+> `aa-runtime` / `aa-proxy` layers. The Go SDK likewise errors on Redact.
 
 Unknown values throw a `RangeError` so a typo can never silently downgrade an agent into
 live enforcement when the operator meant `observe`.

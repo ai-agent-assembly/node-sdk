@@ -143,10 +143,18 @@ export interface NativeClient {
 export const FAIL_OPEN_REASON = "aa-runtime unreachable or slow; failing open (advisory SDK)";
 
 /**
+ * Deny reason used under enforce when the gateway answers `redact`: the SDK has
+ * no way to apply a redaction to the tool args (AAASM-1920), so it must not run
+ * the tool with the unredacted payload.
+ */
+export const REDACT_UNHONOURABLE_REASON =
+  "gateway required redaction the SDK cannot apply client-side; tracked in AAASM-1920/AAASM-6352";
+
+/**
  * Translate the native `{decision, reason}` verdict into the SDK's
- * `PolicyResult`. Only `"deny"` blocks; `"pending"` routes to the approval
- * path; `"allow"` / `"redact"` proceed. This mirrors the shared enforcement
- * contract across the Python / Go / Node SDKs.
+ * `PolicyResult`. `"deny"` blocks; `"pending"` routes to the approval path;
+ * `"allow"` proceeds; `"redact"` denies under `failClosed` (enforce) because the
+ * SDK cannot apply redaction client-side (AAASM-6352) and proceeds otherwise.
  *
  * **Fail-closed (AAASM-4013):** the native shim folds an unreachable / slow /
  * closed runtime onto `"allow"` + {@link FAIL_OPEN_REASON}, and an
@@ -173,14 +181,15 @@ function mapDecisionToPolicyResult(
       }
       return { denied: false, pending: false };
     case "redact":
-      // Deliberately folded onto allow, NOT silently dropped. The in-process
-      // SDK does not honor `redact` client-side: redaction is a response-body
-      // transform owned by the authoritative runtime / proxy layer (aa-runtime,
-      // aa-proxy), which sees the full tool I/O this advisory SDK seam does not.
-      // No client-side wrapper acts on a redact verdict, so surfacing it as a
-      // distinct SDK state would be a no-op that misleads callers into thinking
-      // in-process redaction happened. This mirrors the Go SDK's redact handling
-      // (AAASM-4788) and keeps the SDK layer's non-authoritative posture honest.
+      // The gateway required the payload to be redacted before the tool runs,
+      // but no redacted payload crosses the native ABI (AAASM-1920), so this SDK
+      // cannot apply the redaction client-side. Running the tool with the
+      // ORIGINAL args would leak exactly what the verdict asked to strip, so
+      // under enforce this denies (AAASM-6352), as the Go SDK does by erroring
+      // on Redact. Observe / disabled stay advisory and proceed.
+      if (failClosed) {
+        return { denied: true, pending: false, reason: REDACT_UNHONOURABLE_REASON };
+      }
       return { denied: false, pending: false };
     default:
       // Empty / unrecognized decision: the runtime produced no authoritative
