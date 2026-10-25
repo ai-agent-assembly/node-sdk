@@ -28,7 +28,8 @@ overrides:
   esbuild: '>=0.28.1'
   protobufjs: ^7.6.1
   ws: '>=8.21.0'
-  vite: ^6.4.3
+  # GHSA-587h-7wmj-h5pm (high): vite <=6.4.3, reached via vitest>@vitest/mocker.
+  vite: ^6.4.4
   hono: ^4.13.5
   '@hono/node-server': ^2.0.11
   # Four advisories at two fix levels: GHSA-2vr4-cq9g-pvrc and
@@ -51,7 +52,15 @@ overrides:
   tar: ^7.5.21
   uuid: '>=11.1.1'
   '@langchain/core': ^1.2.1
-  body-parser@2: ^2.3.0
+  # GHSA-27r3-jxmh-p828 (high, DoS via trailing bytes after compressed body):
+  # vulnerable >=2.0.0 <2.4.0, reached via @openai/agents-core>@modelcontextprotocol/sdk>express.
+  body-parser@2: ^2.4.0
+  # GHSA-mrhx-c7xc-m3w5 (high, memory exhaustion): zod <4.6.6, reached via
+  # @langchain/core>langsmith>openai. Scoped to 4.x so 3.x consumers are untouched.
+  zod@4: ^4.6.6
+  # GHSA-xjj6-f33q-929c (high, DoS): undici >=7.18.0 <7.30.1, reached via
+  # ai>@ai-sdk/gateway>@ai-sdk/provider-utils. Scoped to 7.x.
+  undici@7: ^7.30.1
   postcss: ^8.5.18
   brace-expansion: ^5.0.9
   # GHSA-jqcg-44mw-7w3h (critical, IP spoofing via IPv4-mapped IPv6 trust
