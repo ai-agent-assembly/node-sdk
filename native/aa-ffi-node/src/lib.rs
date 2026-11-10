@@ -72,6 +72,10 @@ pub async fn connect(
     parent_agent_id: None,
     sdk_version,
     identity_dir: None,
+    // This SDK does not expose an org claim yet; the shim registers org-less. (A
+    // registration key in the process environment is still resolved by the core.)
+    org_id: None,
+    registration_key: None,
   };
   let resolved = config.resolve_socket_path();
 
@@ -133,6 +137,10 @@ pub async fn register(handle: &ClientHandle, options: RegisterOptions) -> Result
     // gateway register, so it is not needed for this config.
     sdk_version: None,
     identity_dir: None,
+    // This SDK does not expose an org claim yet; the shim registers org-less. (A
+    // registration key in the process environment is still resolved by the core.)
+    org_id: None,
+    registration_key: None,
   };
 
   handle

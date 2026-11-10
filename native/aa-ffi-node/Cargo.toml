@@ -40,8 +40,10 @@ members = [".", "core"]
 # Re-pin to the squash-merge commit once PR #1226 lands on master. (Prior pin
 # ebc4d7dc / AAASM-3415 added `team_id` / `parent_agent_id`, still forwarded.)
 [workspace.dependencies]
-aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "0044d515d020863767d8011e18e266ec37344e5c", package = "aa-sdk-client" }
-aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "0044d515d020863767d8011e18e266ec37344e5c", package = "aa-proto" }
+# AAASM-6444: pinned to core main d4093e89b, whose AssemblyConfig carries the org
+# claim (`org_id`) and operator `registration_key`; this shim sets neither.
+aa-sdk-client = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "d4093e89b07d8ba1c38e6caa92637d2e8edb65d7", package = "aa-sdk-client" }
+aa-proto = { git = "https://github.com/ai-agent-assembly/agent-assembly.git", rev = "d4093e89b07d8ba1c38e6caa92637d2e8edb65d7", package = "aa-proto" }
 prost = "0.14"
 serde_json = "1"
 tokio = { version = "1", features = ["rt"] }
